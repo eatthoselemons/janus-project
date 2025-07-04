@@ -86,8 +86,30 @@ const run = Command.make(
     ({ args }) => Effect.sync(() => console.log(`Running test with config: ${args}`))
 );
 
+// --- Database Commands ---
+
+const dbInit = Command.make("init", {}, () =>
+  Effect.sync(() => console.log("Initializing database..."))
+);
+
+const dbMigrate = Command.make("migrate", {}, () =>
+  Effect.sync(() => console.log("Running database migrations..."))
+);
+
+const dbRollback = Command.make("rollback", {}, () =>
+  Effect.sync(() => console.log("Rolling back database migrations..."))
+);
+
+const dbStatus = Command.make("status", {}, () =>
+  Effect.sync(() => console.log("Checking database status..."))
+);
+
+const db = Command.make("db").pipe(
+  Command.withSubcommands([dbInit, dbMigrate, dbRollback, dbStatus])
+);
+
 // --- Janus Command ---
 
 export const janus = Command.make("janus").pipe(
-  Command.withSubcommands([snippet, composition, parameter, run])
+  Command.withSubcommands([snippet, composition, parameter, run, db])
 );
