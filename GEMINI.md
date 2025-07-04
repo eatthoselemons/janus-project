@@ -17,7 +17,7 @@ The Janus Project is an open-source framework for the rigorous, empathetic, and 
 Before submitting any changes, it is crucial to validate them by running the full preflight check. This command will build the repository, run all tests, check for type errors, and lint the code.
 
 ```bash
-npm run preflight
+pnpm run preflight
 ```
 
 ### Writing Tests

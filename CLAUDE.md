@@ -44,15 +44,17 @@ The project adheres strictly to the principles of **Functional Programming** and
     2.  **Calculations:** Pure functions that take data as input and produce new data as output.
     3.  **Actions:** Managed effects using the `Effect-TS` system.
 -   **Type-Driven Design (inspired by Edwin Brady's "Type-Driven Development with Idris"):** The type system is used to enforce constraints and make illegal states unrepresentable.
+    1. **Other References:** "Domain Modeling Made Functional" by Scott Wlaschin and "Programming with Types" by Vlad Riscutia
 
 ### TypeScript & JavaScript Best Practices
 
--   **Prefer Plain Objects over Classes:** Do not use `class` syntax for data structures. Use plain objects and `type`/`interface` declarations to promote immutability, simplify data flow, and reduce boilerplate.
+-   **Prefer Plain Objects over Classes:** Do not use `class` syntax for data structures. Use plain objects and `type` declarations to promote immutability, simplify data flow, and reduce boilerplate.
 -   **Use ES Modules for Encapsulation:** Use `export` to define the public API of a module. Anything not exported is considered private. This provides clear boundaries and enhances testability.
 -   **Avoid `any`; Prefer `unknown`:** The `any` type is disallowed. For values of an unknown type, use `unknown` and perform safe type-narrowing before operating on the value.
 -   **Use Type Assertions (`as Type`) Sparingly:** Type assertions should be avoided. Their use may indicate a flaw in the type model or an opportunity to refactor.
 -   **Embrace Array Operators:** Use immutable array operators (`.map()`, `.filter()`, `.reduce()`, etc.) over imperative `for` loops for data transformation.
 -   **Comments Policy:** Write high-value comments only when necessary to explain complex logic. Avoid comments that state the obvious.
+-   **Composition over Inheritance:** Composition over Inheritance: Using functional composition with pure functions
 
 ### Formatting & Linting
 
