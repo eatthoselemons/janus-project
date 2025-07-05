@@ -1,7 +1,14 @@
 /**
  * This file contains the core domain models for the Janus Project.
  * These types are based on the specifications in `docs/domain-model.md`.
+ * 
+ * Following functional programming principles:
+ * - Data: Plain, immutable types
+ * - Calculations: Pure functions for construction and validation
+ * - Actions: Effect-TS integration for operations that can fail
  */
+
+import { Effect } from "effect"
 
 // --- Branded ID Types ---
 // These are opaque types that prevent accidentally mixing up different kinds of IDs.
@@ -21,6 +28,48 @@ export type TagId = string & { readonly __brand: "TagId" };
  * It can only be created via a smart constructor that performs validation.
  */
 export type Slug = string & { readonly __brand: "Slug" };
+
+// --- Slug Validation (Smart Constructor) ---
+
+export class InvalidSlugError extends Error {
+  readonly _tag = "InvalidSlugError"
+  constructor(message: string) {
+    super(message)
+  }
+}
+
+export const createSlug = (rawName: string): Effect.Effect<Slug, InvalidSlugError> =>
+  Effect.gen(function* () {
+    const trimmed = rawName.trim()
+    
+    if (trimmed.length === 0) {
+      return yield* Effect.fail(new InvalidSlugError("Slug cannot be empty"))
+    }
+    
+    if (trimmed.length > 100) {
+      return yield* Effect.fail(new InvalidSlugError("Slug cannot be longer than 100 characters"))
+    }
+    
+    // Check if it matches lowercase-with-hyphens pattern
+    const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+    if (!slugPattern.test(trimmed)) {
+      return yield* Effect.fail(new InvalidSlugError("Slug must contain only lowercase letters, numbers, and hyphens"))
+    }
+    
+    return trimmed as Slug
+  })
+
+// --- ID Generators (Pure Functions) ---
+
+export const generateSnippetId = (): SnippetId => crypto.randomUUID() as SnippetId
+export const generateSnippetVersionId = (): SnippetVersionId => crypto.randomUUID() as SnippetVersionId
+export const generateCompositionId = (): CompositionId => crypto.randomUUID() as CompositionId
+export const generateCompositionVersionId = (): CompositionVersionId => crypto.randomUUID() as CompositionVersionId
+export const generateParameterId = (): ParameterId => crypto.randomUUID() as ParameterId
+export const generateParameterOptionId = (): ParameterOptionId => crypto.randomUUID() as ParameterOptionId
+export const generateTestRunId = (): TestRunId => crypto.randomUUID() as TestRunId
+export const generateDataPointId = (): DataPointId => crypto.randomUUID() as DataPointId
+export const generateTagId = (): TagId => crypto.randomUUID() as TagId
 
 
 // --- Entity Definitions ---
@@ -73,12 +122,17 @@ export type Composition = {
 };
 
 /**
+ * The roles that snippets can play in a composition.
+ */
+export type CompositionRole = "system" | "user_prompt" | "model_response";
+
+/**
  * An immutable snapshot of a composition, locking in specific `SnippetVersion`s
  * in a defined order and role.
  */
 export type CompositionSnippet = {
   readonly snippetVersionId: SnippetVersionId;
-  readonly role: "system" | "user_prompt" | "model_response";
+  readonly role: CompositionRole;
   readonly sequence: number; // The order of the snippet within its role.
 };
 
@@ -118,4 +172,84 @@ export type Tag = {
   readonly id: TagId;
   readonly name: Slug;
 };
+
+// --- Entity Constructors (Pure Functions) ---
+
+export const createSnippet = (name: Slug, description: string): Snippet => ({
+  id: generateSnippetId(),
+  name,
+  description
+})
+
+export const createSnippetVersion = (
+  content: string,
+  commit_message: string
+): SnippetVersion => ({
+  id: generateSnippetVersionId(),
+  content,
+  createdAt: new Date(),
+  commit_message
+})
+
+export const createParameter = (name: Slug, description: string): Parameter => ({
+  id: generateParameterId(),
+  name,
+  description
+})
+
+export const createParameterOption = (
+  value: string,
+  commit_message: string
+): ParameterOption => ({
+  id: generateParameterOptionId(),
+  value,
+  createdAt: new Date(),
+  commit_message
+})
+
+export const createComposition = (name: Slug, description: string): Composition => ({
+  id: generateCompositionId(),
+  name,
+  description
+})
+
+export const createCompositionVersion = (
+  snippets: readonly CompositionSnippet[],
+  commit_message: string
+): CompositionVersion => ({
+  id: generateCompositionVersionId(),
+  snippets,
+  createdAt: new Date(),
+  commit_message
+})
+
+export const createTestRun = (
+  name: string,
+  llm_provider: string,
+  llm_model: string,
+  metadata: Record<string, unknown> = {}
+): TestRun => ({
+  id: generateTestRunId(),
+  name,
+  createdAt: new Date(),
+  llm_provider,
+  llm_model,
+  metadata
+})
+
+export const createDataPoint = (
+  final_prompt_text: string,
+  response_text: string,
+  metrics: Record<string, unknown> = {}
+): DataPoint => ({
+  id: generateDataPointId(),
+  final_prompt_text,
+  response_text,
+  metrics
+})
+
+export const createTag = (name: Slug): Tag => ({
+  id: generateTagId(),
+  name
+})
 
