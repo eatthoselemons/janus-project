@@ -89,7 +89,7 @@ src/
 ```bash
 src/
 ├── core/
-│   ├── __tests__/
+│   ├── tests/
 │   │   ├── schemas/        # Tests for Schema validation (domain.ts)
 │   │   │   ├── branded-types.test.ts  # Slug, IDs validation
 │   │   │   ├── entities.test.ts       # Snippet, Parameter, etc schemas
@@ -102,7 +102,7 @@ src/
 │   ├── domain.ts
 │   └── model.ts
 └── db/
-    ├── __tests__/
+    ├── tests/
     │   ├── neo4j-service.test.ts          # Neo4j service unit tests
     │   ├── snippet-repository.test.ts     # Repository tests
     │   └── composition-repository.test.ts # Repository tests
