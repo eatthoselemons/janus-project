@@ -2,254 +2,263 @@
  * This file contains the core domain models for the Janus Project.
  * These types are based on the specifications in `docs/domain-model.md`.
  * 
- * Following functional programming principles:
- * - Data: Plain, immutable types
- * - Calculations: Pure functions for construction and validation
+ * Following functional programming principles and Effect-TS best practices:
+ * - Data: Schema-validated, immutable data structures
+ * - Calculations: Pure functions for validation and transformation
  * - Actions: Effect-TS integration for operations that can fail
  */
 
-import { Effect } from "effect"
+import { Schema, Effect } from "effect"
 
 // --- Branded ID Types ---
-// These are opaque types that prevent accidentally mixing up different kinds of IDs.
+// Using Schema.brand() for proper Effect-TS integration
 
-export type SnippetId = string & { readonly __brand: "SnippetId" };
-export type SnippetVersionId = string & { readonly __brand: "SnippetVersionId" };
-export type ParameterId = string & { readonly __brand: "ParameterId" };
-export type ParameterOptionId = string & { readonly __brand: "ParameterOptionId" };
-export type CompositionId = string & { readonly __brand: "CompositionId" };
-export type CompositionVersionId = string & { readonly __brand: "CompositionVersionId" };
-export type TestRunId = string & { readonly __brand: "TestRunId" };
-export type DataPointId = string & { readonly __brand: "DataPointId" };
-export type TagId = string & { readonly __brand: "TagId" };
+export const SnippetId = Schema.String.pipe(Schema.brand("SnippetId"))
+export type SnippetId = typeof SnippetId.Type
 
-/**
- * A URL- and command-line-friendly string.
- * It can only be created via a smart constructor that performs validation.
- */
-export type Slug = string & { readonly __brand: "Slug" };
+export const SnippetVersionId = Schema.String.pipe(Schema.brand("SnippetVersionId"))
+export type SnippetVersionId = typeof SnippetVersionId.Type
 
-// --- Slug Validation (Smart Constructor) ---
+export const ParameterId = Schema.String.pipe(Schema.brand("ParameterId"))
+export type ParameterId = typeof ParameterId.Type
 
-export class InvalidSlugError extends Error {
-  readonly _tag = "InvalidSlugError"
-  constructor(message: string) {
-    super(message)
+export const ParameterOptionId = Schema.String.pipe(Schema.brand("ParameterOptionId"))
+export type ParameterOptionId = typeof ParameterOptionId.Type
+
+export const CompositionId = Schema.String.pipe(Schema.brand("CompositionId"))
+export type CompositionId = typeof CompositionId.Type
+
+export const CompositionVersionId = Schema.String.pipe(Schema.brand("CompositionVersionId"))
+export type CompositionVersionId = typeof CompositionVersionId.Type
+
+export const TestRunId = Schema.String.pipe(Schema.brand("TestRunId"))
+export type TestRunId = typeof TestRunId.Type
+
+export const DataPointId = Schema.String.pipe(Schema.brand("DataPointId"))
+export type DataPointId = typeof DataPointId.Type
+
+export const TagId = Schema.String.pipe(Schema.brand("TagId"))
+export type TagId = typeof TagId.Type
+
+// --- Slug Type with Validation ---
+
+export const Slug = Schema.String.pipe(
+  Schema.pattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  Schema.maxLength(100),
+  Schema.minLength(1),
+  Schema.brand("Slug")
+)
+export type Slug = typeof Slug.Type
+
+// --- Tagged Errors ---
+
+export class InvalidSlugError extends Schema.TaggedError<InvalidSlugError>()(
+  "InvalidSlugError",
+  { message: Schema.String }
+) {}
+
+export class EntityNotFoundError extends Schema.TaggedError<EntityNotFoundError>()(
+  "EntityNotFoundError",
+  {
+    entityType: Schema.String,
+    id: Schema.String
   }
-}
+) {}
+
+// --- Entity Schemas ---
+
+export const Snippet = Schema.Struct({
+  id: SnippetId,
+  name: Slug,
+  description: Schema.String,
+  createdAt: Schema.Date,
+  updatedAt: Schema.Date
+})
+export type Snippet = typeof Snippet.Type
+
+export const SnippetVersion = Schema.Struct({
+  id: SnippetVersionId,
+  content: Schema.String,
+  commit_message: Schema.String,
+  createdAt: Schema.Date
+})
+export type SnippetVersion = typeof SnippetVersion.Type
+
+export const Parameter = Schema.Struct({
+  id: ParameterId,
+  name: Slug,
+  description: Schema.String,
+  createdAt: Schema.Date,
+  updatedAt: Schema.Date
+})
+export type Parameter = typeof Parameter.Type
+
+export const ParameterOption = Schema.Struct({
+  id: ParameterOptionId,
+  value: Schema.String,
+  commit_message: Schema.String,
+  createdAt: Schema.Date
+})
+export type ParameterOption = typeof ParameterOption.Type
+
+export const Composition = Schema.Struct({
+  id: CompositionId,
+  name: Slug,
+  description: Schema.String,
+  createdAt: Schema.Date,
+  updatedAt: Schema.Date
+})
+export type Composition = typeof Composition.Type
+
+export const CompositionRole = Schema.Literal("system", "user_prompt", "model_response")
+export type CompositionRole = typeof CompositionRole.Type
+
+export const CompositionSnippet = Schema.Struct({
+  snippetVersionId: SnippetVersionId,
+  role: CompositionRole,
+  sequence: Schema.Number.pipe(Schema.int(), Schema.nonNegative())
+})
+export type CompositionSnippet = typeof CompositionSnippet.Type
+
+export const CompositionVersion = Schema.Struct({
+  id: CompositionVersionId,
+  snippets: Schema.Array(CompositionSnippet),
+  commit_message: Schema.String,
+  createdAt: Schema.Date
+})
+export type CompositionVersion = typeof CompositionVersion.Type
+
+export const TestRun = Schema.Struct({
+  id: TestRunId,
+  name: Schema.String,
+  llm_provider: Schema.String,
+  llm_model: Schema.String,
+  metadata: Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+  createdAt: Schema.Date
+})
+export type TestRun = typeof TestRun.Type
+
+export const DataPoint = Schema.Struct({
+  id: DataPointId,
+  final_prompt_text: Schema.String,
+  response_text: Schema.String,
+  metrics: Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+  createdAt: Schema.Date
+})
+export type DataPoint = typeof DataPoint.Type
+
+export const Tag = Schema.Struct({
+  id: TagId,
+  name: Slug,
+  createdAt: Schema.Date
+})
+export type Tag = typeof Tag.Type
+
+// --- Slug Creation Function ---
 
 export const createSlug = (rawName: string): Effect.Effect<Slug, InvalidSlugError> =>
-  Effect.gen(function* () {
-    const trimmed = rawName.trim()
-    
-    if (trimmed.length === 0) {
-      return yield* Effect.fail(new InvalidSlugError("Slug cannot be empty"))
-    }
-    
-    if (trimmed.length > 100) {
-      return yield* Effect.fail(new InvalidSlugError("Slug cannot be longer than 100 characters"))
-    }
-    
-    // Check if it matches lowercase-with-hyphens pattern
-    const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
-    if (!slugPattern.test(trimmed)) {
-      return yield* Effect.fail(new InvalidSlugError("Slug must contain only lowercase letters, numbers, and hyphens"))
-    }
-    
-    return trimmed as Slug
-  })
+  Schema.decodeUnknown(Slug)(rawName.trim()).pipe(
+    Effect.mapError(() => new InvalidSlugError({ message: "Invalid slug format" }))
+  )
 
-// --- ID Generators (Pure Functions) ---
+// --- Entity Creation Schemas ---
 
-export const generateSnippetId = (): SnippetId => crypto.randomUUID() as SnippetId
-export const generateSnippetVersionId = (): SnippetVersionId => crypto.randomUUID() as SnippetVersionId
-export const generateCompositionId = (): CompositionId => crypto.randomUUID() as CompositionId
-export const generateCompositionVersionId = (): CompositionVersionId => crypto.randomUUID() as CompositionVersionId
-export const generateParameterId = (): ParameterId => crypto.randomUUID() as ParameterId
-export const generateParameterOptionId = (): ParameterOptionId => crypto.randomUUID() as ParameterOptionId
-export const generateTestRunId = (): TestRunId => crypto.randomUUID() as TestRunId
-export const generateDataPointId = (): DataPointId => crypto.randomUUID() as DataPointId
-export const generateTagId = (): TagId => crypto.randomUUID() as TagId
-
-
-// --- Entity Definitions ---
-
-/**
- * The abstract container for a snippet and all its versions.
- */
-export type Snippet = {
-  readonly id: SnippetId;
-  readonly name: Slug;
-  readonly description: string;
-};
-
-/**
- * An immutable snapshot of a snippet's content at a specific point in time.
- */
-export type SnippetVersion = {
-  readonly id: SnippetVersionId;
-  readonly content: string;
-  readonly createdAt: Date;
-  readonly commit_message: string;
-};
-
-/**
- * The abstract definition of a parameter.
- */
-export type Parameter = {
-  readonly id: ParameterId;
-  readonly name: Slug;
-  readonly description: string;
-};
-
-/**
- * A specific, versioned value for a `Parameter`.
- */
-export type ParameterOption = {
-  readonly id: ParameterOptionId;
-  readonly value: string;
-  readonly createdAt: Date;
-  readonly commit_message: string;
-};
-
-/**
- * The abstract container for a composition and all its versions.
- */
-export type Composition = {
-  readonly id: CompositionId;
-  readonly name: Slug;
-  readonly description: string;
-};
-
-/**
- * The roles that snippets can play in a composition.
- */
-export type CompositionRole = "system" | "user_prompt" | "model_response";
-
-/**
- * An immutable snapshot of a composition, locking in specific `SnippetVersion`s
- * in a defined order and role.
- */
-export type CompositionSnippet = {
-  readonly snippetVersionId: SnippetVersionId;
-  readonly role: CompositionRole;
-  readonly sequence: number; // The order of the snippet within its role.
-};
-
-export type CompositionVersion = {
-  readonly id: CompositionVersionId;
-  readonly snippets: readonly CompositionSnippet[];
-  readonly createdAt: Date;
-  readonly commit_message: string;
-};
-
-/**
- * The parent container for a single execution of a test suite.
- */
-export type TestRun = {
-  readonly id: TestRunId;
-  readonly name: string;
-  readonly createdAt: Date;
-  readonly llm_provider: string;
-  readonly llm_model: string;
-  readonly metadata: Record<string, unknown>; // A flexible JSON blob for user metadata.
-};
-
-/**
- * The result of a single LLM call within a `TestRun`.
- */
-export type DataPoint = {
-  readonly id: DataPointId;
-  readonly final_prompt_text: string;
-  readonly response_text: string;
-  readonly metrics: Record<string, unknown>; // JSON blob for latency, token counts, etc.
-};
-
-/**
- * A simple label for organizing and querying entities.
- */
-export type Tag = {
-  readonly id: TagId;
-  readonly name: Slug;
-};
-
-// --- Entity Constructors (Pure Functions) ---
-
-export const createSnippet = (name: Slug, description: string): Snippet => ({
-  id: generateSnippetId(),
-  name,
-  description
+export const CreateSnippetData = Schema.Struct({
+  name: Slug,
+  description: Schema.String
 })
+export type CreateSnippetData = typeof CreateSnippetData.Type
 
-export const createSnippetVersion = (
-  content: string,
-  commit_message: string
-): SnippetVersion => ({
-  id: generateSnippetVersionId(),
-  content,
-  createdAt: new Date(),
-  commit_message
+export const CreateSnippetVersionData = Schema.Struct({
+  content: Schema.String,
+  commit_message: Schema.String
 })
+export type CreateSnippetVersionData = typeof CreateSnippetVersionData.Type
 
-export const createParameter = (name: Slug, description: string): Parameter => ({
-  id: generateParameterId(),
-  name,
-  description
+export const CreateParameterData = Schema.Struct({
+  name: Slug,
+  description: Schema.String
 })
+export type CreateParameterData = typeof CreateParameterData.Type
 
-export const createParameterOption = (
-  value: string,
-  commit_message: string
-): ParameterOption => ({
-  id: generateParameterOptionId(),
-  value,
-  createdAt: new Date(),
-  commit_message
+export const CreateParameterOptionData = Schema.Struct({
+  value: Schema.String,
+  commit_message: Schema.String
 })
+export type CreateParameterOptionData = typeof CreateParameterOptionData.Type
 
-export const createComposition = (name: Slug, description: string): Composition => ({
-  id: generateCompositionId(),
-  name,
-  description
+export const CreateCompositionData = Schema.Struct({
+  name: Slug,
+  description: Schema.String
 })
+export type CreateCompositionData = typeof CreateCompositionData.Type
 
-export const createCompositionVersion = (
-  snippets: readonly CompositionSnippet[],
-  commit_message: string
-): CompositionVersion => ({
-  id: generateCompositionVersionId(),
-  snippets,
-  createdAt: new Date(),
-  commit_message
+export const CreateCompositionVersionData = Schema.Struct({
+  snippets: Schema.Array(CompositionSnippet),
+  commit_message: Schema.String
 })
+export type CreateCompositionVersionData = typeof CreateCompositionVersionData.Type
 
-export const createTestRun = (
-  name: string,
-  llm_provider: string,
-  llm_model: string,
-  metadata: Record<string, unknown> = {}
-): TestRun => ({
-  id: generateTestRunId(),
-  name,
-  createdAt: new Date(),
-  llm_provider,
-  llm_model,
-  metadata
+export const CreateTestRunData = Schema.Struct({
+  name: Schema.String,
+  llm_provider: Schema.String,
+  llm_model: Schema.String,
+  metadata: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown }))
 })
+export type CreateTestRunData = typeof CreateTestRunData.Type
 
-export const createDataPoint = (
-  final_prompt_text: string,
-  response_text: string,
-  metrics: Record<string, unknown> = {}
-): DataPoint => ({
-  id: generateDataPointId(),
-  final_prompt_text,
-  response_text,
-  metrics
+export const CreateDataPointData = Schema.Struct({
+  final_prompt_text: Schema.String,
+  response_text: Schema.String,
+  metrics: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown }))
 })
+export type CreateDataPointData = typeof CreateDataPointData.Type
 
-export const createTag = (name: Slug): Tag => ({
-  id: generateTagId(),
-  name
+export const CreateTagData = Schema.Struct({
+  name: Slug
 })
+export type CreateTagData = typeof CreateTagData.Type
 
+// --- Entity-specific Tagged Errors ---
+
+export class SnippetNotFound extends Schema.TaggedError<SnippetNotFound>()(
+  "SnippetNotFound",
+  { id: SnippetId }
+) {}
+
+export class ParameterNotFound extends Schema.TaggedError<ParameterNotFound>()(
+  "ParameterNotFound",
+  { id: ParameterId }
+) {}
+
+export class CompositionNotFound extends Schema.TaggedError<CompositionNotFound>()(
+  "CompositionNotFound",
+  { id: CompositionId }
+) {}
+
+export class TestRunNotFound extends Schema.TaggedError<TestRunNotFound>()(
+  "TestRunNotFound",
+  { id: TestRunId }
+) {}
+
+export class TagNotFound extends Schema.TaggedError<TagNotFound>()(
+  "TagNotFound",
+  { id: TagId }
+) {}
+
+// --- Validation Helpers ---
+
+export const validateSnippetData = (data: unknown) =>
+  Schema.decodeUnknown(CreateSnippetData)(data)
+
+export const validateParameterData = (data: unknown) =>
+  Schema.decodeUnknown(CreateParameterData)(data)
+
+export const validateCompositionData = (data: unknown) =>
+  Schema.decodeUnknown(CreateCompositionData)(data)
+
+export const validateTestRunData = (data: unknown) =>
+  Schema.decodeUnknown(CreateTestRunData)(data)
+
+export const validateCompositionSnippets = (snippets: unknown) =>
+  Schema.decodeUnknown(Schema.Array(CompositionSnippet))(snippets)

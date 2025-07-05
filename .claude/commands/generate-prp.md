@@ -55,7 +55,7 @@ uv run pytest tests/ -v
 *** ULTRATHINK ABOUT THE PRP AND PLAN YOUR APPROACH THEN START WRITING THE PRP ***
 
 ## Output
-Save as: `PRPs/{feature-name}.md`
+Save as: `docs/llms/PRPs/{feature-name}.md`
 
 ## Quality Checklist
 - [ ] All necessary context included
