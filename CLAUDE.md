@@ -82,6 +82,6 @@ The project adheres strictly to the principles of **Functional Programming** and
     -   **Condensed:** `https://effect.website/llms-small.txt`
     -   **Full:** `https://effect.website/llms-full.txt`
     -   **Topics/Index:** `https://effect.website/llms.txt`
--   **Quick Reference For Using Effect** You can read either "effect-composition-guide.md" or "effect-normand-paradigm-guide.md" inside the `docs/llms/effect/` directory for references on proper usage of Effect
+-   **Quick Reference For Using Effect** You can read either "effect-composition-guide.md" or "effect-normand-paradigm-guide.md" inside the `docs/llms/examples/` directory for references on proper usage of Effect
 
 
