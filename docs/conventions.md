@@ -1,11 +1,3 @@
-Excellent question. You are absolutely right. We've had a long and detailed conversation, and now is the perfect time to consolidate all of our decisions into a formal set of conventions.
-
-This document will serve as the "constitution" for the Janus Project. It will ensure consistency, clarity, and alignment as we move forward. It's exactly what we would need to pass to any other context—be it another developer or a future version of me—to get them up to speed instantly.
-
-Here is the formalized summary of our project conventions.
-
-***
-
 ## The Janus Project: Conventions & Guiding Principles
 
 ### 1. Project Identity
@@ -31,7 +23,7 @@ The project will adhere to the principles of **Functional Programming** and **Ty
     2.  **Calculations:** Pure functions that take data as input and produce new data as output, with no side effects.
     3.  **Actions:** Impure functions that interact with the outside world (database, file system, APIs). These will be isolated at the "edges" of the application.
 
-*   **Monadic Error Handling:** We will avoid throwing exceptions for predictable errors. Instead, functions that can fail will return a `Result` type (from a library like `fp-ts` or `neverthrow`).
+*   **Monadic Error Handling:** We will avoid throwing exceptions for predictable errors. Instead, functions that can fail will return a `Result` type
 
     ```typescript
     // GOOD: The function signature is honest about its potential failure.
@@ -91,9 +83,4 @@ The project will maintain a `/docs` directory with detailed specifications:
 
 
 ### Unit Testing Framework
-This is a crucial addition we missed. For a TypeScript project, the two leading contenders are Jest and Vitest.
-
-*   **Jest:** The long-standing industry standard. Very mature, huge community.
 *   **Vitest:** A modern, ESM-native alternative that is often much faster and has a Jest-compatible API.
-
-**Recommendation:** Let's use **Vitest**. For a new project, its speed and modern architecture are a significant advantage. It will keep our test cycles fast and our developer experience smooth.

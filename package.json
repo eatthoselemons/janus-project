@@ -1,0 +1,33 @@
+{
+  "name": "janus",
+  "version": "0.0.1",
+  "description": "A framework for the rigorous, empathetic, and reproducible testing of Large Language Models.",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "preflight": "pnpm run build && pnpm run test"
+  },
+  "keywords": [
+    "llm",
+    "testing",
+    "ai",
+    "effect-ts"
+  ],
+  "author": "Elizabeth Wynn",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "effect": "^3.16.12",
+    "@effect/cli": "^0.66.7",
+    "@effect/platform-node": "^0.88.11",
+    "neo4j-driver": "^5.28.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "@effect/vitest": "^0.23.12",
+    "vitest": "^3.2.4",
+    "@types/node": "^24.0.10",
+    "ts-node": "^10.9.2"
+  }
+}
