@@ -38,6 +38,11 @@ Also ensure that you have done everything in the `docs/llms/effect/effect-compli
 
 This project uses **Vitest** as its primary testing framework. Test files (`*.test.ts`) should be co-located with the source files they test. When writing tests, please follow the established patterns for mocking and test structure found in existing test files.
 
+When making tests you should always make sure there are at least tests for the following, if it is a complicated piece of code add more test cases
+  - 1 test for expected use
+  - 1 edge case
+  - 1 failure case
+
 ## 2. Core Technology Stack
 
 -   **Language:** TypeScript
