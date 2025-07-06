@@ -109,6 +109,195 @@ const program = Effect.gen(function*(_) {
 
 Here, `isAdministrator` is a pure **calculation**. It takes a `CurrentUser` (data) and returns a `boolean` (data). It has no side effects. The `program` then uses this calculation to decide what to do.
 
+## Real-World Example: Database Services
+
+Let's look at how to structure database services, particularly for Neo4j (graph database) since this project uses Neo4j. The key principle is that database operations are **actions** (they have side effects), while the data schemas and business logic are **data** and **calculations**.
+
+### Defining Data with Schema (Not Model.Class!)
+
+For Neo4j and other non-SQL databases, use `Schema.Struct` or `Schema.Class`, NOT `Model.Class` (which is SQL-specific):
+
+```typescript
+import { Schema } from "@effect/schema"
+
+// Data: Define your node schema
+export const UserNode = Schema.Struct({
+  id: Schema.String,  // Neo4j uses string IDs
+  email: Schema.String.pipe(Schema.nonEmpty()),
+  name: Schema.String,
+  createdAt: Schema.DateTimeUtc
+})
+export type UserNode = typeof UserNode.Type
+
+// Data: Define relationship schema  
+export const FollowsRelationship = Schema.Struct({
+  since: Schema.DateTimeUtc,
+  strength: Schema.Number.pipe(Schema.between(0, 1))
+})
+```
+
+### Creating a Repository Service (Actions)
+
+```typescript
+import { Context, Effect, Layer } from "effect"
+import * as Neo4j from "neo4j-driver"
+
+// Define the repository interface (what actions can we perform?)
+export interface UserRepository {
+  findById: (id: string) => Effect.Effect<Option.Option<UserNode>, Neo4jError>
+  create: (user: UserNode) => Effect.Effect<UserNode, Neo4jError>
+  findFollowers: (userId: string) => Effect.Effect<ReadonlyArray<UserNode>, Neo4jError>
+  createFollowsRelationship: (followerId: string, followeeId: string) => Effect.Effect<void, Neo4jError>
+}
+
+// Create a Context.Tag for dependency injection
+export const UserRepository = Context.Tag<UserRepository>("UserRepository")
+
+// Live implementation that talks to Neo4j
+export const UserRepositoryLive = Layer.effect(
+  UserRepository,
+  Effect.gen(function*(_) {
+    const driver = yield* _(Neo4jDriver)  // Assume we have a Neo4jDriver service
+    
+    return {
+      findById: (id: string) =>
+        Effect.tryPromise({
+          try: async () => {
+            const session = driver.session()
+            try {
+              const result = await session.run(
+                'MATCH (u:User {id: $id}) RETURN u',
+                { id }
+              )
+              const record = result.records[0]
+              return record ? Option.some(Schema.decodeUnknownSync(UserNode)(record.get('u'))) : Option.none()
+            } finally {
+              await session.close()
+            }
+          },
+          catch: (error) => new Neo4jError({ message: String(error) })
+        }),
+        
+      create: (user: UserNode) =>
+        Effect.tryPromise({
+          try: async () => {
+            const session = driver.session()
+            try {
+              const result = await session.run(
+                'CREATE (u:User $props) RETURN u',
+                { props: user }
+              )
+              return Schema.decodeUnknownSync(UserNode)(result.records[0].get('u'))
+            } finally {
+              await session.close()
+            }
+          },
+          catch: (error) => new Neo4jError({ message: String(error) })
+        }),
+        
+      findFollowers: (userId: string) =>
+        Effect.tryPromise({
+          try: async () => {
+            const session = driver.session()
+            try {
+              const result = await session.run(
+                'MATCH (follower:User)-[:FOLLOWS]->(u:User {id: $userId}) RETURN follower',
+                { userId }
+              )
+              return result.records.map(r => 
+                Schema.decodeUnknownSync(UserNode)(r.get('follower'))
+              )
+            } finally {
+              await session.close()
+            }
+          },
+          catch: (error) => new Neo4jError({ message: String(error) })
+        }),
+        
+      createFollowsRelationship: (followerId: string, followeeId: string) =>
+        Effect.tryPromise({
+          try: async () => {
+            const session = driver.session()
+            try {
+              await session.run(
+                'MATCH (a:User {id: $followerId}), (b:User {id: $followeeId}) CREATE (a)-[:FOLLOWS {since: datetime()}]->(b)',
+                { followerId, followeeId }
+              )
+            } finally {
+              await session.close()
+            }
+          },
+          catch: (error) => new Neo4jError({ message: String(error) })
+        })
+    }
+  })
+)
+
+// Test implementation for unit tests
+export const UserRepositoryTest = Layer.succeed(UserRepository, {
+  findById: (id) => Effect.succeed(
+    id === "123" 
+      ? Option.some({ id: "123", email: "test@example.com", name: "Test User", createdAt: new Date() })
+      : Option.none()
+  ),
+  create: (user) => Effect.succeed(user),
+  findFollowers: () => Effect.succeed([]),
+  createFollowsRelationship: () => Effect.succeed(undefined)
+})
+```
+
+### Using Services with Calculations
+
+```typescript
+// Calculation: Pure function to check if user can follow another
+const canFollow = (follower: UserNode, followee: UserNode): boolean => {
+  return follower.id !== followee.id  // Can't follow yourself
+}
+
+// Calculation: Determine if a user is popular
+const isPopularUser = (followerCount: number): boolean => {
+  return followerCount > 1000
+}
+
+// Action that combines calculations with database operations
+export const followUser = (followerId: string, followeeId: string) =>
+  Effect.gen(function*(_) {
+    const repo = yield* _(UserRepository)
+    
+    // Get both users (actions)
+    const follower = yield* _(repo.findById(followerId))
+    const followee = yield* _(repo.findById(followeeId))
+    
+    // Check if both exist
+    if (Option.isNone(follower) || Option.isNone(followee)) {
+      return yield* _(Effect.fail(new Error("User not found")))
+    }
+    
+    // Apply business rule (calculation)
+    if (!canFollow(follower.value, followee.value)) {
+      return yield* _(Effect.fail(new Error("Cannot follow this user")))
+    }
+    
+    // Create the relationship (action)
+    yield* _(repo.createFollowsRelationship(followerId, followeeId))
+    
+    // Check if followee is now popular (calculation + action)
+    const followers = yield* _(repo.findFollowers(followeeId))
+    if (isPopularUser(followers.length)) {
+      console.log(`${followee.value.name} is now a popular user!`)
+    }
+  })
+
+// Running the program with dependency injection
+const program = followUser("123", "456")
+
+// In production
+const runnable = Effect.provide(program, UserRepositoryLive)
+
+// In tests
+const testRunnable = Effect.provide(program, UserRepositoryTest)
+```
+
 ## Putting It All Together
 
 By using `Services` to define our **actions**, `Layers` to provide their implementations, and pure functions for our **calculations**, we can build Effect applications that are:
@@ -118,3 +307,11 @@ By using `Services` to define our **actions**, `Layers` to provide their impleme
 *   **Composable:** Effect's powerful composition operators allow us to build complex applications from small, reusable pieces.
 
 This approach aligns perfectly with the principles of "actions, calculations, and data," and provides a solid foundation for building robust and scalable applications with Effect.
+
+### Key Takeaways for Database Services
+
+1. **For Neo4j/Graph DBs:** Use `Schema.Struct` or `Schema.Class`, never `Model.Class`
+2. **Services are Actions:** Database operations are always actions (side effects)
+3. **Keep Calculations Pure:** Business logic should be separate pure functions
+4. **Use Layers for DI:** Swap between live and test implementations easily
+5. **Data is Immutable:** Define your schemas as immutable data structures

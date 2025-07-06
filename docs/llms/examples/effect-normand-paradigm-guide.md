@@ -42,20 +42,21 @@ export const User = Schema.Struct({
 export type User = typeof User.Type
 ```
 
-### Using Model Classes for Rich Data
+### Using Model Classes for SQL Database Data
 
-For more complex domain models, use Effect's Model system:
+For SQL database models specifically, use Effect's Model system. IMPORTANT: Model.Class is ONLY for SQL databases (PostgreSQL, MySQL, SQLite). For graph databases like Neo4j, use Schema.Struct or Schema.Class instead:
 
 ```typescript
 import { Model } from "@effect/sql"
 
+// SQL-specific model with auto-generated fields
 export class User extends Model.Class<User>("User")({
-  id: Model.Generated(UserId),
+  id: Model.Generated(UserId),  // SQL auto-increment
   email: Email,
   name: Schema.NonEmptyTrimmedString,
   age: Schema.Number.pipe(Schema.int(), Schema.positive()),
-  createdAt: Model.DateTimeInsert,
-  updatedAt: Model.DateTimeUpdate
+  createdAt: Model.DateTimeInsert,  // SQL timestamp
+  updatedAt: Model.DateTimeUpdate   // SQL timestamp
 }) {}
 
 // Compose models by extending
@@ -64,6 +65,32 @@ export class UserWithProfile extends Model.Class<UserWithProfile>("UserWithProfi
   profile: Profile,
   preferences: UserPreferences
 }) {}
+```
+
+### Using Schema for Non-SQL Database Data (Neo4j, MongoDB, etc.)
+
+For graph databases, document databases, or any non-SQL storage:
+
+```typescript
+// Neo4j node schema
+export const UserNode = Schema.Struct({
+  id: Schema.String,  // Neo4j uses string IDs
+  email: Email,
+  name: Schema.NonEmptyTrimmedString,
+  age: Schema.Number.pipe(Schema.int(), Schema.positive()),
+  createdAt: Schema.DateTimeUtc,
+  labels: Schema.Array(Schema.String)
+})
+
+// MongoDB document schema
+export const UserDocument = Schema.Struct({
+  _id: Schema.String,
+  email: Email,
+  name: Schema.NonEmptyTrimmedString,
+  age: Schema.Number.pipe(Schema.int(), Schema.positive()),
+  createdAt: Schema.DateTimeUtc,
+  metadata: Schema.Record(Schema.String, Schema.Unknown)
+})
 ```
 
 ### Data Composition Patterns
@@ -173,11 +200,13 @@ export const hasPermission = (actor: User, action: string, resource: string): bo
 
 ### Database Actions
 
+For SQL databases using @effect/sql:
+
 ```typescript
 import { Effect, Context } from "effect"
 import { SqlClient } from "@effect/sql"
 
-// Define repository interface
+// SQL Repository with Model.Class
 export interface UserRepository {
   findById: (id: UserId) => Effect.Effect<Option.Option<User>, SqlError>
   create: (user: User) => Effect.Effect<User, SqlError>
@@ -185,10 +214,8 @@ export interface UserRepository {
   delete: (id: UserId) => Effect.Effect<void, SqlError>
 }
 
-// Context tag for dependency injection
 export const UserRepository = Context.GenericTag<UserRepository>("UserRepository")
 
-// Implementation of database actions
 export const UserRepositoryLive = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
 
@@ -206,6 +233,65 @@ export const UserRepositoryLive = Effect.gen(function* () {
     )
 
   return { findById, create, update, delete } satisfies UserRepository
+})
+```
+
+For Neo4j graph database:
+
+```typescript
+// Neo4j Repository with Schema.Struct
+export interface UserNodeRepository {
+  findById: (id: string) => Effect.Effect<Option.Option<UserNode>, Neo4jError>
+  create: (user: UserNode) => Effect.Effect<UserNode, Neo4jError>
+  createRelationship: (userId: string, targetId: string, type: string) => Effect.Effect<void, Neo4jError>
+  findConnections: (id: string) => Effect.Effect<UserNode[], Neo4jError>
+}
+
+export const UserNodeRepository = Context.GenericTag<UserNodeRepository>("UserNodeRepository")
+
+export const UserNodeRepositoryLive = Effect.gen(function* () {
+  const neo4j = yield* Neo4jClient
+
+  const findById = (id: string): Effect.Effect<Option.Option<UserNode>, Neo4jError> =>
+    neo4j.query(`MATCH (u:User {id: $id}) RETURN u`, { id }).pipe(
+      Effect.map(result => result.records[0]?.get('u')),
+      Effect.map(Option.fromNullable),
+      Effect.flatMap(Option.traverse(Schema.decodeUnknown(UserNode))),
+      Effect.withSpan("UserNodeRepository.findById")
+    )
+
+  const create = (user: UserNode): Effect.Effect<UserNode, Neo4jError> =>
+    neo4j.query(
+      `CREATE (u:User $props) RETURN u`,
+      { props: user }
+    ).pipe(
+      Effect.map(result => result.records[0].get('u')),
+      Effect.flatMap(Schema.decodeUnknown(UserNode)),
+      Effect.withSpan("UserNodeRepository.create")
+    )
+
+  const createRelationship = (userId: string, targetId: string, type: string) =>
+    neo4j.query(
+      `MATCH (a:User {id: $userId}), (b:User {id: $targetId})
+       CREATE (a)-[r:${type} {createdAt: datetime()}]->(b)`,
+      { userId, targetId }
+    ).pipe(
+      Effect.asVoid,
+      Effect.withSpan("UserNodeRepository.createRelationship")
+    )
+
+  const findConnections = (id: string): Effect.Effect<UserNode[], Neo4jError> =>
+    neo4j.query(
+      `MATCH (u:User {id: $id})-[*1..2]-(connected:User)
+       RETURN DISTINCT connected`,
+      { id }
+    ).pipe(
+      Effect.map(result => result.records.map(r => r.get('connected'))),
+      Effect.flatMap(Schema.decodeUnknown(Schema.Array(UserNode))),
+      Effect.withSpan("UserNodeRepository.findConnections")
+    )
+
+  return { findById, create, createRelationship, findConnections } satisfies UserNodeRepository
 })
 ```
 
@@ -474,5 +560,27 @@ describe("User Service Actions", () => {
 4. **Test Each Layer**: Different testing strategies for each layer
 5. **Use Type Safety**: Let the compiler prevent mixing concerns
 6. **Document Boundaries**: Make it clear which layer each function belongs to
+
+### Schema Selection Guidelines
+
+**For SQL Databases (PostgreSQL, MySQL, SQLite):**
+- Use `Model.Class` for entities with auto-generated IDs and timestamps
+- Use `Model.makeRepository()` for CRUD operations
+- Leverage SQL-specific features like `Model.Generated`, `Model.DateTimeInsert`
+
+**For Graph Databases (Neo4j):**
+- Use `Schema.Struct` for simple node/relationship data
+- Use `Schema.Class` when nodes need methods
+- Never use `Model.Class` - it's SQL-specific
+- Handle IDs as strings (typical for graph databases)
+
+**For Document Databases (MongoDB, DynamoDB):**
+- Use `Schema.Struct` for document schemas
+- Use `Schema.Class` for documents with behavior
+- Never use `Model.Class`
+
+**For HTTP APIs:**
+- Always use `Schema.Struct` for request/response validation
+- Keep API schemas separate from database schemas
 
 This paradigm, enforced by Effect's type system, leads to more maintainable, testable, and reasoning-friendly code that naturally follows functional programming principles.
