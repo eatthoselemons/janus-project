@@ -18,16 +18,16 @@
   "author": "Elizabeth Wynn",
   "license": "Apache-2.0",
   "dependencies": {
-    "effect": "^3.16.12",
     "@effect/cli": "^0.66.7",
     "@effect/platform-node": "^0.88.11",
+    "effect": "^3.16.12",
     "neo4j-driver": "^5.28.1"
   },
   "devDependencies": {
-    "typescript": "^5.8.3",
     "@effect/vitest": "^0.23.12",
-    "vitest": "^3.2.4",
     "@types/node": "^24.0.10",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
   }
 }

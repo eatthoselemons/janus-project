@@ -5,7 +5,7 @@ description: |
 Template optimized for AI agents to implement features with sufficient context and self-validation capabilities to achieve working code through iterative refinement.
 
 ## Core Principles
-1. **Context is King**: Include ALL necessary documentation, examples, and caveats
+1. **Context is Complete but Focused**: Include ALL necessary documentation sections, specific examples, and discovered caveats
 2. **Validation Loops**: Provide executable tests/lints the AI can run and fix
 3. **Information Dense**: Use keywords and patterns from the codebase
 4. **Progressive Success**: Start simple, validate, then enhance
@@ -29,23 +29,39 @@ Template optimized for AI agents to implement features with sufficient context a
 
 ## All Needed Context
 
-### Documentation & References (list all context needed to implement the feature)
+### Documentation & References (include complete sections that are directly relevant)
 ```yaml
-# MUST READ - Include these in your context window
+# MUST READ - Include these specific sections in your context window
+# ✅ Include: Complete relevant sections, not just snippets
+# ❌ Avoid: Entire folders or unrelated documentation
+
 - url: [Official API docs URL]
-  why: [Specific sections/methods you'll need]
+  sections: ["Authentication", "Error Handling"]  # Complete sections needed
+  why: [These endpoints will be used for X, Y, Z]
+  discovered_caveat: [Rate limit of 10 req/sec not documented in main API]
   
 - file: [path/to/example.py]
-  why: [Pattern to follow, gotchas to avoid]
+  why: [Follow this exact pattern for connection handling]
+  gotcha: [Lines 45-60 show retry logic that prevents common timeout issue]
   
 - doc: [Library documentation URL] 
-  section: [Specific section about common pitfalls]
-  critical: [Key insight that prevents common errors]
-
-- docfile: [PRPs/ai_docs/file.md]
-  why: [docs that the user has pasted in to the project]
+  section: ["Common Pitfalls", "Advanced Configuration"]
+  critical: |
+    BatchProcessor silently fails on batches > 1000 items
+    Must set connection_pool_size=50 for production
+  
+- docfile: docs/architecture/[component].md
+  include_sections: ["Data Flow", "Error Handling", "Configuration"]
+  skip_sections: ["Historical Context", "Roadmap"]  # Not relevant for implementation
 
 ```
+
+### Context Inclusion Guidelines
+- Include COMPLETE sections when they contain implementation details
+- Include MULTIPLE examples if they show different use cases
+- Include ALL caveats and warnings discovered during research
+- Skip sections about: history, philosophy, future plans, unrelated features
+- When in doubt, include it - but be specific about WHY it's needed
 
 ### Current Codebase tree (run `tree` in the root of the project) to get an overview of the codebase
 ```bash

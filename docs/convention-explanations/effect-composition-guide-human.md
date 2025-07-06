@@ -354,6 +354,7 @@ const authorizedEffect = policyRequire("User", "read")(
 
 **When to use:** Use policy composition for authorization logic that needs to be flexible and reusable across different parts of your application.
 
+
 ## Benefits of Effect Composition
 
 ### 1. Type Safety

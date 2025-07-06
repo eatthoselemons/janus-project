@@ -4,7 +4,7 @@
 - **Use consistent naming conventions, file structure, and architecture patterns** as described in `PLANNING.md`.
 
 ### 🧱 Code Structure & Modularity
-- **Never create a file longer than 500 lines of code.** If a file approaches this limit, refactor by splitting it into modules or helper files.
+- **Never create a file longer than 300 lines of code.** If a file approaches this limit, refactor by splitting it into modules or helper files.
 - **Organize code into clearly separated modules**, grouped by feature or responsibility.
 - **Use clear, consistent imports** (prefer relative imports within packages).
 
@@ -37,6 +37,11 @@ Also ensure that you have done everything in the `docs/llms/effect/effect-compli
 ### Writing Tests
 
 This project uses **Vitest** as its primary testing framework. Test files (`*.test.ts`) should be co-located with the source files they test. When writing tests, please follow the established patterns for mocking and test structure found in existing test files.
+
+When making tests you should always make sure there are at least tests for the following, if it is a complicated piece of code add more test cases
+  - 1 test for expected use
+  - 1 edge case
+  - 1 failure case
 
 ## 2. Core Technology Stack
 
@@ -80,8 +85,14 @@ The project adheres strictly to the principles of **Functional Programming** and
 -   **The `Effect-TS` Mandate:** This is our foundational framework. All asynchronous operations, error handling, and dependency management **MUST** be modeled using the `Effect` system.
 -   **`Effect-TS` Documentation:** If you are unsure about a specific `Effect-TS` implementation, you are encouraged to consult the official LLM-optimized documentation.
     -   **Condensed:** `https://effect.website/llms-small.txt`
-    -   **Full:** `https://effect.website/llms-full.txt`
     -   **Topics/Index:** `https://effect.website/llms.txt`
 -   **Quick Reference For Using Effect** You can read either "effect-composition-guide.md" or "effect-normand-paradigm-guide.md" inside the `docs/llms/examples/` directory for references on proper usage of Effect
 
+### Notes
 
+Effects `Model.Class` is for when you're using sql databases, we need to use `Schema.Struct` because we are using neo4j for our databases
+Use `pnpm test <string>` to skip the tests from the `examples` folder, the `<string>` is something that appears in the path so `pnpm test basic` would test:
+- basic.test.ts
+- basic-foo.test.ts
+- basic/foo.test.ts
+But skip other tests, you should usually just use `pnpm test src` to run the janus tests

@@ -12,7 +12,7 @@ importers:
         specifier: ^0.66.7
         version: 0.66.7(@effect/platform@0.87.7(effect@3.16.12))(@effect/printer-ansi@0.44.12(@effect/typeclass@0.35.12(effect@3.16.12))(effect@3.16.12))(@effect/printer@0.44.12(@effect/typeclass@0.35.12(effect@3.16.12))(effect@3.16.12))(effect@3.16.12)
       '@effect/platform-node':
-        specifier: 0.88.11
+        specifier: ^0.88.11
         version: 0.88.11(@effect/cluster@0.41.11(@effect/platform@0.87.7(effect@3.16.12))(@effect/rpc@0.64.8(@effect/platform@0.87.7(effect@3.16.12))(effect@3.16.12))(@effect/sql@0.40.8(@effect/experimental@0.51.8(@effect/platform@0.87.7(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.87.7(effect@3.16.12))(effect@3.16.12))(@effect/workflow@0.4.8(@effect/platform@0.87.7(effect@3.16.12))(@effect/rpc@0.64.8(@effect/platform@0.87.7(effect@3.16.12))(effect@3.16.12))(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.87.7(effect@3.16.12))(@effect/rpc@0.64.8(@effect/platform@0.87.7(effect@3.16.12))(effect@3.16.12))(@effect/sql@0.40.8(@effect/experimental@0.51.8(@effect/platform@0.87.7(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.87.7(effect@3.16.12))(effect@3.16.12))(effect@3.16.12)
       effect:
         specifier: ^3.16.12
@@ -22,7 +22,7 @@ importers:
         version: 5.28.1
     devDependencies:
       '@effect/vitest':
-        specifier: 0.23.12
+        specifier: ^0.23.12
         version: 0.23.12(effect@3.16.12)(vitest@3.2.4(@types/node@24.0.10)(yaml@2.8.0))
       '@types/node':
         specifier: ^24.0.10
