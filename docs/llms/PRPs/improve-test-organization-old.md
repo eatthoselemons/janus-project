@@ -68,6 +68,9 @@ Create a comprehensive test suite that:
 - url: https://effect.website/llms-small.txt
   section: Search for "Testing" and "it.effect"
   why: Condensed Effect testing patterns
+
+- url: https://www.npmjs.com/package/@effect/vitest
+| why: Has a simple how to for using effect and vitest
 ```
 
 ### Current Codebase Structure

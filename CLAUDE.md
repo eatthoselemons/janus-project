@@ -85,8 +85,14 @@ The project adheres strictly to the principles of **Functional Programming** and
 -   **The `Effect-TS` Mandate:** This is our foundational framework. All asynchronous operations, error handling, and dependency management **MUST** be modeled using the `Effect` system.
 -   **`Effect-TS` Documentation:** If you are unsure about a specific `Effect-TS` implementation, you are encouraged to consult the official LLM-optimized documentation.
     -   **Condensed:** `https://effect.website/llms-small.txt`
-    -   **Full:** `https://effect.website/llms-full.txt`
     -   **Topics/Index:** `https://effect.website/llms.txt`
 -   **Quick Reference For Using Effect** You can read either "effect-composition-guide.md" or "effect-normand-paradigm-guide.md" inside the `docs/llms/examples/` directory for references on proper usage of Effect
 
+### Notes
 
+Effects `Model.Class` is for when you're using sql databases, we need to use `Schema.Struct` because we are using neo4j for our databases
+Use `pnpm test <string>` to skip the tests from the `examples` folder, the `<string>` is something that appears in the path so `pnpm test basic` would test:
+- basic.test.ts
+- basic-foo.test.ts
+- basic/foo.test.ts
+But skip other tests, you should usually just use `pnpm test src` to run the janus tests
