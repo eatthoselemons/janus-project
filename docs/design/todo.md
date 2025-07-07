@@ -140,6 +140,11 @@ Based on analysis of the design documents and current codebase, this document ou
     - [ ] Claude-specific handling
     - [ ] Tests with mocked HTTP responses
 
+  - [ ] **Google Provider** (`gemini-provider.ts`)
+    - [ ] Gemini API integration
+    - [ ] Gemini-specific handling
+    - [ ] Tests with mocked HTTP responses
+    
 - [ ] **Test Execution Service** (`src/services/test-execution-service.ts`)
   - [ ] Test matrix execution coordination
   - [ ] Parallel/sequential execution strategies

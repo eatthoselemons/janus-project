@@ -1,3 +1,5 @@
+> **Audience:** Human Developers (Learning & Onboarding)
+
 # Using Effect to Follow Eric Normand's "Data, Calculations, Actions" Paradigm (Human Learning Edition)
 
 This guide shows how to use Effect to implement Eric Normand's paradigm from "Grokking Simplicity", with detailed explanations of why each pattern works and how it benefits your code.

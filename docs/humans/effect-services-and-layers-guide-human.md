@@ -1,4 +1,6 @@
 
+> **Audience:** Human Developers (Learning & Onboarding)
+
 # Using Services and Layers in Effect: A Guide to Actions, Calculations, and Data
 
 This guide explains how to use Effect's `Services` and `Layers` to structure your application according to the principles of "actions, calculations, and data," as described in Eric Normand's "Grokking Simplicity." We'll use examples from this repository to illustrate these concepts.

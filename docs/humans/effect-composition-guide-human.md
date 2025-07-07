@@ -1,3 +1,5 @@
+> **Audience:** Human Developers (Learning & Onboarding)
+
 # Effect Composition Guide: Types and Layers (Human Learning Edition)
 
 This guide explains how Effect uses composition patterns for building scalable applications, with detailed explanations of why each pattern works and when to use it.

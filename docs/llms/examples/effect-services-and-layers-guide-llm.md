@@ -1,3 +1,5 @@
+> **Audience:** LLM / AI Agent (Implementation & Reference)
+
 # Effect Services and Layers Guide
 
 This guide explains how to use Effect's Services and Layers system to structure applications following the "actions, calculations, and data" paradigm.

@@ -1,3 +1,5 @@
+> **Audience:** LLM / AI Agent (Implementation & Reference)
+
 # Using Effect to Follow Eric Normand's "Data, Calculations, Actions" Paradigm
 
 This guide shows how to use Effect to implement Eric Normand's paradigm from "Grokking Simplicity", demonstrating how Effect's type system naturally enforces the separation between Data, Calculations, and Actions.

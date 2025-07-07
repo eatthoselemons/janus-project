@@ -1,3 +1,5 @@
+> **Audience:** LLM / AI Agent (Implementation & Reference)
+
 # Effect Composition Guide: Types and Layers
 
 This guide explains how Effect uses composition patterns for building scalable applications, with examples from the http-server project.
