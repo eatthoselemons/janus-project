@@ -4,7 +4,7 @@
  */
 
 import { Effect, Layer, Option, Schema } from "effect"
-import { Neo4jService, Neo4jQueryError, executeQuery } from "./neo4j"
+import { Neo4jService, Neo4jQueryError } from "./neo4j"
 import {
   Snippet,
   SnippetId,
@@ -29,7 +29,9 @@ import {
   CompositionNotFound,
   ParameterNotFound,
   TestRunNotFound,
-  TagNotFound
+  TagNotFound,
+  CreateSnippetData,
+  CreateCompositionData
 } from "../core/domain"
 
 // --- Repository Errors ---
@@ -56,11 +58,11 @@ export class EntityValidationError extends Schema.TaggedError<EntityValidationEr
 // --- Snippet Repository ---
 
 export interface SnippetRepositoryService {
-  readonly create: (snippet: typeof Snippet.insert.Type) => Effect.Effect<Snippet, RepositoryError>
+  readonly create: (snippet: Snippet) => Effect.Effect<Snippet, RepositoryError>
   readonly findById: (id: SnippetId) => Effect.Effect<Option.Option<Snippet>, RepositoryError>
   readonly findByName: (name: Slug) => Effect.Effect<Option.Option<Snippet>, RepositoryError>
   readonly list: () => Effect.Effect<readonly Snippet[], RepositoryError>
-  readonly update: (id: SnippetId, updates: Partial<typeof Snippet.update.Type>) => Effect.Effect<Snippet, RepositoryError | SnippetNotFound>
+  readonly update: (id: SnippetId, updates: Partial<CreateSnippetData>) => Effect.Effect<Snippet, RepositoryError | SnippetNotFound>
   readonly delete: (id: SnippetId) => Effect.Effect<void, RepositoryError | SnippetNotFound>
 }
 
@@ -68,37 +70,32 @@ export class SnippetRepository extends Effect.Service<SnippetRepository>()("Snip
   effect: Effect.gen(function*() {
     const neo4j = yield* Neo4jService
 
-    const create = (snippet: typeof Snippet.insert.Type): Effect.Effect<Snippet, RepositoryError> =>
-      Effect.gen(function*() {
-        const insertData = Snippet.insert.make(snippet)
-        const createdSnippet = yield* executeQuery<Snippet>(
-          `CREATE (s:Snippet {id: randomUUID(), name: $name, description: $description, createdAt: datetime(), updatedAt: datetime()})
-           RETURN s`,
-          {
-            name: insertData.name,
-            description: insertData.description
-          }
-        ).pipe(
-          Effect.map(records => records[0]),
-          Effect.mapError(cause => new RepositoryError({
-            operation: "create",
-            entityType: "Snippet",
-            message: "Failed to create snippet",
-            cause
-          }))
-        )
-        
-        return Snippet.make(createdSnippet)
-      }).pipe(
+    const create = (snippet: Snippet): Effect.Effect<Snippet, RepositoryError> =>
+      neo4j.runQuery<unknown>(
+        `CREATE (s:Snippet $props) RETURN s`,
+        { props: snippet }
+      ).pipe(
+        Effect.map(records => records[0]),
+        Effect.flatMap(Schema.decodeUnknown(Snippet)),
+        Effect.mapError(cause => new RepositoryError({
+          operation: "create",
+          entityType: "Snippet",
+          message: "Failed to create snippet",
+          cause
+        })),
         Effect.withSpan("SnippetRepository.create")
       )
 
     const findById = (id: SnippetId): Effect.Effect<Option.Option<Snippet>, RepositoryError> =>
-      executeQuery<Snippet>(
+      neo4j.runQuery<unknown>(
         `MATCH (s:Snippet {id: $id}) RETURN s`,
         { id }
       ).pipe(
-        Effect.map(records => records.length > 0 ? Option.some(Snippet.make(records[0])) : Option.none()),
+        Effect.map(records => Option.fromNullable(records[0])),
+        Effect.flatMap(Option.match({
+          onNone: () => Effect.succeed(Option.none()),
+          onSome: (record) => Schema.decodeUnknown(Snippet)(record).pipe(Effect.map(Option.some))
+        })),
         Effect.mapError(cause => new RepositoryError({
           operation: "findById",
           entityType: "Snippet",
@@ -109,11 +106,15 @@ export class SnippetRepository extends Effect.Service<SnippetRepository>()("Snip
       )
 
     const findByName = (name: Slug): Effect.Effect<Option.Option<Snippet>, RepositoryError> =>
-      executeQuery<Snippet>(
+      neo4j.runQuery<unknown>(
         `MATCH (s:Snippet {name: $name}) RETURN s`,
         { name }
       ).pipe(
-        Effect.map(records => records.length > 0 ? Option.some(Snippet.make(records[0])) : Option.none()),
+        Effect.map(records => Option.fromNullable(records[0])),
+        Effect.flatMap(Option.match({
+          onNone: () => Effect.succeed(Option.none()),
+          onSome: (record) => Schema.decodeUnknown(Snippet)(record).pipe(Effect.map(Option.some))
+        })),
         Effect.mapError(cause => new RepositoryError({
           operation: "findByName", 
           entityType: "Snippet",
@@ -124,10 +125,10 @@ export class SnippetRepository extends Effect.Service<SnippetRepository>()("Snip
       )
 
     const list = (): Effect.Effect<readonly Snippet[], RepositoryError> =>
-      executeQuery<Snippet>(
+      neo4j.runQuery<unknown>(
         `MATCH (s:Snippet) RETURN s ORDER BY s.name`
       ).pipe(
-        Effect.map(records => records.map(record => Snippet.make(record))),
+        Effect.flatMap(Schema.decodeUnknown(Schema.Array(Snippet))),
         Effect.mapError(cause => new RepositoryError({
           operation: "list",
           entityType: "Snippet", 
@@ -137,21 +138,23 @@ export class SnippetRepository extends Effect.Service<SnippetRepository>()("Snip
         Effect.withSpan("SnippetRepository.list")
       )
 
-    const update = (id: SnippetId, updates: Partial<typeof Snippet.update.Type>): Effect.Effect<Snippet, RepositoryError | SnippetNotFound> =>
+    const update = (id: SnippetId, updates: Partial<CreateSnippetData>): Effect.Effect<Snippet, RepositoryError | SnippetNotFound> =>
       Effect.gen(function*() {
         const existing = yield* findById(id)
         if (Option.isNone(existing)) {
           return yield* Effect.fail(new SnippetNotFound({ id }))
         }
 
-        const updateData = Snippet.update.make(updates)
-        const updatedSnippet = yield* executeQuery<Snippet>(
+        const now = new Date()
+        const updateData = { ...updates, updatedAt: now }
+        const records = yield* neo4j.runQuery<unknown>(
           `MATCH (s:Snippet {id: $id})
-           SET s += $updates, s.updatedAt = datetime()
+           SET s += $updates
            RETURN s`,
           { id, updates: updateData }
         ).pipe(
-          Effect.map(records => Snippet.make(records[0])),
+          Effect.map(records => records[0]),
+          Effect.flatMap(Schema.decodeUnknown(Snippet)),
           Effect.mapError(cause => new RepositoryError({
             operation: "update",
             entityType: "Snippet",
@@ -160,7 +163,7 @@ export class SnippetRepository extends Effect.Service<SnippetRepository>()("Snip
           }))
         )
 
-        return updatedSnippet
+        return records
       }).pipe(
         Effect.withSpan("SnippetRepository.update", { attributes: { id } })
       )
@@ -172,7 +175,7 @@ export class SnippetRepository extends Effect.Service<SnippetRepository>()("Snip
           return yield* Effect.fail(new SnippetNotFound({ id }))
         }
 
-        yield* executeQuery(
+        yield* neo4j.runQuery(
           `MATCH (s:Snippet {id: $id}) DETACH DELETE s`,
           { id }
         ).pipe(
@@ -198,24 +201,28 @@ export class SnippetRepository extends Effect.Service<SnippetRepository>()("Snip
   }),
   dependencies: [Neo4jService.Default]
 }) {
-  static Test = Layer.succeed(this, {
-    create: () => Effect.dieMessage("SnippetRepository.create not implemented in test"),
-    findById: () => Effect.succeed(Option.none()),
-    findByName: () => Effect.succeed(Option.none()),
-    list: () => Effect.succeed([]),
-    update: () => Effect.dieMessage("SnippetRepository.update not implemented in test"),
-    delete: () => Effect.void
-  })
+  static Test = Layer.succeed(this, (function() {
+    const service: SnippetRepositoryService = {
+      create: () => Effect.dieMessage("SnippetRepository.create not implemented in test"),
+      findById: () => Effect.succeed(Option.none()),
+      findByName: () => Effect.succeed(Option.none()),
+      list: () => Effect.succeed([]),
+      update: () => Effect.dieMessage("SnippetRepository.update not implemented in test"),
+      delete: () => Effect.void
+    }
+    // Cast to include required runtime properties
+    return Object.assign(Object.create(SnippetRepository.prototype), service)
+  })())
 }
 
 // --- Composition Repository ---
 
 export interface CompositionRepositoryService {
-  readonly create: (composition: typeof Composition.insert.Type) => Effect.Effect<Composition, RepositoryError>
+  readonly create: (composition: Composition) => Effect.Effect<Composition, RepositoryError>
   readonly findById: (id: CompositionId) => Effect.Effect<Option.Option<Composition>, RepositoryError>
   readonly findByName: (name: Slug) => Effect.Effect<Option.Option<Composition>, RepositoryError>
   readonly list: () => Effect.Effect<readonly Composition[], RepositoryError>
-  readonly update: (id: CompositionId, updates: Partial<typeof Composition.update.Type>) => Effect.Effect<Composition, RepositoryError | CompositionNotFound>
+  readonly update: (id: CompositionId, updates: Partial<CreateCompositionData>) => Effect.Effect<Composition, RepositoryError | CompositionNotFound>
   readonly delete: (id: CompositionId) => Effect.Effect<void, RepositoryError | CompositionNotFound>
 }
 
@@ -223,37 +230,32 @@ export class CompositionRepository extends Effect.Service<CompositionRepository>
   effect: Effect.gen(function*() {
     const neo4j = yield* Neo4jService
 
-    const create = (composition: typeof Composition.insert.Type): Effect.Effect<Composition, RepositoryError> =>
-      Effect.gen(function*() {
-        const insertData = Composition.insert.make(composition)
-        const createdComposition = yield* executeQuery<Composition>(
-          `CREATE (c:Composition {id: randomUUID(), name: $name, description: $description, createdAt: datetime(), updatedAt: datetime()})
-           RETURN c`,
-          {
-            name: insertData.name,
-            description: insertData.description
-          }
-        ).pipe(
-          Effect.map(records => records[0]),
-          Effect.mapError(cause => new RepositoryError({
-            operation: "create",
-            entityType: "Composition",
-            message: "Failed to create composition",
-            cause
-          }))
-        )
-
-        return Composition.make(createdComposition)
-      }).pipe(
+    const create = (composition: Composition): Effect.Effect<Composition, RepositoryError> =>
+      neo4j.runQuery<unknown>(
+        `CREATE (c:Composition $props) RETURN c`,
+        { props: composition }
+      ).pipe(
+        Effect.map(records => records[0]),
+        Effect.flatMap(Schema.decodeUnknown(Composition)),
+        Effect.mapError(cause => new RepositoryError({
+          operation: "create",
+          entityType: "Composition",
+          message: "Failed to create composition",
+          cause
+        })),
         Effect.withSpan("CompositionRepository.create")
       )
 
     const findById = (id: CompositionId): Effect.Effect<Option.Option<Composition>, RepositoryError> =>
-      executeQuery<Composition>(
+      neo4j.runQuery<unknown>(
         `MATCH (c:Composition {id: $id}) RETURN c`,
         { id }
       ).pipe(
-        Effect.map(records => records.length > 0 ? Option.some(Composition.make(records[0])) : Option.none()),
+        Effect.map(records => Option.fromNullable(records[0])),
+        Effect.flatMap(Option.match({
+          onNone: () => Effect.succeed(Option.none()),
+          onSome: (record) => Schema.decodeUnknown(Composition)(record).pipe(Effect.map(Option.some))
+        })),
         Effect.mapError(cause => new RepositoryError({
           operation: "findById",
           entityType: "Composition",
@@ -264,11 +266,15 @@ export class CompositionRepository extends Effect.Service<CompositionRepository>
       )
 
     const findByName = (name: Slug): Effect.Effect<Option.Option<Composition>, RepositoryError> =>
-      executeQuery<Composition>(
+      neo4j.runQuery<unknown>(
         `MATCH (c:Composition {name: $name}) RETURN c`,
         { name }
       ).pipe(
-        Effect.map(records => records.length > 0 ? Option.some(Composition.make(records[0])) : Option.none()),
+        Effect.map(records => Option.fromNullable(records[0])),
+        Effect.flatMap(Option.match({
+          onNone: () => Effect.succeed(Option.none()),
+          onSome: (record) => Schema.decodeUnknown(Composition)(record).pipe(Effect.map(Option.some))
+        })),
         Effect.mapError(cause => new RepositoryError({
           operation: "findByName",
           entityType: "Composition", 
@@ -279,10 +285,10 @@ export class CompositionRepository extends Effect.Service<CompositionRepository>
       )
 
     const list = (): Effect.Effect<readonly Composition[], RepositoryError> =>
-      executeQuery<Composition>(
+      neo4j.runQuery<unknown>(
         `MATCH (c:Composition) RETURN c ORDER BY c.name`
       ).pipe(
-        Effect.map(records => records.map(record => Composition.make(record))),
+        Effect.flatMap(Schema.decodeUnknown(Schema.Array(Composition))),
         Effect.mapError(cause => new RepositoryError({
           operation: "list",
           entityType: "Composition",
@@ -292,21 +298,23 @@ export class CompositionRepository extends Effect.Service<CompositionRepository>
         Effect.withSpan("CompositionRepository.list")
       )
 
-    const update = (id: CompositionId, updates: Partial<typeof Composition.update.Type>): Effect.Effect<Composition, RepositoryError | CompositionNotFound> =>
+    const update = (id: CompositionId, updates: Partial<CreateCompositionData>): Effect.Effect<Composition, RepositoryError | CompositionNotFound> =>
       Effect.gen(function*() {
         const existing = yield* findById(id)
         if (Option.isNone(existing)) {
           return yield* Effect.fail(new CompositionNotFound({ id }))
         }
 
-        const updateData = Composition.update.make(updates)
-        const updatedComposition = yield* executeQuery<Composition>(
+        const now = new Date()
+        const updateData = { ...updates, updatedAt: now }
+        const records = yield* neo4j.runQuery<unknown>(
           `MATCH (c:Composition {id: $id})
-           SET c += $updates, c.updatedAt = datetime()
+           SET c += $updates
            RETURN c`,
           { id, updates: updateData }
         ).pipe(
-          Effect.map(records => Composition.make(records[0])),
+          Effect.map(records => records[0]),
+          Effect.flatMap(Schema.decodeUnknown(Composition)),
           Effect.mapError(cause => new RepositoryError({
             operation: "update",
             entityType: "Composition",
@@ -315,7 +323,7 @@ export class CompositionRepository extends Effect.Service<CompositionRepository>
           }))
         )
 
-        return updatedComposition
+        return records
       }).pipe(
         Effect.withSpan("CompositionRepository.update", { attributes: { id } })
       )
@@ -327,7 +335,7 @@ export class CompositionRepository extends Effect.Service<CompositionRepository>
           return yield* Effect.fail(new CompositionNotFound({ id }))
         }
 
-        yield* executeQuery(
+        yield* neo4j.runQuery(
           `MATCH (c:Composition {id: $id}) DETACH DELETE c`,
           { id }
         ).pipe(
@@ -353,25 +361,26 @@ export class CompositionRepository extends Effect.Service<CompositionRepository>
   }),
   dependencies: [Neo4jService.Default]
 }) {
-  static Test = Layer.succeed(this, {
-    create: () => Effect.dieMessage("CompositionRepository.create not implemented in test"),
-    findById: () => Effect.succeed(Option.none()),
-    findByName: () => Effect.succeed(Option.none()),
-    list: () => Effect.succeed([]),
-    update: () => Effect.dieMessage("CompositionRepository.update not implemented in test"),
-    delete: () => Effect.void
-  })
+  static Test = Layer.succeed(this, (function() {
+    const service: CompositionRepositoryService = {
+      create: () => Effect.dieMessage("CompositionRepository.create not implemented in test"),
+      findById: () => Effect.succeed(Option.none()),
+      findByName: () => Effect.succeed(Option.none()),
+      list: () => Effect.succeed([]),
+      update: () => Effect.dieMessage("CompositionRepository.update not implemented in test"),
+      delete: () => Effect.void
+    }
+    // Cast to include required runtime properties
+    return Object.assign(Object.create(CompositionRepository.prototype), service)
+  })())
 }
 
 // --- Test Helper ---
 
 /**
  * Helper function to create test layers for repositories.
+ * This is handled by the test-utils makeTestLayer function instead.
  */
-export const makeTestRepository = <T extends Record<string, any>>(
-  service: new() => T,
-  implementation: Partial<T[keyof T]>
-) => Layer.succeed(service, implementation as T[keyof T])
 
 // --- Repository Layer Composition ---
 

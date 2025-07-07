@@ -1,22 +1,34 @@
 /**
- * Pure calculation functions for domain model operations.
- * Following Eric Normand's paradigm, these functions are pure calculations
- * that transform data without side effects.
+ * Domain model operations with proper separation of concerns:
+ * - Pure functions (Calculations) for data transformation
+ * - Effectful functions (Actions) for operations with side effects
+ * Following Eric Normand's paradigm and Effect-TS best practices.
  */
 
 import { Effect, Schema } from "effect"
+import { Clock } from "effect"
+import { UuidServiceTag, type Uuid } from "./services"
 import {
   Slug,
   Snippet,
-  SnippetVersion, 
+  SnippetId,
+  SnippetVersion,
+  SnippetVersionId,
   Parameter,
+  ParameterId,
   ParameterOption,
+  ParameterOptionId,
   Composition,
+  CompositionId,
   CompositionVersion,
+  CompositionVersionId,
   CompositionSnippet,
   TestRun,
+  TestRunId,
   DataPoint,
+  DataPointId,
   Tag,
+  TagId,
   InvalidSlugError,
   createSlug,
   CreateSnippetData,
@@ -53,260 +65,260 @@ export const createSlugFromInput = (input: string): Effect.Effect<Slug, InvalidS
   return createSlug(normalized)
 }
 
-// --- Entity Creation Helpers ---
-// These are pure calculation functions that create data for entity insertion
+// --- Pure Creation Functions (Calculations) ---
 
 /**
- * Creates validated data for Snippet creation.
+ * Creates a Snippet from complete data. Pure function.
  */
-export const createSnippetData = (name: Slug, description: string): CreateSnippetData => ({
-  name,
-  description
-})
+export const createSnippet = (data: CreateSnippetData & { id: SnippetId; createdAt: Date; updatedAt: Date }): Snippet => {
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt
+  }
+}
 
 /**
- * Creates validated data for SnippetVersion creation.
+ * Creates a SnippetVersion from complete data. Pure function.
  */
-export const createSnippetVersionData = (content: string, commit_message: string): CreateSnippetVersionData => ({
-  content,
-  commit_message
-})
+export const createSnippetVersion = (data: CreateSnippetVersionData & { id: SnippetVersionId; createdAt: Date }): SnippetVersion => {
+  return {
+    id: data.id,
+    content: data.content,
+    commit_message: data.commit_message,
+    createdAt: data.createdAt
+  }
+}
 
 /**
- * Creates validated data for Parameter creation.
+ * Creates a Parameter from complete data. Pure function.
  */
-export const createParameterData = (name: Slug, description: string): CreateParameterData => ({
-  name,
-  description
-})
+export const createParameter = (data: CreateParameterData & { id: ParameterId; createdAt: Date; updatedAt: Date }): Parameter => {
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt
+  }
+}
 
 /**
- * Creates validated data for ParameterOption creation.
+ * Creates a ParameterOption from complete data. Pure function.
  */
-export const createParameterOptionData = (value: string, commit_message: string): CreateParameterOptionData => ({
-  value,
-  commit_message
-})
+export const createParameterOption = (data: CreateParameterOptionData & { id: ParameterOptionId; createdAt: Date }): ParameterOption => {
+  return {
+    id: data.id,
+    value: data.value,
+    commit_message: data.commit_message,
+    createdAt: data.createdAt
+  }
+}
 
 /**
- * Creates validated data for Composition creation.
+ * Creates a Composition from complete data. Pure function.
  */
-export const createCompositionData = (name: Slug, description: string): CreateCompositionData => ({
-  name,
-  description
-})
+export const createComposition = (data: CreateCompositionData & { id: CompositionId; createdAt: Date; updatedAt: Date }): Composition => {
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt
+  }
+}
 
 /**
- * Creates validated data for CompositionVersion creation.
+ * Creates a CompositionVersion from complete data. Pure function.
  */
-export const createCompositionVersionData = (
-  snippets: readonly CompositionSnippet[],
-  commit_message: string
-): CreateCompositionVersionData => ({
-  snippets,
-  commit_message
-})
+export const createCompositionVersion = (data: CreateCompositionVersionData & { id: CompositionVersionId; createdAt: Date }): CompositionVersion => {
+  return {
+    id: data.id,
+    snippets: data.snippets,
+    commit_message: data.commit_message,
+    createdAt: data.createdAt
+  }
+}
 
 /**
- * Creates validated data for TestRun creation.
+ * Creates a TestRun from complete data. Pure function.
  */
-export const createTestRunData = (
-  name: string,
-  llm_provider: string,
-  llm_model: string,
-  metadata: Record<string, unknown> = {}
-): CreateTestRunData => ({
-  name,
-  llm_provider,
-  llm_model,
-  metadata
-})
+export const createTestRun = (data: CreateTestRunData & { id: TestRunId; createdAt: Date }): TestRun => {
+  return {
+    id: data.id,
+    name: data.name,
+    llm_provider: data.llm_provider,
+    llm_model: data.llm_model,
+    metadata: data.metadata || {},
+    createdAt: data.createdAt
+  }
+}
 
 /**
- * Creates validated data for DataPoint creation.
+ * Creates a DataPoint from complete data. Pure function.
  */
-export const createDataPointData = (
-  final_prompt_text: string,
-  response_text: string,
-  metrics: Record<string, unknown> = {}
-): CreateDataPointData => ({
-  final_prompt_text,
-  response_text,
-  metrics
-})
+export const createDataPoint = (data: CreateDataPointData & { id: DataPointId; createdAt: Date }): DataPoint => {
+  return {
+    id: data.id,
+    final_prompt_text: data.final_prompt_text,
+    response_text: data.response_text,
+    metrics: data.metrics || {},
+    createdAt: data.createdAt
+  }
+}
 
 /**
- * Creates validated data for Tag creation.
+ * Creates a Tag from complete data. Pure function.
  */
-export const createTagData = (name: Slug): CreateTagData => ({
-  name
-})
+export const createTag = (data: CreateTagData & { id: TagId; createdAt: Date }): Tag => {
+  return {
+    id: data.id,
+    name: data.name,
+    createdAt: data.createdAt
+  }
+}
 
-// --- Validation Helpers ---
-// Pure functions for validating composition structures
+// --- Effectful Build Functions (Actions) ---
 
 /**
- * Validates that composition snippets have proper sequence ordering.
+ * Builds a new Snippet with generated ID and timestamps.
  */
-export const validateSnippetSequencing = (snippets: readonly CompositionSnippet[]): boolean => {
-  const roleGroups = snippets.reduce((acc, snippet) => {
-    const role = snippet.role
-    if (!acc[role]) acc[role] = []
-    acc[role].push(snippet.sequence)
-    return acc
-  }, {} as Record<string, number[]>)
-
-  return Object.values(roleGroups).every(sequences => {
-    const sorted = [...sequences].sort((a, b) => a - b)
-    return sequences.length === 0 || (
-      sorted[0] === 0 && 
-      sorted.every((seq, idx) => idx === 0 || seq === sorted[idx - 1] + 1)
-    )
+export const buildSnippet = (data: CreateSnippetData): Effect.Effect<Snippet, never, Clock.Clock | UuidServiceTag> =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis
+    const uuidService = yield* UuidServiceTag
+    const id = yield* uuidService.v4
+    return createSnippet({
+      ...data,
+      id: id as unknown as SnippetId,
+      createdAt: new Date(now),
+      updatedAt: new Date(now)
+    })
   })
-}
 
 /**
- * Validates that all snippet version IDs in a composition are unique.
+ * Builds a new SnippetVersion with generated ID and timestamp.
  */
-export const validateUniqueSnippetVersions = (snippets: readonly CompositionSnippet[]): boolean => {
-  const ids = snippets.map(s => s.snippetVersionId)
-  return new Set(ids).size === ids.length
-}
-
-/**
- * Validates a complete composition structure.
- */
-export const validateCompositionStructure = (snippets: readonly CompositionSnippet[]): boolean => {
-  return validateSnippetSequencing(snippets) && validateUniqueSnippetVersions(snippets)
-}
-
-// --- Transformation Helpers ---
-
-/**
- * Extracts snippet version IDs from a composition version.
- */
-export const extractSnippetVersionIds = (composition: CompositionVersion): readonly string[] => {
-  return composition.snippets.map(s => s.snippetVersionId)
-}
-
-/**
- * Groups composition snippets by role.
- */
-export const groupSnippetsByRole = (snippets: readonly CompositionSnippet[]) => {
-  return snippets.reduce((acc, snippet) => {
-    const role = snippet.role
-    if (!acc[role]) acc[role] = []
-    acc[role].push(snippet)
-    return acc
-  }, {} as Record<string, CompositionSnippet[]>)
-}
-
-/**
- * Sorts snippets within each role by sequence.
- */
-export const sortSnippetsBySequence = (snippets: readonly CompositionSnippet[]): CompositionSnippet[] => {
-  return [...snippets].sort((a, b) => {
-    if (a.role !== b.role) {
-      const roleOrder = { system: 0, user_prompt: 1, model_response: 2 }
-      return roleOrder[a.role as keyof typeof roleOrder] - roleOrder[b.role as keyof typeof roleOrder]
-    }
-    return a.sequence - b.sequence
+export const buildSnippetVersion = (data: CreateSnippetVersionData): Effect.Effect<SnippetVersion, never, Clock.Clock | UuidServiceTag> =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis
+    const uuidService = yield* UuidServiceTag
+    const id = yield* uuidService.v4
+    return createSnippetVersion({
+      ...data,
+      id: id as unknown as SnippetVersionId,
+      createdAt: new Date(now)
+    })
   })
-}
-
-// --- Entity Construction Helpers ---
 
 /**
- * Creates a complete Snippet entity with generated ID and timestamps.
+ * Builds a new Parameter with generated ID and timestamps.
  */
-export const buildSnippet = (data: CreateSnippetData): Snippet => ({
-  id: crypto.randomUUID() as any, // Will be validated by Schema
-  name: data.name,
-  description: data.description,
-  createdAt: new Date(),
-  updatedAt: new Date()
-})
+export const buildParameter = (data: CreateParameterData): Effect.Effect<Parameter, never, Clock.Clock | UuidServiceTag> =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis
+    const uuidService = yield* UuidServiceTag
+    const id = yield* uuidService.v4
+    return createParameter({
+      ...data,
+      id: id as unknown as ParameterId,
+      createdAt: new Date(now),
+      updatedAt: new Date(now)
+    })
+  })
 
 /**
- * Creates a complete SnippetVersion entity with generated ID and timestamp.
+ * Builds a new ParameterOption with generated ID and timestamp.
  */
-export const buildSnippetVersion = (data: CreateSnippetVersionData): SnippetVersion => ({
-  id: crypto.randomUUID() as any, // Will be validated by Schema
-  content: data.content,
-  commit_message: data.commit_message,
-  createdAt: new Date()
-})
+export const buildParameterOption = (data: CreateParameterOptionData): Effect.Effect<ParameterOption, never, Clock.Clock | UuidServiceTag> =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis
+    const uuidService = yield* UuidServiceTag
+    const id = yield* uuidService.v4
+    return createParameterOption({
+      ...data,
+      id: id as unknown as ParameterOptionId,
+      createdAt: new Date(now)
+    })
+  })
 
 /**
- * Creates a complete Parameter entity with generated ID and timestamps.
+ * Builds a new Composition with generated ID and timestamps.
  */
-export const buildParameter = (data: CreateParameterData): Parameter => ({
-  id: crypto.randomUUID() as any, // Will be validated by Schema
-  name: data.name,
-  description: data.description,
-  createdAt: new Date(),
-  updatedAt: new Date()
-})
+export const buildComposition = (data: CreateCompositionData): Effect.Effect<Composition, never, Clock.Clock | UuidServiceTag> =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis
+    const uuidService = yield* UuidServiceTag
+    const id = yield* uuidService.v4
+    return createComposition({
+      ...data,
+      id: id as unknown as CompositionId,
+      createdAt: new Date(now),
+      updatedAt: new Date(now)
+    })
+  })
 
 /**
- * Creates a complete ParameterOption entity with generated ID and timestamp.
+ * Builds a new CompositionVersion with generated ID and timestamp.
  */
-export const buildParameterOption = (data: CreateParameterOptionData): ParameterOption => ({
-  id: crypto.randomUUID() as any, // Will be validated by Schema
-  value: data.value,
-  commit_message: data.commit_message,
-  createdAt: new Date()
-})
+export const buildCompositionVersion = (data: CreateCompositionVersionData): Effect.Effect<CompositionVersion, never, Clock.Clock | UuidServiceTag> =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis
+    const uuidService = yield* UuidServiceTag
+    const id = yield* uuidService.v4
+    return createCompositionVersion({
+      ...data,
+      id: id as unknown as CompositionVersionId,
+      createdAt: new Date(now)
+    })
+  })
 
 /**
- * Creates a complete Composition entity with generated ID and timestamps.
+ * Builds a new TestRun with generated ID and timestamp.
  */
-export const buildComposition = (data: CreateCompositionData): Composition => ({
-  id: crypto.randomUUID() as any, // Will be validated by Schema
-  name: data.name,
-  description: data.description,
-  createdAt: new Date(),
-  updatedAt: new Date()
-})
+export const buildTestRun = (data: CreateTestRunData): Effect.Effect<TestRun, never, Clock.Clock | UuidServiceTag> =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis
+    const uuidService = yield* UuidServiceTag
+    const id = yield* uuidService.v4
+    return createTestRun({
+      ...data,
+      id: id as unknown as TestRunId,
+      createdAt: new Date(now)
+    })
+  })
 
 /**
- * Creates a complete CompositionVersion entity with generated ID and timestamp.
+ * Builds a new DataPoint with generated ID and timestamp.
  */
-export const buildCompositionVersion = (data: CreateCompositionVersionData): CompositionVersion => ({
-  id: crypto.randomUUID() as any, // Will be validated by Schema
-  snippets: data.snippets,
-  commit_message: data.commit_message,
-  createdAt: new Date()
-})
+export const buildDataPoint = (data: CreateDataPointData): Effect.Effect<DataPoint, never, Clock.Clock | UuidServiceTag> =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis
+    const uuidService = yield* UuidServiceTag
+    const id = yield* uuidService.v4
+    return createDataPoint({
+      ...data,
+      id: id as unknown as DataPointId,
+      createdAt: new Date(now)
+    })
+  })
 
 /**
- * Creates a complete TestRun entity with generated ID and timestamp.
+ * Builds a new Tag with generated ID and timestamp.
  */
-export const buildTestRun = (data: CreateTestRunData): TestRun => ({
-  id: crypto.randomUUID() as any, // Will be validated by Schema
-  name: data.name,
-  llm_provider: data.llm_provider,
-  llm_model: data.llm_model,
-  metadata: data.metadata || {},
-  createdAt: new Date()
-})
+export const buildTag = (data: CreateTagData): Effect.Effect<Tag, never, Clock.Clock | UuidServiceTag> =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis
+    const uuidService = yield* UuidServiceTag
+    const id = yield* uuidService.v4
+    return createTag({
+      ...data,
+      id: id as unknown as TagId,
+      createdAt: new Date(now)
+    })
+  })
 
-/**
- * Creates a complete DataPoint entity with generated ID and timestamp.
- */
-export const buildDataPoint = (data: CreateDataPointData): DataPoint => ({
-  id: crypto.randomUUID() as any, // Will be validated by Schema
-  final_prompt_text: data.final_prompt_text,
-  response_text: data.response_text,
-  metrics: data.metrics || {},
-  createdAt: new Date()
-})
 
-/**
- * Creates a complete Tag entity with generated ID and timestamp.
- */
-export const buildTag = (data: CreateTagData): Tag => ({
-  id: crypto.randomUUID() as any, // Will be validated by Schema
-  name: data.name,
-  createdAt: new Date()
-})
+

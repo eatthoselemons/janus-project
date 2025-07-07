@@ -41,7 +41,7 @@ export interface Neo4jDriver {
   readonly runQuery: <T = any>(
     query: string,
     params?: Record<string, any>
-  ) => Effect.Effect<T[], Neo4jQueryError>
+  ) => Effect.Effect<T[], Neo4jQueryError | Neo4jSessionError>
   readonly runTransaction: <T>(
     fn: (session: Session) => Effect.Effect<T, never>
   ) => Effect.Effect<T, Neo4jQueryError | Neo4jSessionError>
@@ -79,10 +79,8 @@ export class Neo4jService extends Effect.Service<Neo4jService>()("Neo4jService",
 
     // Add finalizer to close driver when scope closes
     yield* Effect.addFinalizer(() =>
-      Effect.tryPromise({
-        try: () => driver.close(),
-        catch: () => void 0 // Ignore close errors
-      }).pipe(
+      Effect.promise(() => driver.close()).pipe(
+        Effect.catchAll(() => Effect.void),
         Effect.withSpan("Neo4jService.close")
       )
     )
@@ -99,10 +97,9 @@ export class Neo4jService extends Effect.Service<Neo4jService>()("Neo4jService",
             cause
           })
         }),
-        (session) => Effect.try({
-          try: () => session.close(),
-          catch: () => void 0 // Ignore close errors
-        })
+        (session) => Effect.promise(() => session.close()).pipe(
+          Effect.catchAll(() => Effect.void)
+        )
       ).pipe(
         Effect.withSpan("Neo4jService.createSession")
       )
@@ -110,7 +107,7 @@ export class Neo4jService extends Effect.Service<Neo4jService>()("Neo4jService",
     const runQuery = <T = any>(
       query: string,
       params: Record<string, any> = {}
-    ): Effect.Effect<T[], Neo4jQueryError> =>
+    ): Effect.Effect<T[], Neo4jQueryError | Neo4jSessionError> =>
       Effect.scoped(
         Effect.gen(function*() {
           const session = yield* createSession()
@@ -163,10 +160,8 @@ export class Neo4jService extends Effect.Service<Neo4jService>()("Neo4jService",
       )
 
     const close = (): Effect.Effect<void, never> =>
-      Effect.try({
-        try: () => driver.close(),
-        catch: () => void 0 // Ignore close errors
-      }).pipe(
+      Effect.promise(() => driver.close()).pipe(
+        Effect.catchAll(() => Effect.void),
         Effect.withSpan("Neo4jService.close")
       )
 
@@ -182,12 +177,16 @@ export class Neo4jService extends Effect.Service<Neo4jService>()("Neo4jService",
   /**
    * Test layer for mocking Neo4j service in tests.
    */
-  static Test = Layer.succeed(this, {
-    createSession: () => Effect.dieMessage("Neo4jService.createSession not implemented in test"),
-    runQuery: () => Effect.succeed([]),
-    runTransaction: () => Effect.dieMessage("Neo4jService.runTransaction not implemented in test"),
-    close: () => Effect.void
-  })
+  static Test = Layer.succeed(this, (function() {
+    const service: Neo4jDriver = {
+      createSession: () => Effect.dieMessage("Neo4jService.createSession not implemented in test"),
+      runQuery: () => Effect.succeed([]),
+      runTransaction: () => Effect.dieMessage("Neo4jService.runTransaction not implemented in test"),
+      close: () => Effect.void
+    }
+    // Cast to include required runtime properties
+    return Object.assign(Object.create(Neo4jService.prototype), service)
+  })())
 }
 
 // --- Convenience Functions ---
@@ -198,7 +197,7 @@ export class Neo4jService extends Effect.Service<Neo4jService>()("Neo4jService",
 export const executeQuery = <T = any>(
   query: string,
   params: Record<string, any> = {}
-): Effect.Effect<T[], Neo4jQueryError, Neo4jService> =>
+): Effect.Effect<T[], Neo4jQueryError | Neo4jSessionError, Neo4jService> =>
   Effect.gen(function*() {
     const neo4j = yield* Neo4jService
     return yield* neo4j.runQuery<T>(query, params)
