@@ -1,101 +1,132 @@
-# Janus Implementation TODO List (v2 - Effect-Optimized)
+# Janus Implementation TODO List (v4 - Idiomatic Service Naming)
 
-This document breaks down the implementation of the Janus project into small, incremental features. This revised plan incorporates advanced and idiomatic patterns from the full Effect documentation to ensure a robust, maintainable, and performant system.
+This document provides a detailed, exhaustive, and incremental plan for implementing the Janus project. It uses idiomatic `Effect-TS` terminology, referring to all dependencies, including data access layers, as "Services".
 
-## Phase 1: Core Domain, Types, and Configuration (The "Data" Layer)
+## Phase 1: Foundational Types & Core Services
 
-This phase focuses on establishing the core, immutable data structures and a typed configuration system for the application.
+This phase establishes the bedrock of the application: the type system, configuration, and essential services.
 
--   [ ] **1.1: Typed Configuration Service:**
-    -   [ ] Create a `Config` schema for the application settings (e.g., `LogLevel`, Neo4j connection details).
-    -   [ ] Use `Config.redacted` for sensitive values like the Neo4j password.
-    -   [ ] Use `Config.nested` to group related configurations (e.g., `neo4j.uri`, `neo4j.user`).
-    -   [ ] Create a `ConfigLive` layer that provides the application configuration from environment variables.
+-   [ ] **1.1: Core Types & Schemas**
+    -   [ ] **Branded IDs:** Define all branded ID types using `Schema.string.pipe(Schema.brand("..."))`:
+        -   `SnippetId`, `SnippetVersionId`, `ParameterId`, `ParameterOptionId`, `CompositionId`, `CompositionVersionId`, `TestRunId`, `DataPointId`, `TagId`.
+    -   [ ] **Slug Type:** Create a `Slug` branded type with a custom validation function to enforce `lowercase-with-hyphens` format.
+    -   [ ] **Entity Schemas:** Define `Schema.Struct` for all core entities as specified in `domain-model.md`:
+        -   `Snippet`, `SnippetVersion`, `Parameter`, `ParameterOption`, `Composition`, `CompositionVersion` (including `CompositionSnippet`), `TestRun`, `DataPoint`, `Tag`.
 
--   [ ] **1.2: Core Error Types:**
-    -   [ ] Define all potential business-level errors as `Data.TaggedError`.
-    -   [ ] Create `Neo4jError` for database-related failures.
-    -   [ ] Create `LlmApiError` for failures in communication with LLM providers.
-    -   [ ] Create `ValidationError` for failures in data validation.
+-   [ ] **1.2: Error Sub-Types**
+    -   [ ] Define a base `JanusError` using `Data.TaggedError`.
+    -   [ ] Define specific error subtypes that extend `JanusError`:
+        -   `PersistenceError` (for database query/connection failures).
+        -   `LlmApiError` (for failures from LLM providers).
+        -   `FileSystemError` (for file IO problems, e.g., `snippet pull/push`).
+        -   `NotFoundError` (for when an entity lookup by ID or slug fails).
+        -   `ConflictError` (for import conflicts).
 
--   [ ] **1.3: Project and Core Identifiers:**
-    -   [ ] Define `ProjectId`, `ModelId`, `DatasetId`, etc., as branded types (`Schema.brand`).
-    -   [ ] Define `ProjectName`, `ModelName`, etc., with appropriate constraints (`Schema.string.pipe(Schema.nonEmpty())`).
-    -   [ ] Define `Timestamp` as a branded `Date` type.
-    -   [ ] Define the `Project` schema.
+-   [ ] **1.3: Typed Configuration Service**
+    -   [ ] **Implementation:** Create a `Config` schema for all application settings (Neo4j URI, user, password; LLM provider API keys).
+    -   [ ] **Implementation:** Use `Config.redacted` for all secrets (passwords, API keys).
+    -   [ ] **Implementation:** Create a `ConfigLive` layer that provides the configuration from environment variables.
+    -   [ ] **Testing:** Write a unit test for the `Config` schema, using `ConfigProvider.fromMap` to provide mock values and verify that the schema loads correctly.
+    -   [ ] **Documentation:** Add a section to `README.md` explaining the required environment variables.
 
--   [ ] **1.4: Model, Dataset, TestRun, and Analysis Schemas:**
-    -   [ ] Define the schemas for `Model`, `Dataset`, `TestCase`, `TestRun`, `TestResult`, and `Analysis` using the branded types and error types defined above.
-    -   [ ] Use `Schema.Json` for flexible fields like `Metadata` and `Evaluation`.
-    -   [ ] Use `Schema.literal` for status enums (`RunStatus`, `AnalysisStatus`).
+-   [ ] **1.4: Neo4j Client Service**
+    -   [ ] **Implementation:** Create a `Neo4jClient` service (`Effect.Tag`) that wraps the `neo4j-driver`.
+    -   [ ] **Implementation:** The service will expose `runQuery(query, params): Effect<Result, PersistenceError>`.
+    -   [ ] **Implementation:** Create a `Neo4jClientLive` layer that manages the driver's lifecycle using `Scope`.
+    -   [ ] **Testing:** Write an integration test for the `Neo4jClientLive` layer that connects to a test database and runs a simple query.
 
-## Phase 2: Neo4j Repositories & LLM Service (The "Actions" Layer)
+## Phase 2: Snippet Management
 
-This phase implements the persistence and external API interactions.
+-   [ ] **2.1: Snippet Persistence Service**
+    -   [ ] **Implementation:** Create `SnippetPersistence` service (`Effect.Tag`).
+    -   [ ] **Implementation:** Implement all required persistence methods:
+        -   `createSnippet(name: Slug, description: string): Effect<Snippet, PersistenceError>`
+        -   `createSnippetVersion(snippetId: SnippetId, content: string, commitMessage: string): Effect<SnippetVersion, PersistenceError>`
+        -   `findSnippetByName(name: Slug): Effect<Option<Snippet>, PersistenceError>`
+        -   `findLatestSnippetVersion(snippetId: SnippetId): Effect<Option<SnippetVersion>, PersistenceError>`
+        -   `listSnippets(): Effect<Snippet[], PersistenceError>`
+        -   `searchSnippets(query: string): Effect<Snippet[], PersistenceError>`
+    -   [ ] **Testing:** Write integration tests for each persistence method using a test Neo4j database.
 
--   [ ] **2.1: Neo4j Client Service:**
-    -   [ ] Create a `Neo4jClient` service (`Effect.Tag`) that wraps the `neo4j-driver`.
-    -   [ ] The service should expose methods like `runQuery(query, params)` that return `Effect<Result, Neo4jError>`.
-    -   [ ] Create a `Neo4jClientLive` layer that creates the driver instance and provides it to the service. Manage the driver's lifecycle with `Scope`.
+-   [ ] **2.2: Snippet CLI Commands**
+    -   [ ] **Implementation:** `janus snippet pull <snippet-name>`
+    -   [ ] **Implementation:** `janus snippet push <file-path> -m <message>`
+    -   [ ] **Implementation:** `janus snippet list`
+    -   [ ] **Implementation:** `janus snippet search "<query>"`
+    -   [ ] **Testing:** Write end-to-end tests for each CLI command.
+    -   [ ] **Documentation:** Write user documentation for the `janus snippet` commands.
 
--   [ ] **2.2: LLM API Service (with Request Batching & Caching):**
-    -   [ ] Define `LlmApiRequest` as a `Request.Request` schema, capturing the prompt, model, and configuration.
-    -   [ ] Create a batched `RequestResolver` (`LlmApiResolver`) for these requests. This resolver will handle the actual HTTP calls to the LLM provider's API.
-    -   [ ] Create an `LlmApiService` (`Effect.Tag`) with a method `generate(request: LlmApiRequest): Effect<Response, LlmApiError>`.
-    -   [ ] The `generate` method will use `Effect.request(request, LlmApiResolver)` and enable caching with `Effect.withRequestCaching(true)`.
-    -   [ ] Create a `LlmApiServiceLive` layer.
+## Phase 3: Parameter Management
 
--   [ ] **2.3: Aggregate Repositories:**
-    -   [ ] For each aggregate root (`Project`, `Model`, `Dataset`, `TestRun`, `Analysis`), create a corresponding repository service using `Effect.Tag`.
-    -   [ ] Implement the live layers (`ProjectRepositoryLive`, etc.) for these services. They will depend on the `Neo4jClient` service.
-    -   [ ] All repository methods (`create`, `findById`, etc.) will be composed of calls to the `Neo4jClient` service.
+-   [ ] **3.1: Parameter Persistence Service**
+    -   [ ] **Implementation:** Create `ParameterPersistence` service (`Effect.Tag`).
+    -   [ ] **Implementation:** Implement all required persistence methods:
+        -   `createParameter(name: Slug, description: string): Effect<Parameter, PersistenceError>`
+        -   `createParameterOption(parameterId: ParameterId, value: string, commitMessage: string): Effect<ParameterOption, PersistenceError>`
+        -   `findParameterByName(name: Slug): Effect<Option<Parameter>, PersistenceError>`
+        -   `listParameters(): Effect<Parameter[], PersistenceError>`
+        -   `listParameterOptions(parameterId: ParameterId): Effect<ParameterOption[], PersistenceError>`
+    -   [ ] **Testing:** Write integration tests for each persistence method.
 
-## Phase 3: Core Services (Orchestration)
+-   [ ] **3.2: Parameter CLI Commands**
+    -   [ ] **Implementation:** `janus parameter create <name> --description "<desc>"`
+    -   [ ] **Implementation:** `janus parameter add-option --parameter-name <name> <value> -m <message>`
+    -   [ ] **Implementation:** `janus parameter list`
+    -   [ ] **Implementation:** `janus parameter list-options <parameter-name>`
+    -   [ ] **Testing:** Write end-to-end tests for each CLI command.
+    -   [ ] **Documentation:** Write user documentation for the `janus parameter` commands.
 
-This phase focuses on the business logic, implemented as services that compose repositories and other action-oriented services.
+## Phase 4: Composition Management
 
--   [ ] **3.1: Project, Model, and Dataset Services:**
-    -   [ ] Create services (`ProjectService`, `ModelService`, `DatasetService`) using `Effect.Tag`.
-    -   [ ] These services will orchestrate the repositories to enforce business rules (e.g., ensuring unique names, handling dataset imports).
-    -   [ ] Provide live layers for each service.
+-   [ ] **4.1: Composition Persistence Service**
+    -   [ ] **Implementation:** Create `CompositionPersistence` service (`Effect.Tag`).
+    -   [ ] **Implementation:** Implement all required persistence methods:
+        -   `createCompositionVersion(from: { compositionId: CompositionId } | { groupName: Slug }, message: string): Effect<CompositionVersion, PersistenceError>`
+        -   `listCompositions(): Effect<Composition[], PersistenceError>`
+    -   [ ] **Testing:** Write integration tests for each persistence method.
 
--   [ ] **3.2: Test Execution Service:**
-    -   [ ] Create `TestExecutionService` (`Effect.Tag`).
-    -   [ ] Implement a `startTestRun` method that takes a `TestRunId`.
-    -   [ ] This method will fetch the `TestRun`, `Model`, and `Dataset`, then iterate through `TestCase`s.
-    -   [ ] For each `TestCase`, it will call the `LlmApiService.generate` method. The batching and caching will be handled automatically by the `Effect` runtime.
-    -   [ ] It will save results using the `TestRunRepository`.
+-   [ ] **4.2: Composition CLI Commands**
+    -   [ ] **Implementation:** `janus composition create-version --from-composition <id> | --from-group <name> -m <message>`
+    -   [ ] **Implementation:** `janus composition list`
+    -   [ ] **Testing:** Write end-to-end tests for each CLI command.
+    -   [ ] **Documentation:** Write user documentation for the `janus composition` commands.
 
--   [ ] **3.3: Analysis Service:**
-    -   [ ] Create `AnalysisService` (`Effect.Tag`).
-    -   [ ] Implement logic for analyzing a completed `TestRun`.
+## Phase 5: Test Execution & Results
 
-## Phase 4: CLI (The User Interface)
+-   [ ] **5.1: TestRun & DataPoint Persistence Service**
+    -   [ ] **Implementation:** Create `TestRunPersistence` service (`Effect.Tag`).
+    -   [ ] **Implementation:** Implement methods:
+        -   `createTestRun(name: string, llmProvider: string, llmModel: string, metadata: Record<string, any>): Effect<TestRun, PersistenceError>`
+        -   `createDataPoint(testRunId: TestRunId, compositionVersionId: CompositionVersionId, finalPrompt: string, responseText: string, metrics: Record<string, any>): Effect<DataPoint, PersistenceError>`
+        -   `listTestRuns(): Effect<TestRun[], PersistenceError>`
+    -   [ ] **Testing:** Write integration tests for each persistence method.
 
-This phase builds the user-facing CLI.
+-   [ ] **5.2: Test Execution Service (Business Logic)**
+    -   [ ] **Implementation:** Create `TestExecutionService` (`Effect.Tag`). This is a business logic service, distinct from the persistence services.
+    -   [ ] **Implementation:** Implement `runFromFile(configPath: string): Effect<TestRun, JanusError>`.
+    -   [ ] **Implementation:** This service will parse the YAML, use the persistence services to create the `TestRun` and `CompositionVersion`, call the LLM API, and save `DataPoint`s.
+    -   [ ] **Testing:** Write integration tests for the service, providing test implementations of the persistence and LLM services.
 
--   [ ] **4.1: CLI Framework and Effect Runtime:**
-    -   [ ] Set up `oclif` or a similar framework.
-    -   [ ] Create a `ManagedRuntime` for the application by composing all the `Live` layers (`ConfigLive`, `Neo4jClientLive`, `ProjectRepositoryLive`, etc.).
-    -   [ ] Each CLI command will use this runtime to execute the `Effect` workflows.
+-   [ ] **5.3: Run CLI Commands**
+    -   [ ] **Implementation:** `janus run <config-file-path>`
+    -   [ ] **Implementation:** `janus run list`
+    -   [ ] **Testing:** Write end-to-end tests for the CLI commands.
+    -   [ ] **Documentation:** Write user documentation for the `janus run` commands and the `test_config.yaml` format.
 
--   [ ] **4.2: Implement `janus` Commands:**
-    -   [ ] Implement all the `janus <noun> <verb>` commands as outlined in the design documents.
-    -   [ ] Each command will be a small `Effect` program that calls the appropriate service (e.g., `janus project create` calls `ProjectService.createProject`).
+## Phase 6: Import/Export
 
-## Phase 5: Testing, Documentation, and CI/CD
+-   [ ] **6.1: Export Service (Business Logic)**
+    -   [ ] **Implementation:** Create `ExportService` (`Effect.Tag`).
+    -   [ ] **Implementation:** Implement `exportTestRun(runId: TestRunId): Effect<string, JanusError>` which uses the persistence services to query the full graph for a test run and serializes it to the specified JSON format.
+    -   [ ] **Testing:** Write an integration test that creates a test run, exports it, and validates the JSON output against the schema.
 
--   [ ] **5.1: Unit & Integration Tests:**
-    -   [ ] Write unit tests for all pure "Calculation" functions.
-    -   [ ] Write integration tests for services using `Layer.provide` with test implementations of dependencies.
-    -   [ ] Use `ConfigProvider.fromMap` to provide mock configurations in tests.
-    -   [ ] Use `TestClock` to test any time-dependent logic (e.g., timeouts, scheduling).
-    -   [ ] Create a `Neo4jClientTest` layer that mocks the database interactions for repository tests.
+-   [ ] **6.2: Import Service (Business Logic)**
+    -   [ ] **Implementation:** Create `ImportService` (`Effect.Tag`).
+    -   [ ] **Implementation:** Implement `importTestRun(jsonContent: string, conflictNamespace: string): Effect<void, JanusError>` which parses the JSON and safely merges it into the database via the persistence services.
+    -   [ ] **Testing:** Write an integration test that imports a known JSON file and verifies the created entities in the database.
 
--   [ ] **5.2: Documentation:**
-    -   [ ] Write user documentation for the CLI.
-    -   [ ] Document the domain model, architecture, and the `Effect` patterns used.
-
--   [ ] **5.3: CI/CD:**
-    -   [ ] Set up a CI/CD pipeline.
-    -   [ ] The pipeline should run `pnpm run preflight` to ensure all tests, linting, and type checks pass.
+-   [ ] **6.3: Global CLI Commands**
+    -   [ ] **Implementation:** `janus export --run-id <id> --output <file-path>`
+    -   [ ] **Implementation:** `janus import <file-path> --conflict-namespace <prefix>`
+    -   [ ] **Testing:** Write end-to-end tests for the import/export commands.
+    -   [ ] **Documentation:** Write user documentation for the `janus import` and `janus export` commands.
