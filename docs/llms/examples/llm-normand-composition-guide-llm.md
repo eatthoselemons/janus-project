@@ -1,3 +1,5 @@
+> **Audience:** LLM / AI Agent (Quick Reference)
+
 # Effect LLM Guide: Normand Paradigm & Composition Patterns
 
 Quick reference for implementing Effect features following "Data, Calculations, Actions" paradigm with proper composition patterns.

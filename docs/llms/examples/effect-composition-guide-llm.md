@@ -1,3 +1,5 @@
+> **Audience:** LLM / AI Agent (Implementation & Reference)
+
 # Effect Composition Guide: Types and Layers
 
 This guide explains how Effect uses composition patterns for building scalable applications, with examples from the http-server project.
@@ -295,6 +297,159 @@ const authorizedEffect = policyRequire("User", "read")(
   getUserById(id)
 ).pipe(
   policyCompose(policyRequire("Account", "access")(getAccountById(accountId)))
+)
+```
+
+## Schema Composition: When to Use What
+
+Effect provides different schema types for different use cases. Understanding when to use each is crucial for building well-structured applications.
+
+### Schema.Struct vs Model.Class vs Schema.Class
+
+#### Schema.Struct - Simple Object Validation
+Use for inline object validation, especially in API definitions:
+
+```typescript
+// HTTP API path parameters
+HttpApiEndpoint.get("getUser", "/users/:id")
+  .setPath(Schema.Struct({ id: UserIdFromString }))
+
+// API request payloads
+HttpApiEndpoint.post("createTodo", "/todos")
+  .setPayload(Schema.Struct({ text: Schema.NonEmptyTrimmedString }))
+```
+
+**When to use Schema.Struct:**
+- HTTP API path parameters and payloads
+- Simple object shapes without methods
+- Inline validation schemas
+- When you need anonymous object types
+
+#### Model.Class - SQL Database Entities (SQL ONLY)
+Use for SQL database models with ORM features (requires @effect/sql). IMPORTANT: Model.Class is ONLY for SQL databases (PostgreSQL, MySQL, SQLite). For graph databases like Neo4j, use Schema.Struct or Schema.Class instead:
+
+```typescript
+export class User extends Model.Class<User>("User")({
+  id: Model.Generated(UserId),
+  accountId: Model.GeneratedByApp(AccountId),
+  email: Email,
+  accessToken: Model.Sensitive(AccessToken),
+  createdAt: Model.DateTimeInsert,
+  updatedAt: Model.DateTimeUpdate
+}) {}
+```
+
+**When to use Model.Class:**
+- SQL database entities ONLY (PostgreSQL, MySQL, SQLite)
+- Need SQL-specific field types (`Generated`, `Sensitive`, `DateTimeInsert`)
+- Automatic SQL timestamp handling
+- SQL-specific functionality with @effect/sql
+- Field composition with `Model.fields()`
+- Want automatic SQL CRUD operations via `Model.makeRepository()`
+
+**When NOT to use Model.Class:**
+- Graph databases (Neo4j) - use Schema.Struct or Schema.Class
+- Document databases (MongoDB, DynamoDB) - use Schema.Struct or Schema.Class
+- Key-value stores (Redis) - use Schema.Struct
+- Any non-SQL database
+
+#### Schema.Class - Business Logic Classes
+Use for domain objects with methods and validation:
+
+```typescript
+export class Todo extends Schema.Class<Todo>("Todo")({
+  id: TodoId,
+  text: Schema.NonEmptyTrimmedString,
+  done: Schema.Boolean
+}) {
+  complete() {
+    return new Todo({ ...this, done: true })
+  }
+}
+```
+
+**When to use Schema.Class:**
+- Business domain objects
+- Need custom methods and behavior
+- Want class-like syntax with validation
+- Don't need database-specific features
+- Want built-in equality and hashing
+
+### Decision Matrix
+
+| Use Case | Schema.Struct | Model.Class | Schema.Class |
+|----------|---------------|-------------|--------------|
+| HTTP API params | ✅ | ❌ | ❌ |
+| SQL database entities | ❌ | ✅ | ❌ |
+| Neo4j/graph DB entities | ✅ | ❌ | ✅ |
+| MongoDB/document DB | ✅ | ❌ | ✅ |
+| Business objects | ❌ | ❌ | ✅ |
+| Simple validation | ✅ | ❌ | ❌ |
+| Need custom methods | ❌ | ❌ | ✅ |
+| SQL auto-increment IDs | ❌ | ✅ | ❌ |
+| Anonymous types | ✅ | ❌ | ❌ |
+
+### Neo4j/Graph Database Example
+
+For graph databases like Neo4j, use Schema.Struct or Schema.Class:
+
+```typescript
+// Define Neo4j node schemas with Schema.Struct
+export const UserNode = Schema.Struct({
+  id: Schema.String,  // Neo4j uses string IDs, not auto-increment
+  email: Email,
+  name: Schema.NonEmptyTrimmedString,
+  createdAt: Schema.DateTimeUtc,
+  labels: Schema.Array(Schema.String)
+})
+
+// Define relationships
+export const Relationship = Schema.Struct({
+  type: Schema.String,
+  sourceId: Schema.String,
+  targetId: Schema.String,
+  properties: Schema.Record(Schema.String, Schema.Unknown)
+})
+
+// Use Schema.Class for nodes with behavior
+export class PersonNode extends Schema.Class<PersonNode>("PersonNode")({
+  id: Schema.String,
+  name: Schema.NonEmptyTrimmedString,
+  labels: Schema.Array(Schema.String),
+  properties: Schema.Record(Schema.String, Schema.Unknown)
+}) {
+  hasLabel(label: string): boolean {
+    return this.labels.includes(label)
+  }
+  
+  getProperty(key: string): unknown {
+    return this.properties[key]
+  }
+}
+
+// Repository pattern for Neo4j (not using Model.makeRepository)
+export const UserRepository = Layer.effect(
+  UserRepositoryTag,
+  Effect.gen(function* () {
+    const neo4j = yield* Neo4jClient
+    
+    return {
+      findById: (id: string) =>
+        neo4j.query(`MATCH (u:User {id: $id}) RETURN u`, { id }).pipe(
+          Effect.map(result => result.records[0]?.get('u')),
+          Effect.flatMap(Schema.decodeUnknown(UserNode))
+        ),
+        
+      create: (user: UserNode) =>
+        neo4j.query(
+          `CREATE (u:User $props) RETURN u`,
+          { props: user }
+        ).pipe(
+          Effect.map(result => result.records[0].get('u')),
+          Effect.flatMap(Schema.decodeUnknown(UserNode))
+        )
+    }
+  })
 )
 ```
 

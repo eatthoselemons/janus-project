@@ -21,11 +21,13 @@
     "@effect/cli": "^0.66.7",
     "@effect/platform-node": "^0.88.11",
     "effect": "^3.16.12",
-    "neo4j-driver": "^5.28.1"
+    "neo4j-driver": "^5.28.1",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@effect/vitest": "^0.23.12",
     "@types/node": "^24.0.10",
+    "@types/uuid": "^10.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"

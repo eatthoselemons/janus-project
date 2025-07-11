@@ -96,3 +96,12 @@ Use `pnpm test <string>` to skip the tests from the `examples` folder, the `<str
 - basic-foo.test.ts
 - basic/foo.test.ts
 But skip other tests, you should usually just use `pnpm test src` to run the janus tests
+- Leave newlines at the end of files
+
+## **IMPORTANT**: Ensure code always follows these ideals
+1. follows "programming with types" by vlad riscutia
+2. follows "type driven development with idris" by edwin Brady
+3. follows "grokking simplicity" by eric normand
+4. does composition over inheritance
+5. follows the effect best practices (documentation: https://effect.website/llms-small.txt)
+6. is tailored to a project that is using neo4j as its database not sql
