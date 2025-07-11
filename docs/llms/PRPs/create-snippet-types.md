@@ -102,25 +102,23 @@ janus-project/
 ```bash
 janus-project/
 └── src/
-    ├── domain/
-    │   ├── types/
-    │   │   ├── branded.ts        # All branded types (IDs, Slug, etc.)
-    │   │   ├── snippet.ts        # Snippet and SnippetVersion schemas
-    │   │   ├── parameter.ts      # Parameter and ParameterOption schemas
-    │   │   ├── composition.ts    # Composition schemas
-    │   │   ├── testing.ts        # TestRun and DataPoint schemas
-    │   │   └── tag.ts           # Tag schema
-    │   └── index.ts              # Re-exports all types
     └── domain/
-        └── types/
-            ├── __tests__/
-            │   ├── branded.test.ts
-            │   ├── snippet.test.ts
-            │   ├── parameter.test.ts
-            │   ├── composition.test.ts
-            │   ├── testing.test.ts
-            │   └── tag.test.ts
-            └── index.ts
+        ├── types/
+        │   ├── tests/
+        │   │   ├── branded.test.ts
+        │   │   ├── snippet.test.ts
+        │   │   ├── parameter.test.ts
+        │   │   ├── composition.test.ts
+        │   │   ├── testing.test.ts
+        │   │   └── tag.test.ts
+        │   ├── branded.ts        # All branded types (IDs, Slug, etc.)
+        │   ├── snippet.ts        # Snippet and SnippetVersion schemas
+        │   ├── parameter.ts      # Parameter and ParameterOption schemas
+        │   ├── composition.ts    # Composition schemas
+        │   ├── testing.ts        # TestRun and DataPoint schemas
+        │   ├── tag.ts           # Tag schema
+        │   └── index.ts         # Re-exports all types
+        └── index.ts             # Re-exports from types
 ```
 
 ### Known Gotchas & Library Quirks
@@ -233,15 +231,15 @@ CREATE src/domain/types/index.ts:
   - Re-export all types from all modules
   - Group exports logically
 
-Task 8: Write tests for branded types (src/domain/types/__tests__/branded.test.ts)
-CREATE src/domain/types/__tests__/branded.test.ts:
+Task 8: Write tests for branded types (src/domain/types/tests/branded.test.ts)
+CREATE src/domain/types/tests/branded.test.ts:
   - Test UUID validation for all ID types
   - Test Slug pattern validation
   - Test edge cases (empty, too long, invalid chars)
   - Use it.effect() for Effect-based tests
 
-Task 9: Write tests for snippet schemas (src/domain/types/__tests__/snippet.test.ts)
-CREATE src/domain/types/__tests__/snippet.test.ts:
+Task 9: Write tests for snippet schemas (src/domain/types/tests/snippet.test.ts)
+CREATE src/domain/types/tests/snippet.test.ts:
   - Test valid snippet creation
   - Test validation failures
   - Test template string content
