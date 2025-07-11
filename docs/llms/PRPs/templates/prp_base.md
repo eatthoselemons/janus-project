@@ -99,14 +99,14 @@ Examples:
 
 ```yaml
 Task 1:
-MODIFY src/existing_module.py:
-  - FIND pattern: "class OldImplementation"
-  - INJECT after line containing "def __init__"
-  - PRESERVE existing method signatures
+MODIFY src/existing_module.ts:
+  - FIND pattern: "export const OldService"
+  - INJECT after line containing "Effect.gen(function*"
+  - PRESERVE existing function signatures
 
-CREATE src/new_feature.py:
-  - MIRROR pattern from: src/similar_feature.py
-  - MODIFY class name and core logic
+CREATE src/new_feature.ts:
+  - MIRROR pattern from: src/similar_feature.ts
+  - MODIFY service name and core logic
   - KEEP error handling pattern identical
 
 ...(...)
