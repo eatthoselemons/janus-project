@@ -40,7 +40,7 @@ Template optimized for AI agents to implement features with sufficient context a
   why: [These endpoints will be used for X, Y, Z]
   discovered_caveat: [Rate limit of 10 req/sec not documented in main API]
   
-- file: [path/to/example.py]
+- file: [path/to/example.ts]
   why: [Follow this exact pattern for connection handling]
   gotcha: [Lines 45-60 show retry logic that prevents common timeout issue]
   
@@ -74,11 +74,11 @@ Template optimized for AI agents to implement features with sufficient context a
 ```
 
 ### Known Gotchas of our codebase & Library Quirks
-```python
-# CRITICAL: [Library name] requires [specific setup]
-# Example: FastAPI requires async functions for endpoints
-# Example: This ORM doesn't support batch inserts over 1000 records
-# Example: We use pydantic v2 and  
+```typescript
+// CRITICAL: [Library name] requires [specific setup]
+// Example: Effect.gen requires function* syntax for generators
+// Example: Schema.decode returns an Effect, not a plain value
+// Example: We use Effect v3 and Schema.Struct for Neo4j (not Model.Class)
 ```
 
 ## Implementation Blueprint
@@ -86,12 +86,12 @@ Template optimized for AI agents to implement features with sufficient context a
 ### Data models and structure
 
 Create the core data models, we ensure type safety and consistency.
-```python
+```typescript
 Examples: 
- - orm models
- - pydantic models
- - pydantic schemas
- - pydantic validators
+ - Effect Schema types (Schema.Struct)
+ - Branded types for domain concepts
+ - Tagged errors for error handling
+ - Service definitions with Context.Tag
 
 ```
 
@@ -118,27 +118,32 @@ Task N:
 
 
 ### Per task pseudocode as needed added to each task
-```python
+```typescript
 
-# Task 1
-# Pseudocode with CRITICAL details dont write entire code
-async def new_feature(param: str) -> Result:
-    # PATTERN: Always validate input first (see src/validators.py)
-    validated = validate_input(param)  # raises ValidationError
+// Task 1
+// Pseudocode with CRITICAL details dont write entire code
+const newFeature = (param: string) => 
+  Effect.gen(function* () {
+    // PATTERN: Always decode/validate input first (see src/domain/types)
+    const validated = yield* Schema.decode(ParamSchema)(param)
     
-    # GOTCHA: This library requires connection pooling
-    async with get_connection() as conn:  # see src/db/pool.py
-        # PATTERN: Use existing retry decorator
-        @retry(attempts=3, backoff=exponential)
-        async def _inner():
-            # CRITICAL: API returns 429 if >10 req/sec
-            await rate_limiter.acquire()
-            return await external_api.call(validated)
-        
-        result = await _inner()
+    // GOTCHA: Effect requires yield* to unwrap Effects
+    const conn = yield* ConnectionPool
     
-    # PATTERN: Standardized response format
-    return format_response(result)  # see src/utils/responses.py
+    // PATTERN: Use Effect retry policies
+    const result = yield* pipe(
+      ExternalApi.call(validated),
+      Effect.retry(Schedule.exponential("1 second").pipe(
+        Schedule.jittered,
+        Schedule.compose(Schedule.recurs(3))
+      )),
+      // CRITICAL: API returns 429 if >10 req/sec
+      Effect.tap(() => RateLimiter.acquire)
+    )
+    
+    // PATTERN: Return domain types, not raw data
+    return yield* Schema.decode(ResponseSchema)(result)
+  })
 ```
 
 ### Integration Points
@@ -148,73 +153,89 @@ DATABASE:
   - index: "CREATE INDEX idx_feature_lookup ON users(feature_id)"
   
 CONFIG:
-  - add to: config/settings.py
-  - pattern: "FEATURE_TIMEOUT = int(os.getenv('FEATURE_TIMEOUT', '30'))"
+  - add to: src/config.ts
+  - pattern: "export const featureTimeout = Config.integer('FEATURE_TIMEOUT').pipe(Config.withDefault(30))"
   
 ROUTES:
-  - add to: src/api/routes.py  
-  - pattern: "router.include_router(feature_router, prefix='/feature')"
+  - add to: src/api/routes.ts  
+  - pattern: "HttpApiGroup.add(HttpApiEndpoint.get('getFeature', '/feature/:id'))"
 ```
 
 ## Validation Loop
 
-### Level 1: Syntax & Style
+### Level 1: Syntax & Type Checking
 ```bash
 # Run these FIRST - fix any errors before proceeding
-ruff check src/new_feature.py --fix  # Auto-fix what's possible
-mypy src/new_feature.py              # Type checking
+pnpm run build                    # TypeScript compilation
+pnpm run lint                     # ESLint checking
 
 # Expected: No errors. If errors, READ the error and fix.
 ```
 
 ### Level 2: Unit Tests each new feature/file/function use existing test patterns
-```python
-# CREATE test_new_feature.py with these test cases:
-def test_happy_path():
-    """Basic functionality works"""
-    result = new_feature("valid_input")
-    assert result.status == "success"
+```typescript
+// CREATE new-feature.test.ts with these test cases:
+import { it } from "@effect/vitest"
+import { Effect, Exit } from "effect"
 
-def test_validation_error():
-    """Invalid input raises ValidationError"""
-    with pytest.raises(ValidationError):
-        new_feature("")
+it.effect("should handle happy path", () =>
+  Effect.gen(function* () {
+    const result = yield* newFeature("valid_input")
+    expect(result.status).toBe("success")
+  })
+)
 
-def test_external_api_timeout():
-    """Handles timeouts gracefully"""
-    with mock.patch('external_api.call', side_effect=TimeoutError):
-        result = new_feature("valid")
-        assert result.status == "error"
-        assert "timeout" in result.message
+it.effect("should reject invalid input", () =>
+  Effect.gen(function* () {
+    const result = yield* Effect.exit(newFeature(""))
+    expect(Exit.isFailure(result)).toBe(true)
+  })
+)
+
+it.effect("should handle external API timeout", () =>
+  Effect.gen(function* () {
+    const TestLayer = Layer.succeed(ExternalApi, {
+      call: () => Effect.fail(new TimeoutError())
+    })
+    
+    const result = yield* pipe(
+      newFeature("valid"),
+      Effect.provide(TestLayer),
+      Effect.either
+    )
+    expect(result._tag).toBe("Left")
+  })
+)
 ```
 
 ```bash
 # Run and iterate until passing:
-uv run pytest test_new_feature.py -v
+pnpm test new-feature.test.ts
 # If failing: Read error, understand root cause, fix code, re-run (never mock to pass)
 ```
 
 ### Level 3: Integration Test
 ```bash
 # Start the service
-uv run python -m src.main --dev
+pnpm run dev
 
 # Test the endpoint
-curl -X POST http://localhost:8000/feature \
+curl -X POST http://localhost:3000/feature \
   -H "Content-Type: application/json" \
   -d '{"param": "test_value"}'
 
 # Expected: {"status": "success", "data": {...}}
-# If error: Check logs at logs/app.log for stack trace
+# If error: Check console output for Effect stack trace
 ```
 
 ## Final validation Checklist
-- [ ] All tests pass: `uv run pytest tests/ -v`
-- [ ] No linting errors: `uv run ruff check src/`
-- [ ] No type errors: `uv run mypy src/`
+- [ ] All tests pass: `pnpm test`
+- [ ] No linting errors: `pnpm run lint`
+- [ ] No type errors: `pnpm run build`
+- [ ] Preflight passes: `pnpm run preflight`
 - [ ] Manual test successful: [specific curl/command]
-- [ ] Error cases handled gracefully
-- [ ] Logs are informative but not verbose
+- [ ] Error cases handled with proper Effect error types
+- [ ] Traces are informative (using Effect.withSpan)
 - [ ] Documentation updated if needed
 
 ---
@@ -223,6 +244,8 @@ curl -X POST http://localhost:8000/feature \
 - ❌ Don't create new patterns when existing ones work
 - ❌ Don't skip validation because "it should work"  
 - ❌ Don't ignore failing tests - fix them
-- ❌ Don't use sync functions in async context
-- ❌ Don't hardcode values that should be config
-- ❌ Don't catch all exceptions - be specific
+- ❌ Don't use Promise/async-await - use Effect
+- ❌ Don't hardcode values - use Config service
+- ❌ Don't catch all errors - use typed errors
+- ❌ Don't use try/catch - use Effect error handling
+- ❌ Don't mutate data - keep everything immutable
