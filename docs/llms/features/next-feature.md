@@ -25,4 +25,3 @@ use the `docs/llms/effect/effect-compliance-checklist.md` to ensure that you hav
 
 all code is in the `src/` folder
 When making the PRP name it after the subsection
-remember that to run only the janus tests you need to run `pnpm test src`
