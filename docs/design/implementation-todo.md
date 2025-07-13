@@ -1,4 +1,4 @@
-# Janus Implementation TODO List (v4 - Idiomatic Service Naming)
+# Janus Implementation TODO List (v5 - Refined)
 
 This document provides a detailed, exhaustive, and incremental plan for implementing the Janus project. It uses idiomatic `Effect-TS` terminology, referring to all dependencies, including data access layers, as "Services".
 
@@ -31,9 +31,9 @@ This phase establishes the bedrock of the application: the type system, configur
 
 - [ ] **1.4: Neo4j Client Service**
   - [ ] **Implementation:** Create a `Neo4jClient` service (`Effect.Tag`) that wraps the `neo4j-driver`.
-  - [ ] **Implementation:** The service will expose `runQuery(query, params): Effect<Result, PersistenceError>`.
+  - [ ] **Implementation:** The service will expose `runQuery(query, params): Effect<Result, PersistenceError>` and a higher-level `transactionally(effect): Effect<A, E | PersistenceError>`.
   - [ ] **Implementation:** Create a `Neo4jClientLive` layer that manages the driver's lifecycle using `Scope`.
-  - [ ] **Testing:** Write an integration test for the `Neo4jClientLive` layer that connects to a test database and runs a simple query.
+  - [ ] **Testing:** Write an integration test for the `Neo4jClientLive` layer that connects to a test database, runs a simple query, and verifies a transaction.
 
 ## Phase 2: Snippet Management
 
@@ -81,7 +81,7 @@ This phase establishes the bedrock of the application: the type system, configur
 - [ ] **4.1: Composition Persistence Service**
   - [ ] **Implementation:** Create `CompositionPersistence` service (`Effect.Tag`).
   - [ ] **Implementation:** Implement all required persistence methods:
-    - `createCompositionVersion(from: { compositionId: CompositionId } | { groupName: Slug }, message: string): Effect<CompositionVersion, PersistenceError>`
+    - `createCompositionVersion(from: { compositionId: CompositionId } | { groupName: Slug }, message: string, snippets: { snippetId: SnippetId, versionId: SnippetVersionId, order: number }[]): Effect<CompositionVersion, PersistenceError>`
     - `listCompositions(): Effect<Composition[], PersistenceError>`
   - [ ] **Testing:** Write integration tests for each persistence method.
 
@@ -93,7 +93,13 @@ This phase establishes the bedrock of the application: the type system, configur
 
 ## Phase 5: Test Execution & Results
 
-- [ ] **5.1: TestRun & DataPoint Persistence Service**
+- [ ] **5.1: LLM API Service**
+  - [ ] **Implementation:** Create an `LlmApi` service (`Effect.Tag`) to abstract LLM provider interactions.
+  - [ ] **Implementation:** The service will expose `generate(prompt: string, model: string): Effect<string, LlmApiError>`.
+  - [ ] **Implementation:** Create a `LlmApiLive` layer that reads the provider and API key from the `Config` service.
+  - [ ] **Testing:** Write an integration test for the `LlmApiLive` layer that makes a real API call (can be mocked in CI environments).
+
+- [ ] **5.2: TestRun & DataPoint Persistence Service**
   - [ ] **Implementation:** Create `TestRunPersistence` service (`Effect.Tag`).
   - [ ] **Implementation:** Implement methods:
     - `createTestRun(name: string, llmProvider: string, llmModel: string, metadata: Record<string, any>): Effect<TestRun, PersistenceError>`
@@ -101,13 +107,14 @@ This phase establishes the bedrock of the application: the type system, configur
     - `listTestRuns(): Effect<TestRun[], PersistenceError>`
   - [ ] **Testing:** Write integration tests for each persistence method.
 
-- [ ] **5.2: Test Execution Service (Business Logic)**
+- [ ] **5.3: Test Execution Service (Business Logic)**
   - [ ] **Implementation:** Create `TestExecutionService` (`Effect.Tag`). This is a business logic service, distinct from the persistence services.
+  - [ ] **Implementation:** Define a `Schema` for the `test_config.yaml` file to ensure type-safe parsing and validation.
   - [ ] **Implementation:** Implement `runFromFile(configPath: string): Effect<TestRun, JanusError>`.
-  - [ ] **Implementation:** This service will parse the YAML, use the persistence services to create the `TestRun` and `CompositionVersion`, call the LLM API, and save `DataPoint`s.
-  - [ ] **Testing:** Write integration tests for the service, providing test implementations of the persistence and LLM services.
+  - [ ] **Implementation:** This service will parse and validate the YAML, use the persistence services to create the `TestRun` and `CompositionVersion`, call the `LlmApi` service, and save `DataPoint`s.
+  - [ ] **Testing:** Write integration tests for the service, providing test implementations of the persistence and `LlmApi` services.
 
-- [ ] **5.3: Run CLI Commands**
+- [ ] **5.4: Run CLI Commands**
   - [ ] **Implementation:** `janus run <config-file-path>`
   - [ ] **Implementation:** `janus run list`
   - [ ] **Testing:** Write end-to-end tests for the CLI commands.
