@@ -83,6 +83,32 @@ Template optimized for AI agents to implement features with sufficient context a
 
 ```
 
+### Domain Structure & Naming Conventions
+
+```
+src/
+├── domain/
+│   └── types/              # Domain types and schemas
+│       ├── <type>.ts       # Type definitions using Schema.Struct
+│       └── tests/
+│           └── <type>.test.ts
+├── services/
+│   └── <service-name>/
+│       └── index.ts
+└── layers/
+    └── <layer-domain>/
+        ├── <LayerName>.layer.ts         # Live/production implementation
+        ├── <LayerName>.staticLayers.ts  # Test implementation with static data
+        ├── <LayerName>.test.ts          # Tests for the layers
+        └── index.ts                     # Re-exports
+```
+
+**Key Naming Conventions:**
+
+- `*.layer.ts` - Production layers that may have side effects
+- `*.staticLayers.ts` - Test layers with hardcoded static data (no side effects)
+- `*.test.ts` - Test files that test the layers
+
 ### Known Gotchas of our codebase & Library Quirks
 
 ```typescript
