@@ -14,3 +14,6 @@ export * from "./parameter"
 export * from "./composition"
 export * from "./experiment"
 export * from "./tag"
+
+// Error types
+export * from "./errors"
