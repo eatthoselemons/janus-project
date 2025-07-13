@@ -107,50 +107,55 @@ describe('LlmProviderConfigSchema', () => {
     }),
   );
 
-  // Test required field only
-  it.effect('should accept configuration with only apiKey', () =>
+  // Test all required fields
+  it.effect('should require all fields (apiKey, baseUrl, model)', () =>
     Effect.gen(function* () {
       const validConfig = {
         apiKey: 'sk-test-key-123',
+        baseUrl: 'https://api.example.com/v1',
+        model: 'test-model',
       };
 
       const result = yield* Schema.decode(LlmProviderConfigSchema)(validConfig);
       expect(result.apiKey).toBe('sk-test-key-123');
-      expect(result.baseUrl).toBeUndefined();
-      expect(result.model).toBeUndefined();
+      expect(result.baseUrl).toBe('https://api.example.com/v1');
+      expect(result.model).toBe('test-model');
     }),
   );
 
-  // Test optional fields
-  it.effect('should accept configuration with apiKey and baseUrl only', () =>
+  // Test missing baseUrl
+  it.effect('should reject configuration missing baseUrl', () =>
     Effect.gen(function* () {
-      const validConfig = {
+      const invalidConfig = {
         apiKey: 'sk-test-key-123',
-        baseUrl: 'https://custom.api.com/v1',
+        model: 'test-model',
+        // missing baseUrl
       };
 
-      const result = yield* Schema.decode(LlmProviderConfigSchema)(validConfig);
-      expect(result.apiKey).toBe('sk-test-key-123');
-      expect(result.baseUrl).toBe('https://custom.api.com/v1');
-      expect(result.model).toBeUndefined();
+      const result = yield* Effect.either(
+        Schema.decode(LlmProviderConfigSchema)(invalidConfig),
+      );
+      expect(result._tag).toBe('Left');
     }),
   );
 
-  it.effect('should accept configuration with apiKey and model only', () =>
+  // Test missing model
+  it.effect('should reject configuration missing model', () =>
     Effect.gen(function* () {
-      const validConfig = {
+      const invalidConfig = {
         apiKey: 'sk-test-key-123',
-        model: 'gpt-3.5-turbo',
+        baseUrl: 'https://api.example.com/v1',
+        // missing model
       };
 
-      const result = yield* Schema.decode(LlmProviderConfigSchema)(validConfig);
-      expect(result.apiKey).toBe('sk-test-key-123');
-      expect(result.baseUrl).toBeUndefined();
-      expect(result.model).toBe('gpt-3.5-turbo');
+      const result = yield* Effect.either(
+        Schema.decode(LlmProviderConfigSchema)(invalidConfig),
+      );
+      expect(result._tag).toBe('Left');
     }),
   );
 
-  // Test missing required field
+  // Test missing apiKey
   it.effect('should reject configuration without apiKey', () =>
     Effect.gen(function* () {
       const invalidConfig = {
@@ -176,13 +181,19 @@ describe('LlmProviderConfigSchema', () => {
   ];
 
   validApiKeys.forEach((apiKey) => {
-    it.effect(`should accept API key format: ${apiKey.substring(0, 20)}...`, () =>
-      Effect.gen(function* () {
-        const config = { apiKey };
+    it.effect(
+      `should accept API key format: ${apiKey.substring(0, 20)}...`,
+      () =>
+        Effect.gen(function* () {
+          const config = {
+            apiKey,
+            baseUrl: 'https://api.example.com/v1',
+            model: 'test-model',
+          };
 
-        const result = yield* Schema.decode(LlmProviderConfigSchema)(config);
-        expect(result.apiKey).toBe(apiKey);
-      }),
+          const result = yield* Schema.decode(LlmProviderConfigSchema)(config);
+          expect(result.apiKey).toBe(apiKey);
+        }),
     );
   });
 });
@@ -206,6 +217,7 @@ describe('ConfigSchema', () => {
             },
             anthropic: {
               apiKey: 'sk-ant-key',
+              baseUrl: 'https://api.anthropic.com',
               model: 'claude-3',
             },
           },
@@ -245,6 +257,8 @@ describe('ConfigSchema', () => {
           providers: {
             openai: {
               apiKey: 'sk-openai-key',
+              baseUrl: 'https://api.openai.com/v1',
+              model: 'gpt-4',
             },
           },
         },
@@ -317,6 +331,7 @@ describe('ConfigSchema', () => {
           providers: {
             openai: {
               apiKey: 'sk-openai-production-key',
+              baseUrl: 'https://api.openai.com/v1',
               model: 'gpt-4',
             },
             anthropic: {
@@ -327,9 +342,11 @@ describe('ConfigSchema', () => {
             azure: {
               apiKey: 'azure-openai-key',
               baseUrl: 'https://mycompany.openai.azure.com',
+              model: 'gpt-4-turbo',
             },
             google: {
               apiKey: 'google-vertex-key',
+              baseUrl: 'https://vertex-ai.googleapis.com',
               model: 'gemini-pro',
             },
           },

@@ -16,8 +16,8 @@ export const Neo4jConfigSchema = Schema.Struct({
 // LLM provider configuration schema
 export const LlmProviderConfigSchema = Schema.Struct({
   apiKey: Schema.String, // Will be wrapped with Config.redacted in service
-  baseUrl: Schema.optional(Schema.String),
-  model: Schema.optional(Schema.String),
+  baseUrl: Schema.String,
+  model: Schema.String,
 });
 
 // Main configuration schema
