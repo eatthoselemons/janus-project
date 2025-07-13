@@ -5,16 +5,19 @@ This document describes how to set up and use the Neo4j database integration for
 ## Quick Start
 
 1. **Start Neo4j with Docker Compose:**
+
    ```bash
    docker compose up -d neo4j
    ```
 
 2. **Build the application:**
+
    ```bash
    pnpm run build
    ```
 
 3. **Run database migrations:**
+
    ```bash
    node dist/index.js db migrate
    ```
@@ -40,6 +43,7 @@ The Neo4j connection is configured via environment variables:
 Access the Neo4j browser at: http://localhost:7474
 
 **Default credentials:**
+
 - Username: `neo4j`
 - Password: `password`
 
@@ -52,9 +56,10 @@ Direct connection via Bolt protocol: `bolt://localhost:7687`
 The schema implements the domain model with the following node types:
 
 ### Nodes
+
 - `Snippet` - Abstract snippet containers
 - `SnippetVersion` - Versioned snippet content
-- `Composition` - Abstract composition containers  
+- `Composition` - Abstract composition containers
 - `CompositionVersion` - Versioned composition recipes
 - `Parameter` - Parameter definitions
 - `ParameterOption` - Parameter values
@@ -63,6 +68,7 @@ The schema implements the domain model with the following node types:
 - `Tag` - Categorization labels
 
 ### Relationships
+
 - `VERSION_OF` - Links versions to their parent entities
 - `PREVIOUS_VERSION` - Creates version history chains
 - `DEFINES_PARAMETER` - Links snippets to parameters they use
@@ -76,21 +82,25 @@ The schema implements the domain model with the following node types:
 ## Database Management Commands
 
 ### Initialize Database
+
 ```bash
 node dist/index.js db init
 ```
 
 ### Run Migrations
+
 ```bash
 node dist/index.js db migrate
 ```
 
 ### Rollback Migrations
+
 ```bash
 node dist/index.js db rollback
 ```
 
 ### Check Database Status
+
 ```bash
 node dist/index.js db status
 ```
@@ -100,21 +110,22 @@ node dist/index.js db status
 ### Adding New Migrations
 
 1. Create a new migration in `src/db/migrations.ts`:
+
    ```typescript
    const migration_002_example: Migration = {
-     id: "002",
-     description: "Example migration",
+     id: '002',
+     description: 'Example migration',
      up: () => runCypher(`CREATE ...`),
-     down: () => runCypher(`DROP ...`)
-   }
+     down: () => runCypher(`DROP ...`),
+   };
    ```
 
 2. Add to migrations array:
    ```typescript
    export const migrations: readonly Migration[] = [
      migration_001_constraints,
-     migration_002_example
-   ]
+     migration_002_example,
+   ];
    ```
 
 ### Using the Repository Pattern
@@ -122,15 +133,15 @@ node dist/index.js db status
 The database layer uses the repository pattern with Effect-TS:
 
 ```typescript
-import { SnippetRepository } from "./db/repositories"
-import { Effect } from "effect"
+import { SnippetRepository } from './db/repositories';
+import { Effect } from 'effect';
 
 // Example usage
 const createSnippetProgram = Effect.gen(function* () {
-  const repo = yield* SnippetRepository
-  const snippet = createSnippet(slug, description)
-  yield* repo.create(snippet)
-})
+  const repo = yield* SnippetRepository;
+  const snippet = createSnippet(slug, description);
+  yield* repo.create(snippet);
+});
 ```
 
 ## Docker Compose Services
@@ -163,7 +174,7 @@ The `docker-compose.yml` includes:
 // Check all constraints
 SHOW CONSTRAINTS
 
-// Check all indexes  
+// Check all indexes
 SHOW INDEXES
 
 // Count nodes by type

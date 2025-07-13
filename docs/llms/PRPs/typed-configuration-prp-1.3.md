@@ -1,11 +1,13 @@
 # PRP: Typed Configuration Service (Section 1.3)
 
 ## Objective
+
 Implement a typed configuration service for the Janus project that provides type-safe access to all application settings, including Neo4j connection details and LLM provider API keys, using Effect's Config module.
 
 ## Context and References
 
 ### Required Reading
+
 1. **Effect Config Documentation**: https://effect.website/docs/configuration/
 2. **Effect Redacted Documentation**: https://effect.website/docs/data-types/redacted/
 3. **Effect Default Services**: https://effect.website/docs/requirements-management/default-services/
@@ -13,6 +15,7 @@ Implement a typed configuration service for the Janus project that provides type
 5. **Compliance Checklist**: `docs/llms/effect/effect-compliance-checklist.md`
 
 ### Existing Patterns to Follow
+
 1. **Schema Definitions**: See `src/domain/types/*.ts` - Use `Schema.Struct` for data structures
 2. **Service Pattern**: Reference `examples/effect-official-examples/examples/http-server/src/Accounts.ts` for Effect.Service pattern
 3. **Test Pattern**: See `src/domain/types/tests/branded.test.ts` - Use `@effect/vitest` with `it.effect`
@@ -24,15 +27,15 @@ Implement a typed configuration service for the Janus project that provides type
 
 ```typescript
 // src/domain/types/config.ts
-import { Schema } from "effect"
-import { Config } from "effect"
+import { Schema } from 'effect';
+import { Config } from 'effect';
 
 // Define the configuration schema structure
 export const ConfigSchema = Schema.Struct({
   neo4j: Schema.Struct({
     uri: Schema.String,
     user: Schema.String,
-    password: Schema.String // Will be wrapped with Config.redacted
+    password: Schema.String, // Will be wrapped with Config.redacted
   }),
   llm: Schema.Struct({
     providers: Schema.Record({
@@ -40,167 +43,175 @@ export const ConfigSchema = Schema.Struct({
       value: Schema.Struct({
         apiKey: Schema.String, // Will be wrapped with Config.redacted
         baseUrl: Schema.optional(Schema.String),
-        model: Schema.optional(Schema.String)
-      })
-    })
-  })
-})
+        model: Schema.optional(Schema.String),
+      }),
+    }),
+  }),
+});
 
 // Extract the type from schema
-export type ConfigSchema = typeof ConfigSchema.Type
+export type ConfigSchema = typeof ConfigSchema.Type;
 ```
 
 ### 2. Create Config Service
 
 ```typescript
 // src/services/config/config.service.ts
-import { Effect, Context, Layer, Config, Redacted } from "effect"
-import { ConfigSchema } from "../../domain/types/config"
+import { Effect, Context, Layer, Config, Redacted } from 'effect';
+import { ConfigSchema } from '../../domain/types/config';
 
 // Define the Config service tag
-export class ConfigService extends Context.Tag("ConfigService")<
+export class ConfigService extends Context.Tag('ConfigService')<
   ConfigService,
   {
     readonly neo4j: {
-      readonly uri: string
-      readonly user: string
-      readonly password: Redacted.Redacted<string>
-    }
+      readonly uri: string;
+      readonly user: string;
+      readonly password: Redacted.Redacted<string>;
+    };
     readonly llm: {
-      readonly providers: Record<string, {
-        readonly apiKey: Redacted.Redacted<string>
-        readonly baseUrl?: string
-        readonly model?: string
-      }>
-    }
+      readonly providers: Record<
+        string,
+        {
+          readonly apiKey: Redacted.Redacted<string>;
+          readonly baseUrl?: string;
+          readonly model?: string;
+        }
+      >;
+    };
   }
 >() {}
 
 // Implementation using Effect Config module
 const configProgram = Effect.gen(function* () {
   // Neo4j configuration
-  const neo4jUri = yield* Config.string("NEO4J_URI")
-  const neo4jUser = yield* Config.string("NEO4J_USER")
-  const neo4jPassword = yield* Config.redacted("NEO4J_PASSWORD")
-  
+  const neo4jUri = yield* Config.string('NEO4J_URI');
+  const neo4jUser = yield* Config.string('NEO4J_USER');
+  const neo4jPassword = yield* Config.redacted('NEO4J_PASSWORD');
+
   // LLM providers configuration (supporting multiple providers)
   // Example: LLM_OPENAI_API_KEY, LLM_ANTHROPIC_API_KEY, etc.
   const llmProviders = yield* Config.all({
     openai: Config.all({
-      apiKey: Config.redacted("LLM_OPENAI_API_KEY"),
-      baseUrl: Config.optional(Config.string("LLM_OPENAI_BASE_URL")),
-      model: Config.optional(Config.string("LLM_OPENAI_MODEL"))
+      apiKey: Config.redacted('LLM_OPENAI_API_KEY'),
+      baseUrl: Config.optional(Config.string('LLM_OPENAI_BASE_URL')),
+      model: Config.optional(Config.string('LLM_OPENAI_MODEL')),
     }).pipe(Config.optional),
     anthropic: Config.all({
-      apiKey: Config.redacted("LLM_ANTHROPIC_API_KEY"),
-      baseUrl: Config.optional(Config.string("LLM_ANTHROPIC_BASE_URL")),
-      model: Config.optional(Config.string("LLM_ANTHROPIC_MODEL"))
-    }).pipe(Config.optional)
-  })
-  
+      apiKey: Config.redacted('LLM_ANTHROPIC_API_KEY'),
+      baseUrl: Config.optional(Config.string('LLM_ANTHROPIC_BASE_URL')),
+      model: Config.optional(Config.string('LLM_ANTHROPIC_MODEL')),
+    }).pipe(Config.optional),
+  });
+
   // Filter out undefined providers
   const providers = Object.entries(llmProviders)
     .filter(([_, value]) => value !== undefined)
-    .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {})
-  
+    .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+
   return {
     neo4j: {
       uri: neo4jUri,
       user: neo4jUser,
-      password: neo4jPassword
+      password: neo4jPassword,
     },
     llm: {
-      providers
-    }
-  }
-})
+      providers,
+    },
+  };
+});
 
 // Create the live layer
-export const ConfigServiceLive = Layer.effect(
-  ConfigService,
-  configProgram
-)
+export const ConfigServiceLive = Layer.effect(ConfigService, configProgram);
 ```
 
 ### 3. Write Unit Tests
 
 ```typescript
 // src/services/config/tests/config.service.test.ts
-import { describe, expect, it } from "@effect/vitest"
-import { Effect, ConfigProvider, Redacted } from "effect"
-import { ConfigService, ConfigServiceLive } from "../config.service"
+import { describe, expect, it } from '@effect/vitest';
+import { Effect, ConfigProvider, Redacted } from 'effect';
+import { ConfigService, ConfigServiceLive } from '../config.service';
 
-describe("ConfigService", () => {
+describe('ConfigService', () => {
   // Test with valid configuration
-  it.effect("should load configuration from environment variables", () =>
+  it.effect('should load configuration from environment variables', () =>
     Effect.gen(function* () {
       const mockConfig = {
-        NEO4J_URI: "bolt://localhost:7687",
-        NEO4J_USER: "neo4j",
-        NEO4J_PASSWORD: "test-password",
-        LLM_OPENAI_API_KEY: "sk-test-key",
-        LLM_OPENAI_MODEL: "gpt-4"
-      }
-      
+        NEO4J_URI: 'bolt://localhost:7687',
+        NEO4J_USER: 'neo4j',
+        NEO4J_PASSWORD: 'test-password',
+        LLM_OPENAI_API_KEY: 'sk-test-key',
+        LLM_OPENAI_MODEL: 'gpt-4',
+      };
+
       const config = yield* ConfigService.pipe(
         Effect.provide(ConfigServiceLive),
-        Effect.withConfigProvider(ConfigProvider.fromMap(new Map(Object.entries(mockConfig))))
-      )
-      
-      expect(config.neo4j.uri).toBe("bolt://localhost:7687")
-      expect(config.neo4j.user).toBe("neo4j")
-      expect(Redacted.value(config.neo4j.password)).toBe("test-password")
-      expect(config.llm.providers.openai).toBeDefined()
-      expect(Redacted.value(config.llm.providers.openai!.apiKey)).toBe("sk-test-key")
-      expect(config.llm.providers.openai!.model).toBe("gpt-4")
-    })
-  )
-  
+        Effect.withConfigProvider(
+          ConfigProvider.fromMap(new Map(Object.entries(mockConfig))),
+        ),
+      );
+
+      expect(config.neo4j.uri).toBe('bolt://localhost:7687');
+      expect(config.neo4j.user).toBe('neo4j');
+      expect(Redacted.value(config.neo4j.password)).toBe('test-password');
+      expect(config.llm.providers.openai).toBeDefined();
+      expect(Redacted.value(config.llm.providers.openai!.apiKey)).toBe(
+        'sk-test-key',
+      );
+      expect(config.llm.providers.openai!.model).toBe('gpt-4');
+    }),
+  );
+
   // Test missing required configuration
-  it.effect("should fail when required configuration is missing", () =>
+  it.effect('should fail when required configuration is missing', () =>
     Effect.gen(function* () {
       const mockConfig = {
-        NEO4J_URI: "bolt://localhost:7687",
+        NEO4J_URI: 'bolt://localhost:7687',
         // Missing NEO4J_USER and NEO4J_PASSWORD
-      }
-      
+      };
+
       const result = yield* Effect.either(
         ConfigService.pipe(
           Effect.provide(ConfigServiceLive),
-          Effect.withConfigProvider(ConfigProvider.fromMap(new Map(Object.entries(mockConfig))))
-        )
-      )
-      
-      expect(result._tag).toBe("Left")
-    })
-  )
-  
+          Effect.withConfigProvider(
+            ConfigProvider.fromMap(new Map(Object.entries(mockConfig))),
+          ),
+        ),
+      );
+
+      expect(result._tag).toBe('Left');
+    }),
+  );
+
   // Test redacted values don't leak in logs
-  it.effect("should not expose redacted values in logs", () =>
+  it.effect('should not expose redacted values in logs', () =>
     Effect.gen(function* () {
       const mockConfig = {
-        NEO4J_URI: "bolt://localhost:7687",
-        NEO4J_USER: "neo4j",
-        NEO4J_PASSWORD: "super-secret",
-        LLM_OPENAI_API_KEY: "sk-secret-key"
-      }
-      
+        NEO4J_URI: 'bolt://localhost:7687',
+        NEO4J_USER: 'neo4j',
+        NEO4J_PASSWORD: 'super-secret',
+        LLM_OPENAI_API_KEY: 'sk-secret-key',
+      };
+
       const config = yield* ConfigService.pipe(
         Effect.provide(ConfigServiceLive),
-        Effect.withConfigProvider(ConfigProvider.fromMap(new Map(Object.entries(mockConfig))))
-      )
-      
+        Effect.withConfigProvider(
+          ConfigProvider.fromMap(new Map(Object.entries(mockConfig))),
+        ),
+      );
+
       // Simulating console.log behavior
-      const passwordString = config.neo4j.password.toString()
-      const apiKeyString = config.llm.providers.openai!.apiKey.toString()
-      
-      expect(passwordString).not.toContain("super-secret")
-      expect(apiKeyString).not.toContain("sk-secret-key")
-      expect(passwordString).toContain("Redacted")
-      expect(apiKeyString).toContain("Redacted")
-    })
-  )
-})
+      const passwordString = config.neo4j.password.toString();
+      const apiKeyString = config.llm.providers.openai!.apiKey.toString();
+
+      expect(passwordString).not.toContain('super-secret');
+      expect(apiKeyString).not.toContain('sk-secret-key');
+      expect(passwordString).toContain('Redacted');
+      expect(apiKeyString).toContain('Redacted');
+    }),
+  );
+});
 ```
 
 ### 4. Update README Documentation
@@ -213,19 +224,23 @@ Add the following section to `README.md`:
 The application requires the following environment variables:
 
 ### Neo4j Database
+
 - `NEO4J_URI` - Neo4j connection URI (e.g., `bolt://localhost:7687`)
 - `NEO4J_USER` - Neo4j username
 - `NEO4J_PASSWORD` - Neo4j password (stored securely as redacted value)
 
 ### LLM Providers
+
 Configure one or more LLM providers:
 
 #### OpenAI
+
 - `LLM_OPENAI_API_KEY` - OpenAI API key (stored securely as redacted value)
 - `LLM_OPENAI_BASE_URL` - (Optional) Custom base URL for OpenAI API
 - `LLM_OPENAI_MODEL` - (Optional) Default model to use
 
 #### Anthropic
+
 - `LLM_ANTHROPIC_API_KEY` - Anthropic API key (stored securely as redacted value)
 - `LLM_ANTHROPIC_BASE_URL` - (Optional) Custom base URL for Anthropic API
 - `LLM_ANTHROPIC_MODEL` - (Optional) Default model to use

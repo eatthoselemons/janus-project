@@ -2,9 +2,11 @@ name: "Improve Test Organization and Coverage"
 description: |
 
 ## Purpose
+
 Comprehensive PRP for expanding test coverage and reorganizing test files following Effect-TS patterns and Neo4j testing best practices.
 
 ## Core Principles
+
 1. **Effect-First Testing**: All tests use `@effect/vitest` and Effect patterns
 2. **Deterministic Testing**: Fixed test data, no random values
 3. **Layer-Based Mocking**: Use Effect layers for dependency injection
@@ -14,22 +16,27 @@ Comprehensive PRP for expanding test coverage and reorganizing test files follow
 ---
 
 ## Goal
+
 Expand test coverage to include expected, failure, and edge cases for all functions, and reorganize test files into smaller, focused modules following Effect-TS patterns.
 
 ## Why
+
 - **Quality Assurance**: Ensure all code paths are tested
 - **Maintainability**: Smaller test files are easier to understand and modify
 - **Reliability**: Comprehensive Neo4j operation testing prevents database issues
 - **Documentation**: Tests serve as living documentation of expected behavior
 
 ## What
+
 Create comprehensive test coverage for:
+
 - Domain schemas (validation, branded types)
 - Model calculations (pure functions)
 - Neo4j repositories (CRUD operations)
 - Database migrations
 
 ### Success Criteria
+
 - [ ] All functions have 3+ tests (expected, edge, failure)
 - [ ] Test files are under 300 lines each
 - [ ] Neo4j operations tested with mocks
@@ -39,14 +46,15 @@ Create comprehensive test coverage for:
 ## All Needed Context
 
 ### Documentation & References
+
 ```yaml
 - url: https://www.npmjs.com/package/@effect/vitest
-  sections: ["Getting Started", "Writing Effect Tests", "Test Management"]
+  sections: ['Getting Started', 'Writing Effect Tests', 'Test Management']
   why: Official Effect testing integration patterns
   discovered_caveat: Must use it.effect() not regular it() for Effect code
 
 - url: https://effect.website/llms.txt
-  sections: ["Testing", "Layers", "Services"]
+  sections: ['Testing', 'Layers', 'Services']
   why: Effect patterns for dependency injection and testing
   critical: TestContext is automatically injected with it.effect()
 
@@ -59,15 +67,16 @@ Create comprehensive test coverage for:
   critical: Pure functions go in calculations layer, Effect code in actions
 
 - docfile: /home/user/git/janus-project/examples/vitest/docs
-  include_sections: ["Configuration", "Mocking", "Assertions"]
-  skip_sections: ["Migration", "Browser Mode"]
+  include_sections: ['Configuration', 'Mocking', 'Assertions']
+  skip_sections: ['Migration', 'Browser Mode']
 
 - docfile: /home/user/git/janus-project/examples/neo4j-documentation
-  include_sections: ["Driver API", "Sessions", "Transactions"]
+  include_sections: ['Driver API', 'Sessions', 'Transactions']
   why: Understanding Neo4j operations for accurate mocking
 ```
 
 ### Current Codebase tree
+
 ```bash
 src/
 ├── cli/
@@ -88,6 +97,7 @@ tests/
 ```
 
 ### Desired Codebase tree with files to be added
+
 ```bash
 src/
 ├── cli/
@@ -119,6 +129,7 @@ tests/
 ```
 
 ### Known Gotchas & Library Quirks
+
 ```typescript
 // CRITICAL: Effect testing requires @effect/vitest, not regular vitest
 // Example: import { it } from "@effect/vitest" // NOT from "vitest"
@@ -141,46 +152,46 @@ Create reusable test utilities for consistent testing patterns:
 
 ```typescript
 // src/test-utils/layers.ts
-import { Layer, Context } from "effect"
+import { Layer, Context } from 'effect';
 
 // Generic test layer factory
-export const makeTestLayer = <I, S extends object>(
-  tag: Context.Tag<I, S>
-) => (implementation: Partial<S>): Layer.Layer<I> => {
-  const proxy = new Proxy({} as S, {
-    get(_, prop) {
-      if (prop in implementation) {
-        return implementation[prop as keyof S]
-      }
-      throw new Error(`Method ${String(prop)} not implemented in test`)
-    }
-  })
-  return Layer.succeed(tag, proxy)
-}
+export const makeTestLayer =
+  <I, S extends object>(tag: Context.Tag<I, S>) =>
+  (implementation: Partial<S>): Layer.Layer<I> => {
+    const proxy = new Proxy({} as S, {
+      get(_, prop) {
+        if (prop in implementation) {
+          return implementation[prop as keyof S];
+        }
+        throw new Error(`Method ${String(prop)} not implemented in test`);
+      },
+    });
+    return Layer.succeed(tag, proxy);
+  };
 
 // src/test-utils/data.ts
-import { faker } from "@faker-js/faker"
+import { faker } from '@faker-js/faker';
 
 // Use fixed seed for deterministic tests
-faker.seed(12345)
+faker.seed(12345);
 
 export const testIds = {
-  snippet: "test-snippet-123",
-  parameter: "test-param-456",
-  composition: "test-comp-789"
-}
+  snippet: 'test-snippet-123',
+  parameter: 'test-param-456',
+  composition: 'test-comp-789',
+};
 
 // src/test-utils/neo4j-mocks.ts
-import { Effect } from "effect"
-import * as Neo4j from "../db/neo4j"
+import { Effect } from 'effect';
+import * as Neo4j from '../db/neo4j';
 
 export const mockNeo4jRecord = (data: Record<string, any>) => ({
   get: (key: string) => data[key],
   has: (key: string) => key in data,
   keys: Object.keys(data),
   forEach: (fn: Function) => Object.entries(data).forEach(([k, v]) => fn(v, k)),
-  toObject: () => data
-})
+  toObject: () => data,
+});
 ```
 
 ### List of tasks to be completed
@@ -261,80 +272,79 @@ DELETE tests/index.test.ts:
 
 ```typescript
 // Task 2: Domain schema tests
-import { describe, it, expect } from "@effect/vitest"
-import { Effect, Schema } from "effect"
-import * as Domain from "./domain"
+import { describe, it, expect } from '@effect/vitest';
+import { Effect, Schema } from 'effect';
+import * as Domain from './domain';
 
-describe("Domain Schemas", () => {
-  describe("SnippetId", () => {
-    it("accepts valid UUID format", () => {
-      const valid = "123e4567-e89b-12d3-a456-426614174000"
+describe('Domain Schemas', () => {
+  describe('SnippetId', () => {
+    it('accepts valid UUID format', () => {
+      const valid = '123e4567-e89b-12d3-a456-426614174000';
       const result = Effect.runSync(
-        Schema.decodeUnknown(Domain.SnippetId)(valid)
-      )
-      expect(result).toBe(valid)
-    })
+        Schema.decodeUnknown(Domain.SnippetId)(valid),
+      );
+      expect(result).toBe(valid);
+    });
 
-    it("rejects invalid format", () => {
-      const invalid = "not-a-uuid"
+    it('rejects invalid format', () => {
+      const invalid = 'not-a-uuid';
       const result = Effect.runSyncExit(
-        Schema.decodeUnknown(Domain.SnippetId)(invalid)
-      )
-      expect(result._tag).toBe("Failure")
-    })
+        Schema.decodeUnknown(Domain.SnippetId)(invalid),
+      );
+      expect(result._tag).toBe('Failure');
+    });
 
-    it("rejects empty string", () => {
+    it('rejects empty string', () => {
       const result = Effect.runSyncExit(
-        Schema.decodeUnknown(Domain.SnippetId)("")
-      )
-      expect(result._tag).toBe("Failure")
-    })
-  })
-})
+        Schema.decodeUnknown(Domain.SnippetId)(''),
+      );
+      expect(result._tag).toBe('Failure');
+    });
+  });
+});
 
 // Task 3: Model calculation tests
-describe("Model Calculations", () => {
-  describe("normalizeSlugInput", () => {
-    it("converts to lowercase and replaces spaces", () => {
-      expect(normalizeSlugInput("Hello World")).toBe("hello-world")
-    })
+describe('Model Calculations', () => {
+  describe('normalizeSlugInput', () => {
+    it('converts to lowercase and replaces spaces', () => {
+      expect(normalizeSlugInput('Hello World')).toBe('hello-world');
+    });
 
-    it("handles special characters", () => {
-      expect(normalizeSlugInput("Test@#$%Name")).toBe("test-name")
-    })
+    it('handles special characters', () => {
+      expect(normalizeSlugInput('Test@#$%Name')).toBe('test-name');
+    });
 
-    it("collapses multiple dashes", () => {
-      expect(normalizeSlugInput("test   name")).toBe("test-name")
-    })
-  })
-})
+    it('collapses multiple dashes', () => {
+      expect(normalizeSlugInput('test   name')).toBe('test-name');
+    });
+  });
+});
 
 // Task 4: Neo4j service tests
-describe("Neo4jService", () => {
-  it.effect("creates and closes sessions", () =>
+describe('Neo4jService', () => {
+  it.effect('creates and closes sessions', () =>
     Effect.gen(function* () {
-      const neo4j = yield* Neo4jService
-      const session = yield* neo4j.createSession()
+      const neo4j = yield* Neo4jService;
+      const session = yield* neo4j.createSession();
       // Session should have required methods
-      expect(session.run).toBeDefined()
-      expect(session.close).toBeDefined()
-    }).pipe(
-      Effect.provide(TestNeo4jLayer)
-    )
-  )
-})
+      expect(session.run).toBeDefined();
+      expect(session.close).toBeDefined();
+    }).pipe(Effect.provide(TestNeo4jLayer)),
+  );
+});
 ```
 
 ### Integration Points
+
 ```yaml
 CONFIG:
   - Vitest config: Use default, no changes needed
   - TypeScript: Already excludes test files
-  
+
 IMPORTS:
   - Always use: import { it } from "@effect/vitest"
   - Test utils: import * as TestUtils from "../test-utils"
-  
+
 PATTERNS:
   - Test files: *.test.ts co-located with source
   - Test names: describe block matches module/function name
@@ -344,6 +354,7 @@ PATTERNS:
 ## Validation Loop
 
 ### Level 1: Syntax & Style
+
 ```bash
 # Run after creating each test file
 pnpm run lint
@@ -356,21 +367,22 @@ pnpm run typecheck
 ```
 
 ### Level 2: Unit Tests
+
 ```typescript
 // Each test file should have AT MINIMUM:
-describe("FunctionName", () => {
-  it("handles expected input correctly", () => {
+describe('FunctionName', () => {
+  it('handles expected input correctly', () => {
     // Happy path test
-  })
+  });
 
-  it("handles edge case", () => {
+  it('handles edge case', () => {
     // Boundary condition, empty input, etc.
-  })
+  });
 
-  it("handles failure case", () => {
+  it('handles failure case', () => {
     // Invalid input, errors, etc.
-  })
-})
+  });
+});
 ```
 
 ```bash
@@ -383,6 +395,7 @@ pnpm test src/db
 ```
 
 ### Level 3: Coverage Check
+
 ```bash
 # Ensure comprehensive coverage
 pnpm test src -- --coverage
@@ -392,6 +405,7 @@ pnpm test src -- --coverage
 ```
 
 ### Level 4: Full Test Suite
+
 ```bash
 # Final validation
 pnpm run preflight
@@ -406,6 +420,7 @@ pnpm run preflight
 ```
 
 ## Final Validation Checklist
+
 - [ ] All tests use @effect/vitest patterns
 - [ ] Each function has 3+ test cases
 - [ ] Test files are under 300 lines
@@ -418,6 +433,7 @@ pnpm run preflight
 ---
 
 ## Anti-Patterns to Avoid
+
 - ❌ Don't use regular `it()` from vitest - use `it.effect()`
 - ❌ Don't share test layers between tests
 - ❌ Don't use random data - tests must be deterministic
@@ -430,38 +446,43 @@ pnpm run preflight
 ## Critical Implementation Notes
 
 1. **Effect Testing Pattern**: Always use `it.effect()` for testing Effect code:
+
 ```typescript
-it.effect("description", () =>
+it.effect('description', () =>
   Effect.gen(function* () {
-    const service = yield* MyService
-    const result = yield* service.method()
-    expect(result).toBe(expected)
-  }).pipe(Effect.provide(testLayer))
-)
+    const service = yield* MyService;
+    const result = yield* service.method();
+    expect(result).toBe(expected);
+  }).pipe(Effect.provide(testLayer)),
+);
 ```
 
 2. **Neo4j Mock Pattern**: Mock at the service level, not the driver level:
+
 ```typescript
 const TestNeo4jLayer = makeTestLayer(Neo4jService)({
-  runQuery: (query, params) => Effect.succeed({
-    records: [mockNeo4jRecord({ id: "123" })]
-  })
-})
+  runQuery: (query, params) =>
+    Effect.succeed({
+      records: [mockNeo4jRecord({ id: '123' })],
+    }),
+});
 ```
 
 3. **Error Testing Pattern**: Use Effect.flip or expect exit:
+
 ```typescript
-it.effect("handles errors", () =>
+it.effect('handles errors', () =>
   Effect.gen(function* () {
-    const exit = yield* Effect.exit(failingOperation)
-    expect(exit._tag).toBe("Failure")
-  })
-)
+    const exit = yield* Effect.exit(failingOperation);
+    expect(exit._tag).toBe('Failure');
+  }),
+);
 ```
 
 **Confidence Score: 9/10**
 
 This PRP provides comprehensive context including:
+
 - Complete test patterns from the codebase
 - External documentation references
 - Explicit file paths and structure

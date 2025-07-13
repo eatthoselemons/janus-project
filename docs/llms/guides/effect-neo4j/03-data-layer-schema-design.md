@@ -32,7 +32,7 @@ export class PersonNode extends Schema.Class<PersonNode>("PersonNode")({
   hasLabel(label: Label): boolean {
     return this.labels.includes(label)
   }
-  
+
   get displayName(): string {
     return `${this.name} (${this.id})`
   }
@@ -40,25 +40,27 @@ export class PersonNode extends Schema.Class<PersonNode>("PersonNode")({
 ```
 
 ### Relationship Schemas
+
 Define relationships as first-class entities:
 
 ```typescript
 export const FollowsRelationship = Schema.Struct({
   since: Schema.DateTimeUtc,
   strength: RelationshipStrength,
-  mutual: Schema.Boolean
-})
-export type FollowsRelationship = typeof FollowsRelationship.Type
+  mutual: Schema.Boolean,
+});
+export type FollowsRelationship = typeof FollowsRelationship.Type;
 
 export const WorksAtRelationship = Schema.Struct({
   role: JobTitle,
   startDate: Schema.DateTimeUtc,
   endDate: Schema.Option(Schema.DateTimeUtc),
-  department: Department
-})
+  department: Department,
+});
 ```
 
 ### Complex Node Types
+
 For nodes with rich properties:
 
 ```typescript
@@ -70,6 +72,6 @@ export const CompanyNode = Schema.Struct({
   revenue: Schema.Option(Revenue),
   industries: Schema.Array(Industry),
   headquarters: Address,
-  metadata: Schema.Record(Schema.String, Schema.Unknown)
-})
+  metadata: Schema.Record(Schema.String, Schema.Unknown),
+});
 ```
