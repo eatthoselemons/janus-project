@@ -99,3 +99,4 @@ Use `pnpm test <string>` to skip the tests from the `examples` folder, the `<str
 4. does composition over inheritance
 5. follows the effect best practices (documentation: https://effect.website/llms-small.txt)
 6. is tailored to a project that is using neo4j as its database not sql
+7. Check code for duplicated sections. Sections where the same code is repeated with different options, condense repeated code

@@ -12,6 +12,7 @@ Template optimized for AI agents to implement features with sufficient context a
 3. **Information Dense**: Use keywords and patterns from the codebase
 4. **Progressive Success**: Start simple, validate, then enhance
 5. **Global rules**: Be sure to follow all rules in CLAUDE.md
+6. **Condense Repeated Code**: Refactor code that repeated
 
 ---
 
