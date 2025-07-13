@@ -6,11 +6,11 @@ This document provides a detailed, exhaustive, and incremental plan for implemen
 
 This phase establishes the bedrock of the application: the type system, configuration, and essential services.
 
--   [ ] **1.1: Core Types & Schemas**
-    -   [ ] **Branded IDs:** Define all branded ID types using `Schema.string.pipe(Schema.brand("..."))`:
+-   [x] **1.1: Core Types & Schemas**
+    -   [x] **Branded IDs:** Define all branded ID types using `Schema.string.pipe(Schema.brand("..."))`:
         -   `SnippetId`, `SnippetVersionId`, `ParameterId`, `ParameterOptionId`, `CompositionId`, `CompositionVersionId`, `TestRunId`, `DataPointId`, `TagId`.
-    -   [ ] **Slug Type:** Create a `Slug` branded type with a custom validation function to enforce `lowercase-with-hyphens` format.
-    -   [ ] **Entity Schemas:** Define `Schema.Struct` for all core entities as specified in `domain-model.md`:
+    -   [x] **Slug Type:** Create a `Slug` branded type with a custom validation function to enforce `lowercase-with-hyphens` format.
+    -   [x] **Entity Schemas:** Define `Schema.Struct` for all core entities as specified in `domain-model.md`:
         -   `Snippet`, `SnippetVersion`, `Parameter`, `ParameterOption`, `Composition`, `CompositionVersion` (including `CompositionSnippet`), `TestRun`, `DataPoint`, `Tag`.
 
 -   [ ] **1.2: Error Sub-Types**

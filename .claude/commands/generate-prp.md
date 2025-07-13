@@ -43,11 +43,10 @@ Using docs/llms/PRPs/templates/prp_base.md as template:
 ### Validation Gates (Must be Executable) eg for python
 ```bash
 # Syntax/Style
-ruff check --fix && mypy .
+pnpm run preflight
 
 # Unit Tests
-uv run pytest tests/ -v
-
+pnpm test
 ```
 
 *** CRITICAL AFTER YOU ARE DONE RESEARCHING AND EXPLORING THE CODEBASE BEFORE YOU START WRITING THE PRP ***

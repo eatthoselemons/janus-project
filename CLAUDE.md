@@ -1,8 +1,3 @@
-### 🔄 Project Awareness & Context
-- **Always read `PLANNING.md`** at the start of a new conversation to understand the project's architecture, goals, style, and constraints.
-- **Check `TASK.md`** before starting a new task. If the task isn’t listed, add it with a brief description and today's date.
-- **Use consistent naming conventions, file structure, and architecture patterns** as described in `PLANNING.md`.
-
 ### 🧱 Code Structure & Modularity
 - **Never create a file longer than 300 lines of code.** If a file approaches this limit, refactor by splitting it into modules or helper files.
 - **Organize code into clearly separated modules**, grouped by feature or responsibility.
@@ -79,14 +74,6 @@ The project adheres strictly to the principles of **Functional Programming** and
 
 -   **Formatter:** Prettier
 -   **Linter:** ESLint
-
-### Technical Guidance & Resources
-
--   **The `Effect-TS` Mandate:** This is our foundational framework. All asynchronous operations, error handling, and dependency management **MUST** be modeled using the `Effect` system.
--   **`Effect-TS` Documentation:** If you are unsure about a specific `Effect-TS` implementation, you are encouraged to consult the official LLM-optimized documentation.
-    -   **Condensed:** `https://effect.website/llms-small.txt`
-    -   **Topics/Index:** `https://effect.website/llms.txt`
--   **Quick Reference For Using Effect** You can read either "effect-composition-guide.md" or "effect-normand-paradigm-guide.md" inside the `docs/llms/examples/` directory for references on proper usage of Effect
 
 ### Notes
 

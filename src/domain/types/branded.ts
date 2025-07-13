@@ -99,3 +99,20 @@ export const RelationshipStrength = Schema.Number.pipe(
   Schema.brand("RelationshipStrength")
 )
 export type RelationshipStrength = typeof RelationshipStrength.Type
+
+/**
+ * Union of all ID types in the system
+ * Useful for error types and generic ID handling
+ */
+export const AnyId = Schema.Union(
+  SnippetId,
+  SnippetVersionId,
+  ParameterId,
+  ParameterOptionId,
+  CompositionId,
+  CompositionVersionId,
+  TestRunId,
+  DataPointId,
+  TagId
+)
+export type AnyId = typeof AnyId.Type
