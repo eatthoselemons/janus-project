@@ -7,7 +7,9 @@
     "test": "vitest run",
     "build": "tsc",
     "start": "node dist/index.js",
-    "preflight": "pnpm run build && pnpm run test"
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write .",
+    "preflight": "pnpm run format && pnpm run lint && pnpm run build && pnpm run test"
   },
   "keywords": [
     "llm",
@@ -28,6 +30,12 @@
     "@effect/vitest": "^0.23.12",
     "@types/node": "^24.0.10",
     "@types/uuid": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.36.0",
+    "@typescript-eslint/parser": "^8.36.0",
+    "eslint": "^9.31.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-prettier": "^5.5.1",
+    "prettier": "^3.6.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
