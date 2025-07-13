@@ -13,9 +13,9 @@ This phase establishes the bedrock of the application: the type system, configur
     -   [x] **Entity Schemas:** Define `Schema.Struct` for all core entities as specified in `domain-model.md`:
         -   `Snippet`, `SnippetVersion`, `Parameter`, `ParameterOption`, `Composition`, `CompositionVersion` (including `CompositionSnippet`), `TestRun`, `DataPoint`, `Tag`.
 
--   [ ] **1.2: Error Sub-Types**
-    -   [ ] Define a base `JanusError` using `Data.TaggedError`.
-    -   [ ] Define specific error subtypes that extend `JanusError`:
+-   [x] **1.2: Error Sub-Types**
+    -   [x] Define a base `JanusError` using `Data.TaggedError`.
+    -   [x] Define specific error subtypes that extend `JanusError`:
         -   `PersistenceError` (for database query/connection failures).
         -   `LlmApiError` (for failures from LLM providers).
         -   `FileSystemError` (for file IO problems, e.g., `snippet pull/push`).
