@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@effect/vitest';
-import { Effect, Either, Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 import {
   JanusError,
   PersistenceError,

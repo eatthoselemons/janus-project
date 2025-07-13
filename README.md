@@ -18,7 +18,22 @@ The application requires the following environment variables:
 
 ### LLM Providers
 
-Configure one or more LLM providers:
+Configure LLM providers by editing `config/llm-providers.txt` and adding one provider name per line:
+
+```txt
+# config/llm-providers.txt
+openai
+anthropic
+custom
+```
+
+Then set the environment variables for each provider you listed:
+
+**Note**: You can override the config file by setting the `LLM_PROVIDERS` environment variable:
+
+```bash
+export LLM_PROVIDERS="openai,anthropic,custom"
+```
 
 #### OpenAI
 
@@ -43,3 +58,19 @@ Configure one or more LLM providers:
 - `LLM_GOOGLE_API_KEY` - Google Vertex AI API key (stored securely as redacted value)
 - `LLM_GOOGLE_BASE_URL` - Base URL for Google Vertex AI (e.g., `https://vertex-ai.googleapis.com`)
 - `LLM_GOOGLE_MODEL` - Model to use (e.g., `gemini-pro`, `gemini-1.5-turbo`)
+
+#### Custom Providers
+
+You can add any custom provider by following the naming convention:
+
+- `LLM_<PROVIDER>_API_KEY` - API key (required)
+- `LLM_<PROVIDER>_BASE_URL` - Base URL (required)
+- `LLM_<PROVIDER>_MODEL` - Model to use (required)
+
+Example for a custom provider called "mycorp":
+
+```bash
+LLM_MYCORP_API_KEY=my-api-key
+LLM_MYCORP_BASE_URL=https://api.mycorp.com/v1
+LLM_MYCORP_MODEL=mycorp-large
+```
