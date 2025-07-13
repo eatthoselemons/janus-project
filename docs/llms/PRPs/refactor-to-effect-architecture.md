@@ -1,4 +1,3 @@
-
 # PRP: Refactor to Align with Core Effect Architecture
 
 ## Abstract
@@ -20,8 +19,8 @@ export const buildSnippet = (data: CreateSnippetData): Snippet => ({
   name: data.name,
   description: data.description,
   createdAt: new Date(), // Unmanaged side effect
-  updatedAt: new Date()  // Unmanaged side effect
-})
+  updatedAt: new Date(), // Unmanaged side effect
+});
 ```
 
 This violates the "Actions" principle. Generating a UUID and getting the current time are side effects that should be wrapped in `Effect` to make them explicit, testable, and controllable.
@@ -32,15 +31,18 @@ In `src/db/repositories.ts`, data retrieved from Neo4j is cast directly to the d
 
 ```typescript
 // From src/db/repositories.ts
-const findById = (id: SnippetId): Effect.Effect<Option.Option<Snippet>, RepositoryError> =>
-  neo4j.runQuery<Snippet>(
-    `MATCH (s:Snippet {id: $id}) RETURN s`,
-    { id }
-  ).pipe(
+const findById = (
+  id: SnippetId,
+): Effect.Effect<Option.Option<Snippet>, RepositoryError> =>
+  neo4j.runQuery<Snippet>(`MATCH (s:Snippet {id: $id}) RETURN s`, { id }).pipe(
     // Incorrect: This is an unsafe cast, not a validation.
-    Effect.map(records => records.length > 0 ? Option.some(Snippet.make(records[0])) : Option.none()), 
+    Effect.map((records) =>
+      records.length > 0
+        ? Option.some(Snippet.make(records[0]))
+        : Option.none(),
+    ),
     // ...
-  )
+  );
 ```
 
 The data returned from the database is of type `unknown` and must be validated against the `Snippet` schema using `Schema.decodeUnknown(Snippet)`. The current implementation completely bypasses this safety check, defeating a primary benefit of using `Effect.Schema`.
@@ -75,30 +77,34 @@ export const buildSnippet = (data: CreateSnippetData): Snippet => ({
   id: crypto.randomUUID() as any,
   // ...
   createdAt: new Date(),
-  updatedAt: new Date()
-})
+  updatedAt: new Date(),
+});
 
 // After
-import { Clock, Effect, Data } from "effect"
-import { Uuid } from "effect-contrib/Uuid"
+import { Clock, Effect, Data } from 'effect';
+import { Uuid } from 'effect-contrib/Uuid';
 
 // Pure Calculation
-export const createSnippet = (data: CreateSnippetData & { id: SnippetId, createdAt: Date, updatedAt: Date }): Snippet => {
-  return Snippet.make(data)
-}
+export const createSnippet = (
+  data: CreateSnippetData & { id: SnippetId; createdAt: Date; updatedAt: Date },
+): Snippet => {
+  return Snippet.make(data);
+};
 
 // Action
-export const buildSnippet = (data: CreateSnippetData): Effect.Effect<Snippet, never, Clock | Uuid> => 
-  Effect.gen(function*() {
-    const now = yield* Clock.currentTimeMillis
-    const id = yield* Uuid.v4
+export const buildSnippet = (
+  data: CreateSnippetData,
+): Effect.Effect<Snippet, never, Clock | Uuid> =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis;
+    const id = yield* Uuid.v4;
     return createSnippet({
       ...data,
       id: id as SnippetId,
       createdAt: new Date(now),
-      updatedAt: new Date(now)
-    })
-  })
+      updatedAt: new Date(now),
+    });
+  });
 ```
 
 ### Step 2: Refactor Repositories to Use Schema Decoding
@@ -111,20 +117,27 @@ All repository methods that retrieve data from Neo4j will be updated to use `Sch
 // Before
 const findById = (id: SnippetId) =>
   neo4j.runQuery<Snippet>(/* ... */).pipe(
-    Effect.map(records => records.length > 0 ? Option.some(Snippet.make(records[0])) : Option.none()),
+    Effect.map((records) =>
+      records.length > 0
+        ? Option.some(Snippet.make(records[0]))
+        : Option.none(),
+    ),
     // ...
-  )
+  );
 
 // After
 const findById = (id: SnippetId) =>
   neo4j.runQuery<unknown>(/* ... */).pipe(
-    Effect.map(records => Option.fromNullable(records[0])),
+    Effect.map((records) => Option.fromNullable(records[0])),
     Effect.flatMap(Option.traverse(Schema.decodeUnknown(Snippet))), // Safe decoding
-    Effect.mapError(cause => new RepositoryError({
-      // ...
-    })),
+    Effect.mapError(
+      (cause) =>
+        new RepositoryError({
+          // ...
+        }),
+    ),
     // ...
-  )
+  );
 ```
 
 ### Step 3: Refactor Repository `create` Methods
@@ -168,4 +181,4 @@ These changes will yield significant benefits:
 
 ## Disadvantages
 
--   There will be a minor increase in boilerplate due to the use of `Clock` and `Uuid` services and the need to provide them in the application's `Layer`. However, this is a standard practice in `Effect-TS` applications and the trade-off for correctness and testability is well worth it.
+- There will be a minor increase in boilerplate due to the use of `Clock` and `Uuid` services and the need to provide them in the application's `Layer`. However, this is a standard practice in `Effect-TS` applications and the trade-off for correctness and testability is well worth it.

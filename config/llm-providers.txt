@@ -1,0 +1,15 @@
+# LLM Providers Configuration
+# List one provider per line
+# Lines starting with # are comments
+# 
+# Common providers:
+# - openai      (OpenAI GPT models)
+# - anthropic   (Claude models)
+# - azure       (Azure OpenAI Service)
+# - google      (Google Vertex AI)
+# - cohere      (Cohere models)
+# - huggingface (Hugging Face Inference API)
+# - ollama      (Local Ollama models)
+# - custom      (Any custom provider)
+#
+# Uncomment the providers you want to use:

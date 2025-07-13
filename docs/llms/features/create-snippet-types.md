@@ -7,7 +7,8 @@ create snippet types as defined in the "docs/design/domain-model.md" and then wr
 ## DOCUMENTATION:
 
 There is also the effect llm documentation, follow any links you need for more information
--   **Topics/Index:** `https://effect.website/llms.txt`
+
+- **Topics/Index:** `https://effect.website/llms.txt`
 
 You can find the entire vitest documentation in `examples/vitest/docs`
 

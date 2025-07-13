@@ -11,7 +11,8 @@
 [List out any documentation (web pages, sources for an MCP server like Crawl4AI RAG, etc.) that will need to be referenced during development]
 
 There is also the effect llm documentation, follow any links you need for more information
--   **Topics/Index:** `https://effect.website/llms.txt`
+
+- **Topics/Index:** `https://effect.website/llms.txt`
 
 You can find the entire vitest documentation in `examples/vitest/docs`
 

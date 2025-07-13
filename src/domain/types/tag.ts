@@ -1,5 +1,5 @@
-import { Schema } from "effect"
-import { TagId, Slug } from "./branded"
+import { Schema } from 'effect';
+import { TagId, Slug } from './branded';
 
 /**
  * Tag - A simple label for organizing and querying entities
@@ -7,6 +7,6 @@ import { TagId, Slug } from "./branded"
  */
 export const Tag = Schema.Struct({
   id: TagId,
-  name: Slug
-})
-export type Tag = typeof Tag.Type
+  name: Slug,
+});
+export type Tag = typeof Tag.Type;

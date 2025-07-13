@@ -1,5 +1,5 @@
-import { Schema } from "effect"
-import { TestRunId, DataPointId } from "./branded"
+import { Schema } from 'effect';
+import { TestRunId, DataPointId } from './branded';
 
 /**
  * TestRun - The parent container for a single execution of prompt experiments
@@ -11,9 +11,9 @@ export const TestRun = Schema.Struct({
   createdAt: Schema.DateTimeUtc,
   llm_provider: Schema.String,
   llm_model: Schema.String,
-  metadata: Schema.Record({ key: Schema.String, value: Schema.Unknown })
-})
-export type TestRun = typeof TestRun.Type
+  metadata: Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+});
+export type TestRun = typeof TestRun.Type;
 
 /**
  * DataPoint - The result of a single LLM call within a TestRun
@@ -23,6 +23,6 @@ export const DataPoint = Schema.Struct({
   id: DataPointId,
   final_prompt_text: Schema.String,
   response_text: Schema.String,
-  metrics: Schema.Record({ key: Schema.String, value: Schema.Unknown })
-})
-export type DataPoint = typeof DataPoint.Type
+  metrics: Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+});
+export type DataPoint = typeof DataPoint.Type;

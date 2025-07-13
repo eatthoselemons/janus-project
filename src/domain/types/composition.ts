@@ -1,12 +1,17 @@
-import { Schema } from "effect"
-import { CompositionId, CompositionVersionId, SnippetVersionId, Slug } from "./branded"
+import { Schema } from 'effect';
+import {
+  CompositionId,
+  CompositionVersionId,
+  SnippetVersionId,
+  Slug,
+} from './branded';
 
 /**
  * Role - The type of message in a composition
  * Defines how a snippet is used within a prompt composition
  */
-export const Role = Schema.Literal("system", "user_prompt", "model_response")
-export type Role = typeof Role.Type
+export const Role = Schema.Literal('system', 'user_prompt', 'model_response');
+export type Role = typeof Role.Type;
 
 /**
  * CompositionSnippet - Represents a snippet's role and position in a composition
@@ -19,11 +24,11 @@ export const CompositionSnippet = Schema.Struct({
     Schema.int(),
     Schema.nonNegative(),
     Schema.annotations({
-      description: "The order of the snippet within its role"
-    })
-  )
-})
-export type CompositionSnippet = typeof CompositionSnippet.Type
+      description: 'The order of the snippet within its role',
+    }),
+  ),
+});
+export type CompositionSnippet = typeof CompositionSnippet.Type;
 
 /**
  * Composition - The abstract container for a composition and all its versions
@@ -32,9 +37,9 @@ export type CompositionSnippet = typeof CompositionSnippet.Type
 export const Composition = Schema.Struct({
   id: CompositionId,
   name: Slug,
-  description: Schema.String
-})
-export type Composition = typeof Composition.Type
+  description: Schema.String,
+});
+export type Composition = typeof Composition.Type;
 
 /**
  * CompositionVersion - An immutable snapshot of a composition
@@ -44,6 +49,6 @@ export const CompositionVersion = Schema.Struct({
   id: CompositionVersionId,
   snippets: Schema.Array(CompositionSnippet),
   createdAt: Schema.DateTimeUtc,
-  commit_message: Schema.String // Mandatory message explaining the change
-})
-export type CompositionVersion = typeof CompositionVersion.Type
+  commit_message: Schema.String, // Mandatory message explaining the change
+});
+export type CompositionVersion = typeof CompositionVersion.Type;

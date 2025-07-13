@@ -12,7 +12,8 @@ You can also find the entire neo4j documentation at `examples/neo4j-documentatio
 ## DOCUMENTATION:
 
 There is also the effect llm documentation, follow any links you need for more information
--   **Topics/Index:** `https://effect.website/llms.txt`
+
+- **Topics/Index:** `https://effect.website/llms.txt`
 
 You can find effect specific test instructions here: https://www.npmjs.com/package/@effect/vitest
 
@@ -24,4 +25,3 @@ use the `docs/llms/effect/effect-compliance-checklist.md` to ensure that you hav
 
 all code is in the `src/` folder
 When making the PRP name it after the subsection
-remember that to run only the janus tests you need to run `pnpm test src`
