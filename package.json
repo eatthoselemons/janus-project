@@ -24,9 +24,11 @@
     "@effect/platform-node": "^0.88.11",
     "effect": "^3.16.12",
     "neo4j-driver": "^5.28.1",
+    "ts-patch": "^3.3.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@effect/language-service": "^0.25.0",
     "@effect/vitest": "^0.23.12",
     "@eslint/js": "^9.31.0",
     "@types/node": "^24.0.10",

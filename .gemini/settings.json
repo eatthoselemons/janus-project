@@ -1,0 +1,16 @@
+{
+  "theme": "ANSI",
+  "selectedAuthType": "oauth-personal",
+  "preferredEditor": "vim",
+  "mcpServers": {
+    "mcp-language-server": {
+      "command": "/home/user/git/mcp-language-server/mcp-language-server",
+      "args": [
+        "--workspace",
+        "/home/user/git/janus-project",
+        "--lsp",
+        "/home/user/git/janus-project/run-lsp.sh"
+      ]
+    }
+  }
+}
