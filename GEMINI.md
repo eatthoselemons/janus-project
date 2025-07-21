@@ -66,3 +66,41 @@ The project adheres strictly to the principles of **Functional Programming** and
   - **Condensed:** `https://effect.website/llms-small.txt`
   - **Full:** `https://effect.website/llms-full.txt`
   - **Topics/Index:** `https://effect.website/llms.txt`
+
+## 5. Language Server Usage (MCP)
+
+Use the MCP language server tools frequently to verify Effect-TS types and catch errors early:
+
+### Type Verification During Development
+
+**When to use**: After writing any Effect-TS code, especially:
+- Effect pipelines (`pipe`, `Effect.gen`, `Layer.effect`)
+- Schema definitions and transformations
+- Service implementations with complex dependencies
+
+**How to use**:
+```
+1. Hover (mcp__language-server__hover): Check types of Effect constructs
+   - Verify Effect<A, E, R> signatures match expectations
+   - Confirm service dependencies are correctly inferred
+   
+2. Diagnostics (mcp__language-server__diagnostics): Catch type errors immediately
+   - Run after completing each function, pipeline, or service method
+   - Run before moving to test/implement the next feature
+   - Pay attention to Effect-specific errors (missing Context, incorrect error types)
+```
+
+### Common Patterns to Verify
+
+- **Effect Pipelines**: Hover over `pipe` chains to ensure type flow
+- **Layer Composition**: Check that `Layer.provide` correctly satisfies dependencies
+- **Schema Validations**: Verify Schema.Struct fields match your domain types
+- **Service Tags**: Ensure Tag definitions match interface types
+
+### Other Useful Commands
+
+- **References** (mcp__language-server__references): Find all uses of a Tag or Schema
+- **Rename** (mcp__language-server__rename_symbol): Safely rename services/types across codebase
+- **Edit** (mcp__language-server__edit_file): Apply quick fixes for import paths
+
+**Pro tip**: Run diagnostics before running `pnpm preflight` to catch issues faster!
