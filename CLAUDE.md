@@ -145,4 +145,6 @@ Use the MCP language server tools frequently to verify Effect-TS types and catch
 - **Rename** (mcp__language-server__rename_symbol): Safely rename services/types across codebase
 - **Edit** (mcp__language-server__edit_file): Apply quick fixes for import paths
 
+**Note**: The `definition` feature (go to definition) currently doesn't work due to MCP implementation limitations - it fails with "No Project" error. This is not a configuration issue. Use VS Code or other IDEs for definition lookup instead.
+
 **Pro tip**: Run diagnostics before running `pnpm preflight` to catch issues faster!

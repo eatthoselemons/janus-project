@@ -24,6 +24,17 @@ pnpm run preflight
 
 This project uses **Vitest** as its primary testing framework. Test files (`*.test.ts`) should be co-located with the source files they test. When writing tests, please follow the established patterns for mocking and test structure found in existing test files.
 
+Test requirements:
+- 1 test for expected use
+- 1 edge case
+- 1 failure case
+- Additional test cases for complicated code
+
+### Task Management
+
+- Mark completed tasks in `TASK.md` immediately after finishing them
+- Add new sub-tasks or TODOs discovered during development to `TASK.md` under a "Discovered During Work" section
+
 ## 3. Core Technology Stack
 
 - **Language:** TypeScript
@@ -54,6 +65,17 @@ The project adheres strictly to the principles of **Functional Programming** and
 - **Embrace Array Operators:** Use immutable array operators (`.map()`, `.filter()`, `.reduce()`, etc.) over imperative `for` loops for data transformation.
 - **Comments Policy:** Write high-value comments only when necessary to explain complex logic. Avoid comments that state the obvious.
 
+### Code Organization
+
+- **Never create files longer than 300 lines** - Refactor into modules if approaching this limit
+- **Organize by feature or responsibility** - Clear module boundaries
+- **Use consistent imports** - Prefer relative imports within packages
+
+### Effect-TS Specific Notes
+
+- Use `Schema.Struct` for Neo4j (not `Model.Class` which is for SQL databases)
+- Use `pnpm test src` to run project tests (skips examples folder)
+
 ### Formatting & Linting
 
 - **Formatter:** Prettier
@@ -66,6 +88,12 @@ The project adheres strictly to the principles of **Functional Programming** and
   - **Condensed:** `https://effect.website/llms-small.txt`
   - **Full:** `https://effect.website/llms-full.txt`
   - **Topics/Index:** `https://effect.website/llms.txt`
+
+### Working with the Codebase
+
+- **Never assume missing context** - Ask questions if uncertain
+- **Never hallucinate libraries or functions** - Only use verified packages
+- **Always confirm file paths and module names exist** before referencing them
 
 ## 5. Language Server Usage (MCP)
 
@@ -102,5 +130,7 @@ Use the MCP language server tools frequently to verify Effect-TS types and catch
 - **References** (mcp__language-server__references): Find all uses of a Tag or Schema
 - **Rename** (mcp__language-server__rename_symbol): Safely rename services/types across codebase
 - **Edit** (mcp__language-server__edit_file): Apply quick fixes for import paths
+
+**Note**: The `definition` feature (go to definition) currently doesn't work due to MCP implementation limitations - it fails with "No Project" error. This is not a configuration issue. Use VS Code or other IDEs for definition lookup instead.
 
 **Pro tip**: Run diagnostics before running `pnpm preflight` to catch issues faster!
