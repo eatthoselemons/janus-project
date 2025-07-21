@@ -1,5 +1,5 @@
-import { Schema } from "effect"
-import { ParameterId, ParameterOptionId, Slug } from "./branded"
+import { Schema } from 'effect';
+import { ParameterId, ParameterOptionId, Slug } from './branded';
 
 /**
  * Parameter - The abstract definition of a parameter
@@ -8,9 +8,9 @@ import { ParameterId, ParameterOptionId, Slug } from "./branded"
 export const Parameter = Schema.Struct({
   id: ParameterId,
   name: Slug,
-  description: Schema.String
-})
-export type Parameter = typeof Parameter.Type
+  description: Schema.String,
+});
+export type Parameter = typeof Parameter.Type;
 
 /**
  * ParameterOption - A specific, versioned value for a Parameter
@@ -20,6 +20,6 @@ export const ParameterOption = Schema.Struct({
   id: ParameterOptionId,
   value: Schema.String, // The actual value, e.g., "must", "should", "may"
   createdAt: Schema.DateTimeUtc,
-  commit_message: Schema.String // Mandatory message explaining the change
-})
-export type ParameterOption = typeof ParameterOption.Type
+  commit_message: Schema.String, // Mandatory message explaining the change
+});
+export type ParameterOption = typeof ParameterOption.Type;

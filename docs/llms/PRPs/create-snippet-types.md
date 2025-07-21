@@ -4,9 +4,11 @@ completion_date: 2025-07-11
 description: |
 
 ## Purpose
+
 Implement all snippet-related types from the domain model using Effect-TS patterns with Schema.Struct for Neo4j graph database. This includes branded types, schemas, and comprehensive tests following functional programming principles.
 
 ## Core Principles
+
 1. **Context is Complete but Focused**: All necessary documentation for Effect + Neo4j patterns included
 2. **Validation Loops**: Executable tests using vitest and Effect compliance checks
 3. **Information Dense**: Specific patterns from Effect documentation and examples
@@ -16,15 +18,19 @@ Implement all snippet-related types from the domain model using Effect-TS patter
 ---
 
 ## Goal
+
 Create all snippet-related types defined in `docs/design/domain-model.md` as Effect Schema types suitable for Neo4j graph database, with comprehensive type safety and testing.
 
 ## Why
+
 - **Business value**: Enable the core functionality of the Janus project - managing reusable prompt snippets
 - **Integration**: Foundation for all future features that will interact with snippets
 - **Problems solved**: Type-safe prompt composition, version control, and parameter management for LLM testing
 
 ## What
+
 Implement the following entities from the domain model:
+
 - Snippet (abstract container)
 - SnippetVersion (immutable snapshots)
 - Parameter (named variables)
@@ -36,6 +42,7 @@ Implement the following entities from the domain model:
 - All associated branded types and relationships
 
 ### Success Criteria
+
 - [ ] All entity types implemented with proper branded types
 - [ ] Schema validation working correctly
 - [ ] No primitive obsession - all IDs and domain values are branded
@@ -46,28 +53,30 @@ Implement the following entities from the domain model:
 ## All Needed Context
 
 ### Documentation & References
+
 ```yaml
 # MUST READ - Include these specific sections in your context window
 
 - url: https://effect.website/docs/guides/schema/branded-types
-  sections: ["Creating Branded Types", "Validation"]
+  sections: ['Creating Branded Types', 'Validation']
   why: Need to implement all IDs as branded types for type safety
   discovered_caveat: Must use Schema.brand() not just TypeScript brands
-  
+
 - url: https://www.npmjs.com/package/@effect/vitest
-  sections: ["Usage", "Testing Effects"]
+  sections: ['Usage', 'Testing Effects']
   why: Testing Effect-based code requires special vitest integration
   critical: Use it.effect() for Effect-based tests, not regular it()
-  
+
 - file: docs/design/domain-model.md
   why: Contains exact specifications for all entities and relationships
   critical: |
     - All entity IDs are string UUIDs with brands
     - Slug type for human-readable names
     - Specific relationship types for Neo4j edges
-  
+
 - file: docs/llms/examples/effect-neo4j-essential-guide-llm.md
-  include_sections: ["Critical Schema Rules for Neo4j", "Data, Calculations, Actions Pattern"]
+  include_sections:
+    ['Critical Schema Rules for Neo4j', 'Data, Calculations, Actions Pattern']
   why: Shows correct patterns for Neo4j with Schema.Struct instead of Model.Class
   critical: |
     - NEVER use Model.Class with Neo4j (SQL only!)
@@ -75,7 +84,7 @@ Implement the following entities from the domain model:
     - Use Schema.Class when nodes need methods
 
 - file: docs/llms/examples/effect-normand-paradigm-guide-llm.md
-  include_sections: ["Using Schema for Non-SQL Database Data"]
+  include_sections: ['Using Schema for Non-SQL Database Data']
   why: Shows how to structure Neo4j schemas following Eric Normand's paradigm
   gotcha: Neo4j uses string IDs, not auto-increment numbers
 
@@ -89,6 +98,7 @@ Implement the following entities from the domain model:
 ```
 
 ### Current Codebase tree
+
 ```bash
 janus-project/
 ├── src/                    # Currently empty
@@ -101,6 +111,7 @@ janus-project/
 ```
 
 ### Desired Codebase tree with files to be added
+
 ```bash
 janus-project/
 └── src/
@@ -124,6 +135,7 @@ janus-project/
 ```
 
 ### Known Gotchas & Library Quirks
+
 ```typescript
 # CRITICAL: Neo4j specific considerations
 # 1. Neo4j uses string UUIDs, not numeric auto-increment IDs
@@ -142,44 +154,46 @@ Create the core data models following type-driven development principles:
 
 ```typescript
 // Example structure for branded.ts
-import { Schema } from "effect"
+import { Schema } from 'effect';
 
 // All IDs are string UUIDs with brands
 export const SnippetId = Schema.String.pipe(
-  Schema.pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/),
-  Schema.brand("SnippetId")
-)
-export type SnippetId = typeof SnippetId.Type
+  Schema.pattern(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+  ),
+  Schema.brand('SnippetId'),
+);
+export type SnippetId = typeof SnippetId.Type;
 
 // Slug for URL-friendly names
 export const Slug = Schema.String.pipe(
   Schema.pattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   Schema.minLength(1),
   Schema.maxLength(100),
-  Schema.brand("Slug")
-)
-export type Slug = typeof Slug.Type
+  Schema.brand('Slug'),
+);
+export type Slug = typeof Slug.Type;
 
 // Example structure for snippet.ts
-import { Schema } from "effect"
-import { SnippetId, SnippetVersionId, Slug } from "./branded"
+import { Schema } from 'effect';
+import { SnippetId, SnippetVersionId, Slug } from './branded';
 
 // Abstract container for snippets
 export const Snippet = Schema.Struct({
   id: SnippetId,
   name: Slug,
-  description: Schema.String
-})
-export type Snippet = typeof Snippet.Type
+  description: Schema.String,
+});
+export type Snippet = typeof Snippet.Type;
 
 // Immutable version with content
 export const SnippetVersion = Schema.Struct({
   id: SnippetVersionId,
   content: Schema.String, // Template string with {{variables}}
   createdAt: Schema.DateTimeUtc,
-  commit_message: Schema.String
-})
-export type SnippetVersion = typeof SnippetVersion.Type
+  commit_message: Schema.String,
+});
+export type SnippetVersion = typeof SnippetVersion.Type;
 ```
 
 ### List of tasks to be completed
@@ -250,7 +264,7 @@ CREATE src/domain/types/tests/snippet.test.ts:
 Task 10: Write tests for remaining schemas
 CREATE remaining test files:
   - parameter.test.ts
-  - composition.test.ts  
+  - composition.test.ts
   - testing.test.ts
   - tag.test.ts
   - Each with happy path, edge cases, and failure cases
@@ -274,7 +288,7 @@ MODIFY tsconfig.json:
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 // Create branded ID factory
-const makeIdType = (brand: string) => 
+const makeIdType = (brand: string) =>
   Schema.String.pipe(
     Schema.pattern(uuidPattern),
     Schema.brand(brand)
@@ -326,7 +340,7 @@ NEO4J:
   - All schemas compatible with neo4j-driver serialization
   - String IDs (not numeric)
   - DateTimeUtc format for temporal data
-  
+
 IMPORTS:
   - Use relative imports within domain
   - Export everything through index files
@@ -336,6 +350,7 @@ IMPORTS:
 ## Validation Loop
 
 ### Level 1: Syntax & Type Checking
+
 ```bash
 # Run these FIRST - fix any errors before proceeding
 pnpm run build                      # TypeScript compilation
@@ -348,6 +363,7 @@ pnpm run build                      # TypeScript compilation
 ```
 
 ### Level 2: Unit Tests
+
 ```bash
 # Run all tests
 pnpm test src/domain/types
@@ -363,6 +379,7 @@ pnpm test branded.test.ts
 ```
 
 ### Level 3: Effect Compliance
+
 ```bash
 # Manual checklist verification:
 # □ All IDs use Schema.brand()
@@ -374,32 +391,34 @@ pnpm test branded.test.ts
 ```
 
 ### Level 4: Integration Test
+
 ```typescript
 // Create a simple integration test to verify Neo4j compatibility
-import { Schema } from "effect"
-import neo4j from "neo4j-driver"
+import { Schema } from 'effect';
+import neo4j from 'neo4j-driver';
 
 // Test that schemas can be serialized for Neo4j
 const testNeo4jCompatibility = () => {
   const snippet = {
-    id: "123e4567-e89b-12d3-a456-426614174000",
-    name: "test-snippet",
-    description: "Test description"
-  }
-  
+    id: '123e4567-e89b-12d3-a456-426614174000',
+    name: 'test-snippet',
+    description: 'Test description',
+  };
+
   // Decode and validate
-  const validated = Schema.decodeUnknownSync(Snippet)(snippet)
-  
+  const validated = Schema.decodeUnknownSync(Snippet)(snippet);
+
   // Ensure it can be passed to Neo4j
-  const query = "CREATE (s:Snippet $props) RETURN s"
-  const params = { props: validated }
-  
+  const query = 'CREATE (s:Snippet $props) RETURN s';
+  const params = { props: validated };
+
   // This should not throw
-  console.log("Neo4j compatible:", params)
-}
+  console.log('Neo4j compatible:', params);
+};
 ```
 
 ## Final Validation Checklist
+
 - [x] All tests pass: `pnpm test src/domain/types`
 - [x] Build succeeds: `pnpm run build`
 - [x] No TypeScript errors: `npx tsc --noEmit`
@@ -414,6 +433,7 @@ const testNeo4jCompatibility = () => {
 ---
 
 ## Anti-Patterns to Avoid
+
 - ❌ Don't use Model.Class - it's SQL-specific, not for Neo4j
 - ❌ Don't use numeric IDs - Neo4j uses string UUIDs
 - ❌ Don't skip branded types - enforce type safety everywhere
@@ -425,8 +445,9 @@ const testNeo4jCompatibility = () => {
 ## Confidence Score: 9/10
 
 High confidence due to:
+
 - ✅ Clear domain model specification provided
-- ✅ Comprehensive Effect + Neo4j documentation included  
+- ✅ Comprehensive Effect + Neo4j documentation included
 - ✅ Specific patterns and examples for Schema.Struct usage
 - ✅ Detailed test strategy with @effect/vitest
 - ✅ Clear file structure and implementation order

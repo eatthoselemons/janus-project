@@ -4,9 +4,11 @@ description: |
 This PRP was not finished, you need to finish it, also note that `Schema.Struct`
 
 ## Purpose
+
 Implement comprehensive test coverage and reorganization for the Janus project, ensuring all entities have proper test cases (expected, edge, failure) and that large files are broken into smaller, manageable modules following the 300-line limit.
 
 ## Core Principles
+
 1. **Context is Complete but Focused**: Include ALL necessary documentation sections, specific examples, and discovered caveats
 2. **Validation Loops**: Provide executable tests/lints the AI can run and fix
 3. **Information Dense**: Use keywords and patterns from the codebase
@@ -16,6 +18,7 @@ Implement comprehensive test coverage and reorganization for the Janus project, 
 ---
 
 ## Goal
+
 1. Break up model.ts (312 lines) into smaller, focused modules under 300 lines each
 2. Expand all tests to include expected case, failure case, and edge case
 3. Create comprehensive test directory structure with sub-files for each model type
@@ -23,6 +26,7 @@ Implement comprehensive test coverage and reorganization for the Janus project, 
 5. Ensure all Schema.Structs have proper validation tests
 
 ## Why
+
 - **Maintainability**: Smaller files are easier to navigate and maintain
 - **Test Coverage**: Comprehensive tests prevent regressions and document behavior
 - **Code Quality**: Following the 300-line limit improves code organization
@@ -30,9 +34,11 @@ Implement comprehensive test coverage and reorganization for the Janus project, 
 - **Type Safety**: Schema validation tests catch runtime errors at development time
 
 ## What
+
 Create a well-organized test suite that validates all domain logic, database operations, and schema definitions while reorganizing oversized files into focused modules.
 
 ### Success Criteria
+
 - [ ] model.ts is split into files under 300 lines each
 - [ ] All functions have at least 3 test cases (expected, edge, failure)
 - [ ] All Neo4j entities have comprehensive CRUD tests
@@ -45,34 +51,36 @@ Create a well-organized test suite that validates all domain logic, database ope
 ## All Needed Context
 
 ### Documentation & References (include complete sections that are directly relevant)
+
 ```yaml
 # MUST READ - Include these specific sections in your context window
 # ✅ Include: Complete relevant sections, not just snippets
 # ❌ Avoid: Entire folders or unrelated documentation
 
 - url: https://effect.website/llms-small.txt
-  sections: ["Testing", "Schema", "Services", "Layers"]
+  sections: ['Testing', 'Schema', 'Services', 'Layers']
   why: Core Effect patterns for testing with vitest integration
   discovered_caveat: Use Effect.runSync for synchronous schema tests, Effect.gen for async
 
 - url: https://vitest.dev/guide/
-  sections: ["Writing Tests", "Mocking", "Test Context"]
+  sections: ['Writing Tests', 'Mocking', 'Test Context']
   why: Vitest patterns for describe, it, expect, and mocking
   gotcha: Use @effect/vitest for Effect-based tests, regular vitest for pure functions
 
 - docfile: docs/llms/effect/effect-compliance-checklist.md
-  include_sections: ["Testing Patterns", "Test Structure", "Test Layer Pattern"]
-  skip_sections: ["External Interface Implementation", "Authorization"]
+  include_sections: ['Testing Patterns', 'Test Structure', 'Test Layer Pattern']
+  skip_sections: ['External Interface Implementation', 'Authorization']
   critical: |
     - Use it.effect() for Effect-based tests
     - Create mock layers with makeTestLayer()
     - Each function needs 3 tests: expected, edge, failure
-    
+
 - url: https://www.npmjs.com/package/@effect/vitest
   why: Has a simple how to for using effect and vitest
 ```
 
 ### Context Inclusion Guidelines
+
 - Include COMPLETE sections when they contain implementation details
 - Include MULTIPLE examples if they show different use cases
 - Include ALL caveats and warnings discovered during research
@@ -80,6 +88,7 @@ Create a well-organized test suite that validates all domain logic, database ope
 - When in doubt, include it - but be specific about WHY it's needed
 
 ### Current Codebase tree (run `tree` in the root of the project) to get an overview of the codebase
+
 ```bash
 src/
 ├── core/
@@ -96,6 +105,7 @@ src/
 ```
 
 ### Desired Codebase tree with files to be added and responsibility of file
+
 ```bash
 src/
 ├── core/
@@ -134,6 +144,7 @@ src/
 ```
 
 ### Known Gotchas of our codebase & Library Quirks
+
 ```typescript
 # CRITICAL: Effect-TS testing patterns
 # For Schema tests: Use Effect.runSync(Schema.decodeUnknown(...))
@@ -155,6 +166,7 @@ src/
 ### Data models and structure
 
 The domain models are already defined in domain.ts using Schema.Struct. Key entities:
+
 ```typescript
 - Snippet: Text templates with unique slug names
 - SnippetVersion: Versions of snippets with content
@@ -174,22 +186,22 @@ Task 1: Break up model.ts into smaller modules
 ANALYZE src/core/model.ts:
   - Group functions by responsibility
   - Plan module boundaries
-  
+
 CREATE src/core/calculations/slug.ts:
   - MOVE normalizeSlugInput and createSlugFromInput functions
   - EXPORT all moved functions
-  
+
 CREATE src/core/calculations/builders.ts:
   - MOVE all build* functions (buildSnippet, buildParameter, etc.)
   - IMPORT necessary types from domain
-  
+
 CREATE src/core/calculations/validators.ts:
   - MOVE validation helper functions
   - ENSURE proper imports
-  
+
 CREATE src/core/calculations/transformers.ts:
   - MOVE transformation functions (extractIds, groupByRole, etc.)
-  
+
 MODIFY src/core/model.ts:
   - CONVERT to re-export file for backward compatibility
   - EXPORT * from each new module
@@ -199,12 +211,12 @@ MODIFY src/core/tests/calculations/slug-operations.test.ts:
   - ADD edge cases: empty string, special characters, very long input
   - ADD failure cases: null/undefined handling
   - ENSURE 3 test cases per function
-  
+
 CREATE src/core/tests/calculations/builders.test.ts:
   - TEST each build function with valid data
   - TEST edge cases: minimal data, optional fields
   - TEST failure cases: invalid inputs
-  
+
 CREATE src/core/tests/calculations/validators.test.ts:
   - TEST validation logic for all entities
   - TEST edge cases: boundary conditions
@@ -215,7 +227,7 @@ EXPAND src/core/tests/schemas/entities.test.ts:
   - ADD tests for ALL entity schemas (not just Snippet)
   - TEST SnippetVersion, Parameter, ParameterOption, etc.
   - INCLUDE edge cases: empty strings, max lengths
-  
+
 CREATE src/core/tests/schemas/create-data.test.ts:
   - TEST all Create*Data schemas
   - VALIDATE required vs optional fields
@@ -226,7 +238,7 @@ CREATE src/db/repositories/ directory structure:
   - SPLIT repositories.ts by entity type
   - CREATE individual repository files
   - MAINTAIN consistent patterns
-  
+
 CREATE comprehensive repository tests:
   - TEST all CRUD operations per entity
   - MOCK Neo4jService responses
@@ -238,12 +250,12 @@ CREATE src/db/tests/neo4j-operations/crud.test.ts:
   - TEST MATCH queries with various conditions
   - TEST UPDATE with property merging
   - TEST DELETE with relationship handling
-  
+
 CREATE src/db/tests/neo4j-operations/relationships.test.ts:
   - TEST relationship creation patterns
   - TEST traversal queries
   - TEST cascade delete scenarios
-  
+
 CREATE src/db/tests/neo4j-operations/queries.test.ts:
   - TEST complex queries (version history, etc.)
   - TEST parameter substitution
@@ -255,7 +267,7 @@ RUN pnpm run preflight:
   - FIX any test failures
   - FIX any lint issues
   - FIX any type errors
-  
+
 VERIFY effect-compliance-checklist.md:
   - CHECK all testing requirements met
   - ENSURE 3 tests per function
@@ -291,12 +303,12 @@ describe("slug operations", () => {
       // Expected case
       expect(normalizeSlugInput("Hello World")).toBe("hello-world")
     })
-    
+
     it("should handle special characters", () => {
       // Edge case
       expect(normalizeSlugInput("Test@#$%123")).toBe("test-123")
     })
-    
+
     it("should handle empty input", () => {
       // Failure case
       expect(normalizeSlugInput("")).toBe("")
@@ -314,16 +326,16 @@ describe("Snippet Schema", () => {
       createdAt: new Date(),
       updatedAt: new Date()
     }
-    
+
     const result = Effect.runSync(
       Schema.decodeUnknown(Snippet)(validData)
     )
     expect(result.name).toBe("test-snippet")
   })
-  
+
   it("should reject invalid slug name", () => {
     const invalidData = { ...validData, name: "Invalid Name!" }
-    
+
     const result = Effect.runSync(
       Effect.either(Schema.decodeUnknown(Snippet)(invalidData))
     )
@@ -350,7 +362,7 @@ describe("Neo4j CRUD Operations", () => {
     Effect.gen(function* () {
       const service = yield* Neo4jService
       const query = `CREATE (s:Snippet {id: randomUUID(), name: $name})`
-      
+
       const result = yield* service.executeQuery(query, { name: "test" })
       expect(result[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-/)
     }).pipe(Effect.provide(mockNeo4jLayer))
@@ -359,14 +371,15 @@ describe("Neo4j CRUD Operations", () => {
 ```
 
 ### Integration Points
+
 ```yaml
 DATABASE:
   - relationships: Define all entity relationships in Neo4j
   - indexes: CREATE INDEX for frequently queried fields (name, slug)
-  
+
 CONFIG:
   - No config changes needed
-  
+
 IMPORTS:
   - update: All files importing from model.ts remain compatible
   - pattern: Import from specific modules for better tree-shaking
@@ -375,6 +388,7 @@ IMPORTS:
 ## Validation Loop
 
 ### Level 1: Syntax & Style
+
 ```bash
 # Run these FIRST - fix any errors before proceeding
 pnpm run lint                # ESLint check
@@ -384,6 +398,7 @@ pnpm run typecheck           # TypeScript validation
 ```
 
 ### Level 2: Unit Tests each new feature/file/function use existing test patterns
+
 ```bash
 # Run all tests with coverage
 pnpm run test
@@ -397,6 +412,7 @@ pnpm run test src/db/tests/
 ```
 
 ### Level 3: Integration Test
+
 ```bash
 # Run the full preflight check
 pnpm run preflight
@@ -404,13 +420,14 @@ pnpm run preflight
 # This runs:
 # - build
 # - test
-# - typecheck  
+# - typecheck
 # - lint
 
 # Expected: All checks pass
 ```
 
 ## Final validation Checklist
+
 - [ ] All tests pass: `pnpm run test`
 - [ ] No linting errors: `pnpm run lint`
 - [ ] No type errors: `pnpm run typecheck`
@@ -424,6 +441,7 @@ pnpm run preflight
 ---
 
 ## Anti-Patterns to Avoid
+
 - ❌ Don't create files over 300 lines
 - ❌ Don't skip edge case or failure tests
 - ❌ Don't use string concatenation for Cypher queries
