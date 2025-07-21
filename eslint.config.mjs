@@ -4,7 +4,7 @@ import prettier from 'eslint-plugin-prettier';
 
 export default tseslint.config(
   {
-    ignores: ['examples/**', 'dist/**', 'CLAUDE.md', 'GEMINI.md'],
+    ignores: ['examples/**', 'dist/**', 'CLAUDE.md', 'GEMINI.md', 'docs/**'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
