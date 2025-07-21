@@ -63,6 +63,7 @@ The project adheres strictly to the principles of **Functional Programming** and
 - **Avoid `any`; Prefer `unknown`:** The `any` type is disallowed. For values of an unknown type, use `unknown` and perform safe type-narrowing before operating on the value.
 - **Use Type Assertions (`as Type`) Sparingly:** Type assertions should be avoided. Their use may indicate a flaw in the type model or an opportunity to refactor.
 - **Embrace Array Operators:** Use immutable array operators (`.map()`, `.filter()`, `.reduce()`, etc.) over imperative `for` loops for data transformation.
+- **Use Effect's Immutable Data Structures:** Prefer `Chunk`, `HashMap`, and `HashSet` from Effect over native JavaScript arrays and objects for collections to ensure immutability and leverage performance optimizations.
 - **Comments Policy:** Write high-value comments only when necessary to explain complex logic. Avoid comments that state the obvious.
 
 ### Code Organization
