@@ -85,10 +85,7 @@ The project adheres strictly to the principles of **Functional Programming** and
 ### Technical Guidance & Resources
 
 - **The `Effect-TS` Mandate:** This is our foundational framework. All asynchronous operations, error handling, and dependency management **MUST** be modeled using the `Effect` system.
-- **`Effect-TS` Documentation:** If you are unsure about a specific `Effect-TS` implementation, you are encouraged to consult the official LLM-optimized documentation.
-  - **Condensed:** `https://effect.website/llms-small.txt`
-  - **Full:** `https://effect.website/llms-full.txt`
-  - **Topics/Index:** `https://effect.website/llms.txt`
+- **`Effect-TS` Documentation:** If you are unsure about a specific `Effect-TS` implementation, you are encouraged to consult the official LLM-optimized documentation. Documentation at `docs/llms/guides/effect-docs/`
 
 ### Working with the Codebase
 
