@@ -106,7 +106,7 @@ Ensure code always follows these ideals:
 2. Follows "Type-Driven Development with Idris" by Edwin Brady
 3. Follows "Grokking Simplicity" by Eric Normand
 4. Does composition over inheritance
-5. Follows Effect best practices (documentation: https://effect.website/llms-small.txt)
+5. Follows Effect best practices (documentation: `docs/llms/guides/effect-docs`)
 6. Is tailored for Neo4j as database (not SQL)
 7. Avoids code duplication - condense repeated sections
 
