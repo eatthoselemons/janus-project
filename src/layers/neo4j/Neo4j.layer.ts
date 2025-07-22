@@ -63,7 +63,9 @@ const closeDriver = (driver: Driver) =>
       }),
   }).pipe(
     Effect.catchAll(() =>
-      Effect.logWarning('Failed to close Neo4j driver').pipe(Effect.runSync),
+      Effect.sync(() => {
+        Effect.logWarning('Failed to close Neo4j driver').pipe(Effect.runSync);
+      }),
     ),
   );
 
@@ -104,11 +106,18 @@ const closeSession = (session: Session) =>
  */
 const withSession = <T>(
   driver: Driver,
-  fn: (session: Session) => T | Promise<T>,
-): Effect.Effect<T, Neo4jError> =>
-  Effect.gen(function* () {
-    const session = driver.session();
-    try {
+  fn: (session: Session) => T,
+): Effect.Effect<Awaited<T>, Neo4jError, never> =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const session = yield* Effect.acquireRelease(
+        // Acquire: Create a session synchronously
+        Effect.sync(() => driver.session()),
+        // Release: Close the session
+        (session) => closeSession(session),
+      );
+
+      // Use the session
       const result = yield* Effect.try({
         try: () => fn(session),
         catch: (e) =>
@@ -130,10 +139,8 @@ const withSession = <T>(
         });
       }
       return result;
-    } finally {
-      yield* closeSession(session);
-    }
-  });
+    }),
+  );
 
 /**
  * Runs a Cypher query and returns the results as plain objects
@@ -141,9 +148,16 @@ const withSession = <T>(
 const runQueryWithDriver =
   (driver: Driver) =>
   (query: string, params = {}) =>
-    Effect.gen(function* () {
-      const session = driver.session();
-      try {
+    Effect.scoped(
+      Effect.gen(function* () {
+        const session = yield* Effect.acquireRelease(
+          // Acquire: Create a session
+          Effect.sync(() => driver.session()),
+          // Release: Close the session
+          (session) => closeSession(session),
+        );
+
+        // Run the query
         const result = yield* Effect.tryPromise({
           try: () => session.run(query, params),
           catch: (e) =>
@@ -155,10 +169,8 @@ const runQueryWithDriver =
 
         // Convert Neo4j records to plain objects
         return result.records.map((record) => record.toObject());
-      } finally {
-        yield* closeSession(session);
-      }
-    }).pipe(Effect.withLogSpan('runQuery'));
+      }),
+    ).pipe(Effect.withLogSpan('runQuery'));
 
 // ===========================
 // SERVICE IMPLEMENTATION
@@ -172,7 +184,7 @@ export const make = (config: { uri: string; user: string; password: string }) =>
     // Create and manage driver lifecycle
     const driver = yield* Effect.acquireRelease(
       createDriver(config),
-      closeDriver,
+      (driver) => closeDriver(driver),
     );
 
     // Verify we can connect
