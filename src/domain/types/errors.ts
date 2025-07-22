@@ -120,6 +120,19 @@ export class ConflictError extends Schema.TaggedError<ConflictError>()(
 }
 
 /**
+ * Neo4j error for database operations
+ * Includes the cypher query and the original error message
+ */
+export class Neo4jError extends Schema.TaggedError<Neo4jError>()('Neo4jError', {
+  query: Schema.String,
+  originalMessage: Schema.String,
+}) {
+  get message() {
+    return `Neo4j query failed: ${this.originalMessage}`;
+  }
+}
+
+/**
  * Union type for all Janus errors
  */
 export type JanusErrors =
@@ -128,4 +141,5 @@ export type JanusErrors =
   | LlmApiError
   | FileSystemError
   | NotFoundError
-  | ConflictError;
+  | ConflictError
+  | Neo4jError;

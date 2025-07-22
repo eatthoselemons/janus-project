@@ -24,3 +24,6 @@ export class ConfigService extends Context.Tag('ConfigService')<
     };
   }
 >() {}
+
+// Re-export utility functions
+export * from './utils';

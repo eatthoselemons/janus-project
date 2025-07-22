@@ -1,5 +1,6 @@
 import { Effect, Layer, Config, Redacted } from 'effect';
 import { ConfigService } from '../../services/config';
+import { makeTestLayerFor } from '../../lib/test-utils';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -120,3 +121,87 @@ const configProgram = Effect.gen(function* () {
 
 // Create the live layer
 export const ConfigServiceLive = Layer.effect(ConfigService, configProgram);
+
+/**
+ * Alias for ConfigServiceLive for consistency with other services
+ */
+export const fromEnv = ConfigServiceLive;
+
+/**
+ * Test layer with mock configuration
+ */
+export const ConfigServiceTest = (
+  config: {
+    neo4j?: {
+      uri?: string;
+      user?: string;
+      password?: string;
+    };
+    llm?: {
+      providers?: Record<
+        string,
+        {
+          apiKey: string;
+          baseUrl: string;
+          model: string;
+        }
+      >;
+    };
+  } = {},
+) =>
+  Layer.succeed(ConfigService, {
+    neo4j: {
+      uri: config.neo4j?.uri ?? 'bolt://localhost:7687',
+      user: config.neo4j?.user ?? 'test-user',
+      password: Redacted.make(config.neo4j?.password ?? 'test-password'),
+    },
+    llm: {
+      providers: Object.entries(config.llm?.providers ?? {}).reduce(
+        (acc, [name, provider]) => {
+          acc[name] = {
+            apiKey: Redacted.make(provider.apiKey),
+            baseUrl: provider.baseUrl,
+            model: provider.model,
+          };
+          return acc;
+        },
+        {} as Record<
+          string,
+          { apiKey: Redacted.Redacted<string>; baseUrl: string; model: string }
+        >,
+      ),
+    },
+  });
+
+/**
+ * Create a partial test layer using makeTestLayer pattern
+ * Useful for tests that only need specific config values
+ *
+ * @example
+ * ```ts
+ * const layer = ConfigServiceTestPartial({
+ *   neo4j: { uri: 'bolt://test:7687' }
+ * });
+ * ```
+ */
+export const ConfigServiceTestPartial = (
+  impl: Partial<{
+    neo4j: {
+      uri: string;
+      user: string;
+      password: Redacted.Redacted<string>;
+    };
+    llm: {
+      providers: Record<
+        string,
+        {
+          apiKey: Redacted.Redacted<string>;
+          baseUrl: string;
+          model: string;
+        }
+      >;
+    };
+  }>,
+) => {
+  return makeTestLayerFor(ConfigService)(impl);
+};
