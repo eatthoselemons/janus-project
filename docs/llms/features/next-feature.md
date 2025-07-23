@@ -5,17 +5,19 @@ ie write a prp for section 1.3 or 2.1 etc
 
 ## EXAMPLES:
 
-You can find the entire vitest documentation in `examples/vitest/docs`
-
-You can also find the entire neo4j documentation at `examples/neo4j-documentation`
+You can find example projects at 
+- `examples/effect-official-examples/examples/http-server/src/`
+- `examples/notion-discord-notifications/src/`
 
 ## DOCUMENTATION:
 
-There is also the effect llm documentation, follow any links you need for more information
+You can also find the entire neo4j documentation at `examples/neo4j-documentation`
 
-- **Topics/Index:** `https://effect.website/llms.txt`
+You can find the entire vitest documentation in `examples/vitest/docs`
 
-You can find effect specific test instructions here: https://www.npmjs.com/package/@effect/vitest
+All effect documentation is available at `docs/llms/guides/effect-docs`
+
+You can find effect specific vitest instructions here: https://www.npmjs.com/package/@effect/vitest
 
 follow the best practices as laid out in the effect-neo4j guides. Usage instructions are in `docs/llms/guides/effect-neo4j/README.md`. Link the specific chapters the implementing llm needs
 
@@ -25,3 +27,4 @@ use the `docs/llms/effect/effect-compliance-checklist.md` to ensure that you hav
 
 all code is in the `src/` folder
 When making the PRP name it after the subsection
+Only implement a single subsection, don't combine sections which makes prs too big that they are difficult to review
