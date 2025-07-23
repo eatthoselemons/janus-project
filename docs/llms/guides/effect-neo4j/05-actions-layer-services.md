@@ -105,9 +105,9 @@ export const findPersonById = (id: PersonId) =>
     const query = cypher`MATCH (p:Person {id: ${id}}) RETURN p`;
     const params = yield* queryParams({ id });
     const results = yield* neo4j.runQuery<{ p: unknown }>(query, params);
-    
+
     if (results.length === 0) return Option.none();
-    
+
     const person = yield* Schema.decode(PersonNode)(results[0].p);
     return Option.some(person);
   });
@@ -122,7 +122,7 @@ export const createPerson = (person: PersonNode) =>
     `;
     const params = yield* queryParams({ props: person });
     const results = yield* neo4j.runQuery<{ p: unknown }>(query, params);
-    
+
     return yield* Schema.decode(PersonNode)(results[0].p);
   });
 
@@ -161,9 +161,9 @@ export const makePersonRepository = Effect.gen(function* () {
       const query = cypher`MATCH (p:Person {id: ${id}}) RETURN p`;
       const params = yield* queryParams({ id });
       const results = yield* neo4j.runQuery<{ p: unknown }>(query, params);
-      
+
       if (results.length === 0) return Option.none();
-      
+
       const person = yield* Schema.decode(PersonNode)(results[0].p);
       return Option.some(person);
     });
@@ -177,7 +177,7 @@ export const makePersonRepository = Effect.gen(function* () {
       `;
       const params = yield* queryParams({ props: person });
       const results = yield* neo4j.runQuery<{ p: unknown }>(query, params);
-      
+
       return yield* Schema.decode(PersonNode)(results[0].p);
     });
 
@@ -205,15 +205,23 @@ export const makePersonRepository = Effect.gen(function* () {
 });
 
 // If using the grouped pattern, you might want to create a service:
-export type PersonRepository = Effect.Effect.Success<typeof makePersonRepository>;
-export const PersonRepository = Context.Tag<PersonRepository>('PersonRepository');
-export const PersonRepositoryLive = Layer.effect(PersonRepository, makePersonRepository);
+export type PersonRepository = Effect.Effect.Success<
+  typeof makePersonRepository
+>;
+export const PersonRepository =
+  Context.Tag<PersonRepository>('PersonRepository');
+export const PersonRepositoryLive = Layer.effect(
+  PersonRepository,
+  makePersonRepository,
+);
 ```
 
 **When to use each pattern:**
+
 - **Individual functions**: Better for pure FP style, easier to test individual functions, more tree-shakeable
 - **Grouped repository**: Better when you need to swap implementations (test vs production), want to enforce consistent patterns across operations
-```
+
+````
 
 #### 3. Service Layer with Transactions
 
@@ -224,7 +232,7 @@ For business logic, prefer individual function exports over grouped services:
 export const followPerson = (followerId: PersonId, targetId: PersonId) =>
   Effect.gen(function* () {
     const neo4j = yield* Neo4jService;
-    
+
     return yield* neo4j.runInTransaction((tx) =>
       Effect.gen(function* () {
         // All queries in this block run in the same transaction
@@ -286,7 +294,7 @@ const program = Effect.gen(function* () {
     yield* followPerson(currentUserId, userId);
   }
 });
-```
+````
 
 ### Testing with Test Layers
 
@@ -352,7 +360,7 @@ export const Neo4jTest = (mockData: Map<string, unknown[]> = new Map()) =>
 3. **Resource Management**: Use `Layer.scoped` for driver lifecycle management
 4. **Type Safety**: All queries and parameters use branded types
 5. **Effect Context**: Use `Effect.gen` with `yield*` inside Effect context, never `async/await`
-6. **Function Organization**: 
+6. **Function Organization**:
    - Infrastructure services (Neo4j, HTTP clients) can use grouped methods as they manage resources
    - Business logic should prefer individual function exports for better FP style
    - Data access can use either pattern depending on whether you need test swapping

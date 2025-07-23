@@ -70,10 +70,10 @@ const promoteEmployee = (id: EmployeeId) =>
 
    // ✅ CORRECT
    findPerson(id: PersonId)
-   
+
    // ❌ WRONG - Using Brand.nominal()
    const PersonId = Brand.nominal<PersonId>();
-   
+
    // ✅ CORRECT - Using Schema.pipe pattern
    const PersonId = Schema.String.pipe(
      Schema.pattern(/^person-[a-f0-9]{8}$/),
@@ -136,7 +136,7 @@ const promoteEmployee = (id: EmployeeId) =>
    }, {});
 
    // ✅ CORRECT - Explicit error for undefined
-   const params = yield* queryParams(input); // Fails with UndefinedQueryParameterError
+   const params = yield * queryParams(input); // Fails with UndefinedQueryParameterError
    ```
 
 7. **Test Code Organization**
@@ -157,10 +157,10 @@ const promoteEmployee = (id: EmployeeId) =>
    // ❌ WRONG - Using await inside Effect.gen
    Effect.gen(function* () {
      const result = await somePromise; // NO!
-   })
+   });
 
    // ✅ CORRECT - Using yield* for Effect operations
    Effect.gen(function* () {
      const result = yield* Effect.promise(() => somePromise);
-   })
+   });
    ```

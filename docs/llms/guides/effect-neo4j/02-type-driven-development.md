@@ -64,7 +64,7 @@ const canVote = (person: Person): boolean =>
   isAdult(person.age) && person.citizenship === 'US';
 
 // For complex branded type creation, provide helper functions
-export const personId = (value: string): PersonId => 
+export const personId = (value: string): PersonId =>
   Schema.decodeSync(PersonId)(value);
 
 // For template literals with branded types

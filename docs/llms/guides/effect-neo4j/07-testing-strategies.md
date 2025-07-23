@@ -83,11 +83,11 @@ test('follow operation', async () => {
 test('branded type construction in tests', async () => {
   const personId = Schema.decodeSync(PersonId)('person-12345678');
   const email = Schema.decodeSync(Email)('test@example.com');
-  
+
   // Never use raw strings where branded types are expected
   const person = {
     id: personId, // ✅ Proper branded type
-    email: email,  // ✅ Proper branded type
+    email: email, // ✅ Proper branded type
     // id: 'person-12345678', // ❌ Raw string
   };
 });
