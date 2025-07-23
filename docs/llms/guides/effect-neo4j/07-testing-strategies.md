@@ -33,9 +33,10 @@ describe('Business Rules', () => {
 
 ### Integration Testing with Test Layers
 
-For services and repositories, create test implementations of their dependencies using `Layer.succeed`.
+For services and repositories, create test implementations of their dependencies. Test utilities should be in separate `.test-layers.ts` files:
 
 ```typescript
+// In PersonRepository.test-layers.ts
 export const PersonRepositoryTest = Layer.succeed(PersonRepository, {
   findById: (id) =>
     Effect.succeed(
@@ -58,6 +59,12 @@ export const PersonRepositoryTest = Layer.succeed(PersonRepository, {
     ),
 });
 
+// Create reusable test layers for common scenarios
+export const PersonRepositoryTestWithData = (data: TestData) =>
+  Layer.succeed(PersonRepository, {
+    // Implementation using provided test data
+  });
+
 // Use in tests
 test('follow operation', async () => {
   const result = await Effect.runPromise(
@@ -70,6 +77,19 @@ test('follow operation', async () => {
   );
 
   expect(result).toBeUndefined();
+});
+
+// When using branded types in tests, always construct them properly
+test('branded type construction in tests', async () => {
+  const personId = Schema.decodeSync(PersonId)('person-12345678');
+  const email = Schema.decodeSync(Email)('test@example.com');
+  
+  // Never use raw strings where branded types are expected
+  const person = {
+    id: personId, // ✅ Proper branded type
+    email: email,  // ✅ Proper branded type
+    // id: 'person-12345678', // ❌ Raw string
+  };
 });
 ```
 

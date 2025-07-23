@@ -4,12 +4,6 @@ This directory contains the official guides for building applications with Effec
 
 ## Guides
 
-### Full Guide
-
-For a complete, top-to-bottom understanding of the architecture, start with the complete guide. This is ideal for initial onboarding or high-level architectural reviews.
-
-- [**00-complete-guide.md**](./00-complete-guide.md): The full, unabridged reference guide.
-
 ### Focused Chapters
 
 For targeted tasks, refer to the specific chapter you need. This is ideal for agents or developers who need to solve a specific problem without reading the entire guide.

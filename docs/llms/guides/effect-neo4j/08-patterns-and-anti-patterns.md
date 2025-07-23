@@ -9,12 +9,16 @@ This section provides a quick reference for correct patterns to follow and commo
 #### Type-Safe Query Parameters
 
 ```typescript
-// ✅ CORRECT - All parameters are typed
+// ✅ CORRECT - All parameters are typed and validated
 const findByEmail = (email: Email) =>
-  neo4j.runQuery(
-    `MATCH (p:Person {email: $email}) RETURN p`,
-    { email }, // Email type ensures valid format
-  );
+  Effect.gen(function* () {
+    const query = cypher`MATCH (p:Person {email: $email}) RETURN p`;
+    const params = yield* queryParams({ email }); // Fails if undefined
+    return yield* neo4j.runQuery(query, params);
+  });
+
+// ✅ CORRECT - Using helper functions for branded types
+const query = cypher`MATCH (n:Person {id: ${id}}) RETURN n`;
 ```
 
 #### Parse at Boundaries
@@ -66,6 +70,15 @@ const promoteEmployee = (id: EmployeeId) =>
 
    // ✅ CORRECT
    findPerson(id: PersonId)
+   
+   // ❌ WRONG - Using Brand.nominal()
+   const PersonId = Brand.nominal<PersonId>();
+   
+   // ✅ CORRECT - Using Schema.pipe pattern
+   const PersonId = Schema.String.pipe(
+     Schema.pattern(/^person-[a-f0-9]{8}$/),
+     Schema.brand('PersonId')
+   );
    ```
 
 3. **Effect in Calculations**
@@ -111,4 +124,43 @@ const promoteEmployee = (id: EmployeeId) =>
      findUser: (id: UserId) => Effect.gen(function* () { ... })
    })
    type UserService = ReturnType<typeof makeUserService>
+   ```
+
+6. **Handling Undefined Values**
+
+   ```typescript
+   // ❌ WRONG - Silently dropping undefined
+   const params = Object.entries(input).reduce((acc, [k, v]) => {
+     if (v !== undefined) acc[k] = v;
+     return acc;
+   }, {});
+
+   // ✅ CORRECT - Explicit error for undefined
+   const params = yield* queryParams(input); // Fails with UndefinedQueryParameterError
+   ```
+
+7. **Test Code Organization**
+
+   ```typescript
+   // ❌ WRONG - Test utilities in production files
+   // In Service.layer.ts
+   export const ServiceTest = Layer.succeed(...)
+
+   // ✅ CORRECT - Separate test layer files
+   // In Service.test-layers.ts
+   export const ServiceTest = Layer.succeed(...)
+   ```
+
+8. **Using async/await in Effect**
+
+   ```typescript
+   // ❌ WRONG - Using await inside Effect.gen
+   Effect.gen(function* () {
+     const result = await somePromise; // NO!
+   })
+
+   // ✅ CORRECT - Using yield* for Effect operations
+   Effect.gen(function* () {
+     const result = yield* Effect.promise(() => somePromise);
+   })
    ```

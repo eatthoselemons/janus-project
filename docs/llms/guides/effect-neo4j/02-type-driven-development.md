@@ -10,6 +10,7 @@ Start by defining types that capture your domain concepts and constraints:
 
 ```typescript
 // Brand primitive types to prevent mixing
+// IMPORTANT: Always use Schema.pipe() pattern, never Brand.nominal()
 export const PersonId = Schema.String.pipe(
   Schema.pattern(/^person-[a-f0-9]{8}$/),
   Schema.brand('PersonId'),
@@ -61,4 +62,19 @@ const isAdult = (age: Age): boolean => age >= 18;
 
 const canVote = (person: Person): boolean =>
   isAdult(person.age) && person.citizenship === 'US';
+
+// For complex branded type creation, provide helper functions
+export const personId = (value: string): PersonId => 
+  Schema.decodeSync(PersonId)(value);
+
+// For template literals with branded types
+export const formatQuery = (
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+): CypherQuery => {
+  const query = strings.reduce((acc, str, i) => {
+    return acc + str + (values[i] !== undefined ? String(values[i]) : '');
+  }, '');
+  return Schema.decodeSync(CypherQuery)(query);
+};
 ```
