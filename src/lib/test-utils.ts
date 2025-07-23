@@ -51,6 +51,9 @@ const makeUnimplementedProxy = <A extends object>(
  * This is the recommended approach for creating test layers in Effect applications,
  * especially when using class-based service tags.
  *
+ * @template Identifier - The Context.Tag identifier type
+ * @template ServiceImpl - The service implementation interface type
+ * 
  * @example
  * ```ts
  * // With a class-based service tag
@@ -76,26 +79,34 @@ const makeUnimplementedProxy = <A extends object>(
  * )
  * ```
  */
-export const makeTestLayerFor = <I, S extends object>(
-  tag: Context.Tag<I, S> & { key?: string; _tag?: string },
+export const makeTestLayerFor = <Identifier, ServiceImpl extends object>(
+  tag: Context.Tag<Identifier, ServiceImpl> & { key?: string; _tag?: string },
 ) => {
   const serviceName =
     tag.key || (tag as { _tag?: string })._tag || 'UnknownService';
 
-  return (partialService: Partial<S>): Layer.Layer<I> =>
+  return (partialService: Partial<ServiceImpl>): Layer.Layer<Identifier> =>
     Layer.succeed(tag, makeUnimplementedProxy(serviceName, partialService));
 };
 
 /**
  * Type helper to extract the service type from a Context.Tag
  * Useful when you need to work with the service interface directly
+ * 
+ * @template T - A Context.Tag type
+ * @returns The service implementation type (S) from Context.Tag<I, S>
  */
-export type ServiceOf<T> = T extends Context.Tag<any, infer S> ? S : never;
+export type ServiceOf<T> = T extends Context.Tag<unknown, infer ServiceImpl>
+  ? ServiceImpl
+  : never;
 
 /**
  * Creates a simple stub layer that returns fixed values
  * Useful for services where you want all methods to return the same value
  *
+ * @template Identifier - The Context.Tag identifier type
+ * @template ServiceImpl - The service implementation interface type
+ * 
  * @example
  * ```ts
  * const StubLogger = makeStubLayer(LoggerService)({
@@ -104,8 +115,10 @@ export type ServiceOf<T> = T extends Context.Tag<any, infer S> ? S : never;
  * ```
  */
 export const makeStubLayer =
-  <I, S extends object>(tag: Context.Tag<I, S>) =>
-  (options: { defaultReturn?: unknown } = {}): Layer.Layer<I> => {
+  <Identifier, ServiceImpl extends object>(
+    tag: Context.Tag<Identifier, ServiceImpl>,
+  ) =>
+  (options: { defaultReturn?: unknown } = {}): Layer.Layer<Identifier> => {
     const handler = {
       get(_target: unknown, prop: PropertyKey) {
         if (typeof prop === 'string' && !prop.startsWith('_')) {
@@ -115,5 +128,5 @@ export const makeStubLayer =
       },
     };
 
-    return Layer.succeed(tag, new Proxy({} as S, handler) as S);
+    return Layer.succeed(tag, new Proxy({} as ServiceImpl, handler) as ServiceImpl);
   };
