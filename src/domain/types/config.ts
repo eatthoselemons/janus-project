@@ -1,4 +1,11 @@
 import { Schema } from 'effect';
+import {
+  Neo4jUri,
+  Neo4jUser,
+  ApiBaseUrl,
+  LlmModel,
+  ProviderName,
+} from './database';
 
 /**
  * Configuration schema for the Janus project
@@ -8,16 +15,16 @@ import { Schema } from 'effect';
 
 // Neo4j configuration schema
 export const Neo4jConfigSchema = Schema.Struct({
-  uri: Schema.String,
-  user: Schema.String,
+  uri: Neo4jUri,
+  user: Neo4jUser,
   password: Schema.String, // Will be wrapped with Config.redacted in service
 });
 
 // LLM provider configuration schema
 export const LlmProviderConfigSchema = Schema.Struct({
   apiKey: Schema.String, // Will be wrapped with Config.redacted in service
-  baseUrl: Schema.String,
-  model: Schema.String,
+  baseUrl: ApiBaseUrl,
+  model: LlmModel,
 });
 
 // Main configuration schema
@@ -25,7 +32,7 @@ export const ConfigSchema = Schema.Struct({
   neo4j: Neo4jConfigSchema,
   llm: Schema.Struct({
     providers: Schema.Record({
-      key: Schema.String,
+      key: ProviderName,
       value: LlmProviderConfigSchema,
     }),
   }),

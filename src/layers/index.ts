@@ -33,7 +33,7 @@ export const AllServicesTest = (config?: {
       }
     >;
   };
-  neo4jMockData?: Map<string, any[]>;
+  neo4jMockData?: Map<string, unknown[]>;
 }) => {
   const { ConfigServiceTest } = require('./configuration');
   const { Neo4jTest } = require('./neo4j');

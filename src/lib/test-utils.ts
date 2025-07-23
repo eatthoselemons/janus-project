@@ -9,7 +9,7 @@ const makeUnimplemented = (serviceName: string, methodName: PropertyKey) => {
   const dead = Effect.die(errorMessage);
 
   // Create a function that returns the dead effect
-  function unimplemented(...args: any[]) {
+  function unimplemented(...args: unknown[]) {
     Effect.logError(
       `Called unimplemented method with args: ${JSON.stringify(args)}`,
     ).pipe(Effect.runSync);
@@ -37,7 +37,8 @@ const makeUnimplementedProxy = <A extends object>(
         return target[prop as keyof A];
       }
       // Create and cache the unimplemented method
-      return ((target as any)[prop] = makeUnimplemented(serviceName, prop));
+      return ((target as Record<PropertyKey, unknown>)[prop] =
+        makeUnimplemented(serviceName, prop));
     },
     has: () => true, // Pretend all properties exist
   });
@@ -75,16 +76,14 @@ const makeUnimplementedProxy = <A extends object>(
  * )
  * ```
  */
-export const makeTestLayerFor = <S extends object>(
-  tag: Context.Tag<any, S> & { key?: string; _tag?: string },
+export const makeTestLayerFor = <I, S extends object>(
+  tag: Context.Tag<I, S> & { key?: string; _tag?: string },
 ) => {
-  const serviceName = tag.key || (tag as any)._tag || 'UnknownService';
+  const serviceName =
+    tag.key || (tag as { _tag?: string })._tag || 'UnknownService';
 
-  return (partialService: Partial<S>): Layer.Layer<any> =>
-    Layer.succeed(
-      tag as any,
-      makeUnimplementedProxy(serviceName, partialService),
-    );
+  return (partialService: Partial<S>): Layer.Layer<I> =>
+    Layer.succeed(tag, makeUnimplementedProxy(serviceName, partialService));
 };
 
 /**
@@ -106,9 +105,9 @@ export type ServiceOf<T> = T extends Context.Tag<any, infer S> ? S : never;
  */
 export const makeStubLayer =
   <I, S extends object>(tag: Context.Tag<I, S>) =>
-  (options: { defaultReturn?: any } = {}): Layer.Layer<I> => {
+  (options: { defaultReturn?: unknown } = {}): Layer.Layer<I> => {
     const handler = {
-      get(_target: any, prop: PropertyKey) {
+      get(_target: unknown, prop: PropertyKey) {
         if (typeof prop === 'string' && !prop.startsWith('_')) {
           return () => options.defaultReturn ?? Effect.succeed(undefined);
         }
@@ -116,5 +115,5 @@ export const makeStubLayer =
       },
     };
 
-    return Layer.succeed(tag, new Proxy({} as S, handler));
+    return Layer.succeed(tag, new Proxy({} as S, handler) as S);
   };

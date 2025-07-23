@@ -1,4 +1,11 @@
 import { Context, Redacted } from 'effect';
+import {
+  Neo4jUri,
+  Neo4jUser,
+  ProviderName,
+  ApiBaseUrl,
+  LlmModel,
+} from '../../domain/types';
 
 /**
  * ConfigService provides type-safe access to application configuration
@@ -8,17 +15,17 @@ export class ConfigService extends Context.Tag('ConfigService')<
   ConfigService,
   {
     readonly neo4j: {
-      readonly uri: string;
-      readonly user: string;
+      readonly uri: Neo4jUri;
+      readonly user: Neo4jUser;
       readonly password: Redacted.Redacted<string>;
     };
     readonly llm: {
       readonly providers: Record<
-        string,
+        ProviderName,
         {
           readonly apiKey: Redacted.Redacted<string>;
-          readonly baseUrl: string;
-          readonly model: string;
+          readonly baseUrl: ApiBaseUrl;
+          readonly model: LlmModel;
         }
       >;
     };

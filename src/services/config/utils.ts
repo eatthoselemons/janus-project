@@ -1,6 +1,7 @@
-import { Effect, Redacted } from 'effect';
+import { Effect, Redacted, Schema } from 'effect';
 import { ConfigService } from './index';
 import { JanusError } from '../../domain/types/errors';
+import { ProviderName } from '../../domain/types';
 
 /**
  * Get a specific LLM provider configuration
@@ -8,7 +9,8 @@ import { JanusError } from '../../domain/types/errors';
 export const getLlmProvider = (providerName: string) =>
   Effect.gen(function* () {
     const config = yield* ConfigService;
-    const provider = config.llm.providers[providerName];
+    const providerKey = Schema.decodeSync(ProviderName)(providerName);
+    const provider = config.llm.providers[providerKey];
 
     if (!provider) {
       return yield* Effect.fail(
