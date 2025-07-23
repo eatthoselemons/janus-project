@@ -321,11 +321,13 @@ describe('Database Types', () => {
 
   describe('queryParams helper', () => {
     it('should convert plain object to QueryParameters', async () => {
-      const params = await Effect.runPromise(queryParams({
-        name: 'Alice',
-        age: 30,
-        active: true,
-      }));
+      const params = await Effect.runPromise(
+        queryParams({
+          name: 'Alice',
+          age: 30,
+          active: true,
+        }),
+      );
 
       expect(params[Schema.decodeSync(QueryParameterName)('name')]).toBe(
         'Alice',
@@ -342,10 +344,12 @@ describe('Database Types', () => {
     });
 
     it('should handle nested objects', async () => {
-      const params = await Effect.runPromise(queryParams({
-        user: { name: 'Bob', id: 123 },
-        tags: ['tag1', 'tag2'],
-      }));
+      const params = await Effect.runPromise(
+        queryParams({
+          user: { name: 'Bob', id: 123 },
+          tags: ['tag1', 'tag2'],
+        }),
+      );
 
       expect(params[Schema.decodeSync(QueryParameterName)('user')]).toEqual({
         name: 'Bob',
@@ -369,7 +373,7 @@ describe('Database Types', () => {
       expect(
         params[Schema.decodeSync(QueryParameterName)('nullValue')],
       ).toBeNull();
-      
+
       // regular values work as expected
       expect(params[Schema.decodeSync(QueryParameterName)('validValue')]).toBe(
         'test',
@@ -409,7 +413,7 @@ describe('Database Types', () => {
 
       // Should have all 5 parameters
       expect(Object.keys(params)).toHaveLength(5);
-      
+
       // Verify all values are preserved
       expect(params[Schema.decodeSync(QueryParameterName)('a')]).toBe('value');
       expect(params[Schema.decodeSync(QueryParameterName)('b')]).toBeNull();

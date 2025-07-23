@@ -14,6 +14,11 @@ import {
 import { ConfigService } from '../../services/config';
 import { Neo4jError } from '../../domain/types/errors';
 import { makeTestLayerFor } from '../../lib/test-utils';
+import {
+  CypherQuery,
+  QueryParameters,
+  QueryParameterName,
+} from '../../domain/types/database';
 
 // ===========================
 // DRIVER CONFIGURATION
@@ -115,7 +120,7 @@ const closeSession = (session: Session) =>
  * Creates a transaction context that wraps Neo4j transaction methods
  */
 const createTransactionContext = (tx: Transaction): TransactionContext => ({
-  run: <T = unknown>(query: string, params?: Record<string, unknown>) =>
+  run: <T = unknown>(query: CypherQuery, params?: QueryParameters) =>
     Effect.tryPromise({
       try: async () => {
         const result = await tx.run(query, params);
@@ -176,8 +181,8 @@ const runBatchWithDriver =
   (driver: Driver) =>
   <T = unknown>(
     queries: Array<{
-      query: string;
-      params?: Record<string, unknown>;
+      query: CypherQuery;
+      params?: QueryParameters;
     }>,
   ): Effect.Effect<T[][], Neo4jError, never> =>
     Effect.scoped(
@@ -225,53 +230,11 @@ const withSessionScoped =
     ).pipe(Effect.withLogSpan('withSession'));
 
 /**
- * Legacy method - wraps the old 'use' pattern
- * @deprecated Use withSession instead
- */
-const legacyUse = <T>(
-  driver: Driver,
-  fn: (session: Session) => T,
-): Effect.Effect<Awaited<T>, Neo4jError, never> =>
-  Effect.scoped(
-    Effect.gen(function* () {
-      const session = yield* Effect.acquireRelease(
-        // Acquire: Create a session synchronously
-        Effect.sync(() => driver.session()),
-        // Release: Close the session
-        (session) => closeSession(session),
-      );
-
-      // Use the session
-      const result = yield* Effect.try({
-        try: () => fn(session),
-        catch: (e) =>
-          new Neo4jError({
-            query: 'SESSION_OPERATION',
-            originalMessage: e instanceof Error ? e.message : String(e),
-          }),
-      });
-
-      // Handle both sync and async results
-      if (result instanceof Promise) {
-        return yield* Effect.tryPromise({
-          try: () => result,
-          catch: (e) =>
-            new Neo4jError({
-              query: 'ASYNC_SESSION_OPERATION',
-              originalMessage: e instanceof Error ? e.message : String(e),
-            }),
-        });
-      }
-      return result;
-    }),
-  );
-
-/**
  * Runs a Cypher query and returns the results as plain objects
  */
 const runQueryWithDriver =
   (driver: Driver) =>
-  (query: string, params = {}) =>
+  (query: CypherQuery, params: QueryParameters = {}) =>
     Effect.scoped(
       Effect.gen(function* () {
         const session = yield* Effect.acquireRelease(
@@ -321,7 +284,6 @@ export const make = (config: { uri: string; user: string; password: string }) =>
       runInTransaction: runInTransactionWithDriver(driver),
       runBatch: runBatchWithDriver(driver),
       withSession: withSessionScoped(driver),
-      use: (fn) => legacyUse(driver, fn), // Deprecated, kept for compatibility
     });
   });
 
@@ -376,34 +338,21 @@ const createMockSession = (mockData: Map<string, unknown[]>): Session => {
       const mockRecords = (mockData.get(query) || []).map((obj) => ({
         toObject: () => obj,
         keys: typeof obj === 'object' && obj !== null ? Object.keys(obj) : [],
-        get: (key: string) => typeof obj === 'object' && obj !== null ? (obj as Record<string, unknown>)[key] : undefined,
+        get: (key: string) =>
+          typeof obj === 'object' && obj !== null
+            ? (obj as Record<string, unknown>)[key]
+            : undefined,
       }));
 
-      // Create a minimal mock Result that satisfies the neo4j-driver interface
-      const mockResult = {
+      // Return a mock result compatible with neo4j-driver
+      // We return just the structure that our code actually uses
+      return Promise.resolve({
         records: mockRecords,
-        summary: {} as neo4j.ResultSummary,
-        then: (onfulfilled?: (value: neo4j.Result) => any, onrejected?: (reason: any) => any) =>
-          Promise.resolve({ records: mockRecords, summary: {} }).then(
-            onfulfilled,
-            onrejected,
-          ),
-        catch: (onrejected: (reason: any) => any) =>
-          Promise.resolve({ records: mockRecords, summary: {} }).catch(
-            onrejected,
-          ),
-        finally: (onfinally?: (() => void) | undefined) =>
-          Promise.resolve({ records: mockRecords, summary: {} }).finally(
-            onfinally,
-          ),
-        [Symbol.toStringTag]: 'Promise' as const,
-        subscribe: () => ({ unsubscribe: () => {} }),
-      } as neo4j.Result;
-
-      return mockResult;
+        summary: {},
+      });
     },
     close: () => Promise.resolve(),
-  } as Session;
+  } as unknown as Session;
 
   return mockSession;
 };
@@ -415,18 +364,24 @@ export const Neo4jTest = (mockData: Map<string, unknown[]> = new Map()) =>
   Layer.succeed(
     Neo4jService,
     Neo4jService.of({
-      runQuery: (query, _params = {}) =>
+      runQuery: <T = unknown>(
+        query: CypherQuery,
+        _params: QueryParameters = {},
+      ) =>
         Effect.gen(function* () {
           const data = mockData.get(query) || [];
           yield* Effect.logDebug(`Mock query: ${query}`);
-          return data;
+          return data as T[];
         }),
 
       runInTransaction: (operations) =>
         Effect.gen(function* () {
           // Simple mock transaction context
           const txContext: TransactionContext = {
-            run: <T = unknown>(query: string, _params = {}) =>
+            run: <T = unknown>(
+              query: CypherQuery,
+              _params: QueryParameters = {},
+            ) =>
               Effect.gen(function* () {
                 const data = mockData.get(query) || [];
                 yield* Effect.logDebug(`Mock transaction query: ${query}`);
@@ -436,13 +391,15 @@ export const Neo4jTest = (mockData: Map<string, unknown[]> = new Map()) =>
           return yield* operations(txContext);
         }),
 
-      runBatch: (queries) =>
+      runBatch: <T = unknown>(
+        queries: Array<{ query: CypherQuery; params?: QueryParameters }>,
+      ) =>
         Effect.gen(function* () {
-          const results = [];
+          const results: T[][] = [];
           for (const { query } of queries) {
             const data = mockData.get(query) || [];
             yield* Effect.logDebug(`Mock batch query: ${query}`);
-            results.push(data);
+            results.push(data as T[]);
           }
           return results;
         }),
@@ -451,32 +408,6 @@ export const Neo4jTest = (mockData: Map<string, unknown[]> = new Map()) =>
         Effect.gen(function* () {
           const mockSession = createMockSession(mockData);
           return yield* work(mockSession);
-        }),
-
-      use: (fn) =>
-        Effect.gen(function* () {
-          const mockSession = createMockSession(mockData);
-
-          const result = yield* Effect.try({
-            try: () => fn(mockSession),
-            catch: (e) =>
-              new Neo4jError({
-                query: 'TEST_SESSION_OPERATION',
-                originalMessage: e instanceof Error ? e.message : String(e),
-              }),
-          });
-
-          if (result instanceof Promise) {
-            return yield* Effect.tryPromise({
-              try: () => result,
-              catch: (e) =>
-                new Neo4jError({
-                  query: 'TEST_ASYNC_OPERATION',
-                  originalMessage: e instanceof Error ? e.message : String(e),
-                }),
-            });
-          }
-          return result;
         }),
     }),
   );

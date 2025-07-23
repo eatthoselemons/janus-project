@@ -1,6 +1,7 @@
 import { Effect, Context } from 'effect';
 import type { Session } from 'neo4j-driver';
 import { Neo4jError } from '../../domain/types/errors';
+import { CypherQuery, QueryParameters } from '../../domain/types/database';
 
 /**
  * Transaction context for executing queries within a transaction
@@ -10,8 +11,8 @@ export interface TransactionContext {
    * Run a query within the transaction
    */
   readonly run: <T = unknown>(
-    query: string,
-    params?: Record<string, unknown>,
+    query: CypherQuery,
+    params?: QueryParameters,
   ) => Effect.Effect<T[], Neo4jError, never>;
 }
 
@@ -46,8 +47,8 @@ export interface Neo4jImpl {
    * @returns Effect containing query results as plain objects
    */
   readonly runQuery: <T = unknown>(
-    query: string,
-    params?: Record<string, unknown>,
+    query: CypherQuery,
+    params?: QueryParameters,
   ) => Effect.Effect<T[], Neo4jError, never>;
 
   /**
@@ -67,8 +68,8 @@ export interface Neo4jImpl {
    */
   readonly runBatch: <T = unknown>(
     queries: Array<{
-      query: string;
-      params?: Record<string, unknown>;
+      query: CypherQuery;
+      params?: QueryParameters;
     }>,
   ) => Effect.Effect<T[][], Neo4jError, never>;
 
@@ -80,13 +81,6 @@ export interface Neo4jImpl {
   readonly withSession: <A>(
     work: (session: Session) => Effect.Effect<A, Neo4jError, never>,
   ) => Effect.Effect<A, Neo4jError, never>;
-
-  /**
-   * @deprecated Use withSession instead
-   */
-  readonly use: <T>(
-    fn: (session: Session) => T,
-  ) => Effect.Effect<Awaited<T>, Neo4jError, never>;
 }
 
 export class Neo4jService extends Context.Tag('Neo4jService')<

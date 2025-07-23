@@ -140,15 +140,15 @@ export class UndefinedQueryParameterError extends Schema.TaggedError<UndefinedQu
 
 /**
  * Helper to create query parameters with proper typing
- * 
+ *
  * Note: This function preserves `null` values (which are valid in Neo4j)
  * but fails with an error for `undefined` values (which have no Neo4j equivalent).
- * 
+ *
  * @example
  * // Success case
  * queryParams({ name: 'Alice', age: null })
  * // Returns: Effect.succeed({ name: 'Alice', age: null })
- * 
+ *
  * // Failure case
  * queryParams({ name: 'Alice', city: undefined })
  * // Returns: Effect.fail(UndefinedQueryParameterError)
@@ -158,7 +158,7 @@ export const queryParams = (
 ): Effect.Effect<QueryParameters, UndefinedQueryParameterError> =>
   Effect.gen(function* () {
     const result: QueryParameters = {};
-    
+
     for (const [key, value] of Object.entries(params)) {
       if (value === undefined) {
         return yield* Effect.fail(
@@ -170,6 +170,6 @@ export const queryParams = (
       }
       result[Schema.decodeSync(QueryParameterName)(key)] = value;
     }
-    
+
     return result;
   });

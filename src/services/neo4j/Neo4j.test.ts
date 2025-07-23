@@ -42,13 +42,22 @@ describe('Neo4jService', () => {
 
     const program = Effect.gen(function* () {
       const neo4j = yield* Neo4jService;
-      return yield* neo4j.use(async (session) => {
-        const result = await session.run(
-          'CREATE (n:Person {name: $name}) RETURN n',
-          { name: 'Alice' },
-        );
-        return result.records.map((r) => r.toObject());
-      });
+      return yield* neo4j.withSession((session) =>
+        Effect.gen(function* () {
+          const result = yield* Effect.tryPromise({
+            try: () =>
+              session.run('CREATE (n:Person {name: $name}) RETURN n', {
+                name: 'Alice',
+              }),
+            catch: (error) =>
+              new Neo4jError({
+                message: 'Failed to run query',
+                cause: error,
+              }),
+          });
+          return result.records.map((r) => r.toObject());
+        }),
+      );
     });
 
     const runnable = program.pipe(Effect.provide(Neo4jTest(testData)));
@@ -57,12 +66,17 @@ describe('Neo4jService', () => {
     expect(result).toEqual([{ n: { name: 'Alice' } }]);
   });
 
-  it('should handle errors in the use method', async () => {
+  it('should handle errors in the withSession method', async () => {
     const program = Effect.gen(function* () {
       const neo4j = yield* Neo4jService;
-      return yield* neo4j.use(() => {
-        throw new Error('Session operation failed');
-      });
+      return yield* neo4j.withSession(() =>
+        Effect.fail(
+          new Neo4jError({
+            query: 'SESSION_OPERATION',
+            originalMessage: 'Session operation failed',
+          }),
+        ),
+      );
     });
 
     const runnable = program.pipe(Effect.provide(Neo4jTest()));
@@ -79,12 +93,17 @@ describe('Neo4jService', () => {
     }
   });
 
-  it('should handle async errors in the use method', async () => {
+  it('should handle async operations in the withSession method', async () => {
     const program = Effect.gen(function* () {
       const neo4j = yield* Neo4jService;
-      return yield* neo4j.use(async () => {
-        throw new Error('Async operation failed');
-      });
+      return yield* neo4j.withSession(() =>
+        Effect.fail(
+          new Neo4jError({
+            query: 'ASYNC_SESSION_OPERATION',
+            originalMessage: 'Async operation failed',
+          }),
+        ),
+      );
     });
 
     const runnable = program.pipe(Effect.provide(Neo4jTest()));

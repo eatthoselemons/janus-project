@@ -53,7 +53,7 @@ const makeUnimplementedProxy = <A extends object>(
  *
  * @template Identifier - The Context.Tag identifier type
  * @template ServiceImpl - The service implementation interface type
- * 
+ *
  * @example
  * ```ts
  * // With a class-based service tag
@@ -92,13 +92,12 @@ export const makeTestLayerFor = <Identifier, ServiceImpl extends object>(
 /**
  * Type helper to extract the service type from a Context.Tag
  * Useful when you need to work with the service interface directly
- * 
+ *
  * @template T - A Context.Tag type
  * @returns The service implementation type (S) from Context.Tag<I, S>
  */
-export type ServiceOf<T> = T extends Context.Tag<unknown, infer ServiceImpl>
-  ? ServiceImpl
-  : never;
+export type ServiceOf<T> =
+  T extends Context.Tag<unknown, infer ServiceImpl> ? ServiceImpl : never;
 
 /**
  * Creates a simple stub layer that returns fixed values
@@ -106,7 +105,7 @@ export type ServiceOf<T> = T extends Context.Tag<unknown, infer ServiceImpl>
  *
  * @template Identifier - The Context.Tag identifier type
  * @template ServiceImpl - The service implementation interface type
- * 
+ *
  * @example
  * ```ts
  * const StubLogger = makeStubLayer(LoggerService)({
@@ -128,5 +127,8 @@ export const makeStubLayer =
       },
     };
 
-    return Layer.succeed(tag, new Proxy({} as ServiceImpl, handler) as ServiceImpl);
+    return Layer.succeed(
+      tag,
+      new Proxy({} as ServiceImpl, handler) as ServiceImpl,
+    );
   };
