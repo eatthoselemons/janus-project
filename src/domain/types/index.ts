@@ -7,6 +7,7 @@
 
 // Branded types and primitives
 export * from './branded';
+export * from './database';
 
 // Core entity schemas
 export * from './snippet';

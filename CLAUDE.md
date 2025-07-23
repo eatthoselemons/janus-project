@@ -63,6 +63,7 @@ The project adheres strictly to **Functional Programming** and **Type-Driven Dev
 - **Avoid `any`; Prefer `unknown`** - Perform safe type-narrowing
 - **Minimize Type Assertions** - Their use may indicate a type model flaw
 - **Embrace Array Operators** - Use `.map()`, `.filter()`, `.reduce()` over loops
+- **Use Effect's Immutable Data Structures** - Prefer `Chunk`, `HashMap`, and `HashSet` from Effect over native JavaScript arrays and objects for collections to ensure immutability and leverage performance optimizations.
 - **High-Value Comments Only** - Explain the why with `# Reason:` comments
 - **Composition over Inheritance** - Use functional composition
 
@@ -105,7 +106,7 @@ Ensure code always follows these ideals:
 2. Follows "Type-Driven Development with Idris" by Edwin Brady
 3. Follows "Grokking Simplicity" by Eric Normand
 4. Does composition over inheritance
-5. Follows Effect best practices (documentation: https://effect.website/llms-small.txt)
+5. Follows Effect best practices (documentation: `docs/llms/guides/effect-docs`)
 6. Is tailored for Neo4j as database (not SQL)
 7. Avoids code duplication - condense repeated sections
 

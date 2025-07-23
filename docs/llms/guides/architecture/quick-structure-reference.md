@@ -4,7 +4,7 @@
 
 ### Adding a New Feature
 1. **Domain types** → `src/domain/types/[feature].ts`
-2. **Service interface** → `src/services/[feature]/[Feature].service.ts` 
+2. **Service interface** → `src/services/[feature]/[Feature].service.ts`
 3. **Layer implementation** → `src/layers/[feature]/[Feature].layer.ts`
 4. **Wire it up** → Add to `AppLive` in `src/index.ts`
 

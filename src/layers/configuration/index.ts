@@ -1,2 +1,6 @@
-export { ConfigServiceLive } from './Configuration.layer';
-export { ConfigServiceTest } from './Configuration.staticLayers';
+export {
+  ConfigServiceLive,
+  fromEnv,
+  ConfigServiceTest,
+  ConfigServiceTestPartial,
+} from './Configuration.layer';

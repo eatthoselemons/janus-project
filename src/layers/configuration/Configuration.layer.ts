@@ -1,7 +1,15 @@
-import { Effect, Layer, Config, Redacted } from 'effect';
+import { Effect, Layer, Config, Redacted, Schema } from 'effect';
 import { ConfigService } from '../../services/config';
+import { makeTestLayerFor } from '../../lib/test-utils';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+  Neo4jUri,
+  Neo4jUser,
+  ProviderName,
+  ApiBaseUrl,
+  LlmModel,
+} from '../../domain/types';
 
 // Helper function to load a provider configuration
 const loadProviderConfig = (providerName: string) =>
@@ -20,8 +28,12 @@ const loadProviderConfig = (providerName: string) =>
 
     // If API key exists, the other fields are required
     // These will fail with ConfigError if missing, which is what we want
-    const baseUrl = yield* Config.string(`${prefix}_BASE_URL`);
-    const model = yield* Config.string(`${prefix}_MODEL`);
+    const baseUrlStr = yield* Config.string(`${prefix}_BASE_URL`);
+    const modelStr = yield* Config.string(`${prefix}_MODEL`);
+
+    // Validate and convert to branded types
+    const baseUrl = yield* Schema.decode(ApiBaseUrl)(baseUrlStr);
+    const model = yield* Schema.decode(LlmModel)(modelStr);
 
     return {
       apiKey: maybeApiKey.value,
@@ -73,9 +85,13 @@ const getConfiguredProviders = Effect.gen(function* () {
 // Implementation using Effect Config module
 const configProgram = Effect.gen(function* () {
   // Neo4j configuration
-  const neo4jUri = yield* Config.string('NEO4J_URI');
-  const neo4jUser = yield* Config.string('NEO4J_USER');
+  const neo4jUriStr = yield* Config.string('NEO4J_URI');
+  const neo4jUserStr = yield* Config.string('NEO4J_USER');
   const neo4jPassword = yield* Config.redacted('NEO4J_PASSWORD');
+
+  // Validate and convert to branded types
+  const neo4jUri = yield* Schema.decode(Neo4jUri)(neo4jUriStr);
+  const neo4jUser = yield* Schema.decode(Neo4jUser)(neo4jUserStr);
 
   // Get configured LLM providers
   const providerNames = yield* getConfiguredProviders;
@@ -89,22 +105,19 @@ const configProgram = Effect.gen(function* () {
   );
 
   // Build the providers object, filtering out null configs
-  const providers = providerConfigs.reduce(
-    (acc, { name, config }) => {
-      if (config !== null) {
-        acc[name] = config;
-      }
-      return acc;
-    },
-    {} as Record<
-      string,
-      {
-        apiKey: Redacted.Redacted<string>;
-        baseUrl: string;
-        model: string;
-      }
-    >,
-  );
+  type ProviderConfig = {
+    apiKey: Redacted.Redacted<string>;
+    baseUrl: ApiBaseUrl;
+    model: LlmModel;
+  };
+  const providers: Record<ProviderName, ProviderConfig> = {};
+
+  for (const { name, config } of providerConfigs) {
+    if (config !== null) {
+      const providerName = yield* Schema.decode(ProviderName)(name);
+      providers[providerName] = config;
+    }
+  }
 
   return {
     neo4j: {
@@ -120,3 +133,96 @@ const configProgram = Effect.gen(function* () {
 
 // Create the live layer
 export const ConfigServiceLive = Layer.effect(ConfigService, configProgram);
+
+/**
+ * Alias for ConfigServiceLive for consistency with other services
+ */
+export const fromEnv = ConfigServiceLive;
+
+/**
+ * Test layer with mock configuration
+ */
+export const ConfigServiceTest = (
+  config: {
+    neo4j?: {
+      uri?: string;
+      user?: string;
+      password?: string;
+    };
+    llm?: {
+      providers?: Record<
+        string,
+        {
+          apiKey: string;
+          baseUrl: string;
+          model: string;
+        }
+      >;
+    };
+  } = {},
+) =>
+  Layer.succeed(
+    ConfigService,
+    ConfigService.of({
+      neo4j: {
+        uri: Schema.decodeSync(Neo4jUri)(
+          config.neo4j?.uri ?? 'bolt://localhost:7687',
+        ),
+        user: Schema.decodeSync(Neo4jUser)(config.neo4j?.user ?? 'test-user'),
+        password: Redacted.make(config.neo4j?.password ?? 'test-password'),
+      },
+      llm: {
+        providers: Object.entries(config.llm?.providers ?? {}).reduce(
+          (acc, [name, provider]) => {
+            acc[Schema.decodeSync(ProviderName)(name)] = {
+              apiKey: Redacted.make(provider.apiKey),
+              baseUrl: Schema.decodeSync(ApiBaseUrl)(provider.baseUrl),
+              model: Schema.decodeSync(LlmModel)(provider.model),
+            };
+            return acc;
+          },
+          {} as Record<
+            ProviderName,
+            {
+              apiKey: Redacted.Redacted<string>;
+              baseUrl: ApiBaseUrl;
+              model: LlmModel;
+            }
+          >,
+        ),
+      },
+    }),
+  );
+
+/**
+ * Create a partial test layer using makeTestLayer pattern
+ * Useful for tests that only need specific config values
+ *
+ * @example
+ * ```ts
+ * const layer = ConfigServiceTestPartial({
+ *   neo4j: { uri: 'bolt://test:7687' }
+ * });
+ * ```
+ */
+export const ConfigServiceTestPartial = (
+  impl: Partial<{
+    neo4j: {
+      uri: Neo4jUri;
+      user: Neo4jUser;
+      password: Redacted.Redacted<string>;
+    };
+    llm: {
+      providers: Record<
+        ProviderName,
+        {
+          apiKey: Redacted.Redacted<string>;
+          baseUrl: ApiBaseUrl;
+          model: LlmModel;
+        }
+      >;
+    };
+  }>,
+) => {
+  return makeTestLayerFor(ConfigService)(impl);
+};
