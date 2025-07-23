@@ -22,18 +22,18 @@ This phase establishes the bedrock of the application: the type system, configur
     - `NotFoundError` (for when an entity lookup by ID or slug fails).
     - `ConflictError` (for import conflicts).
 
-- [ ] **1.3: Typed Configuration Service**
-  - [ ] **Implementation:** Create a `Config` schema for all application settings (Neo4j URI, user, password; LLM provider API keys).
-  - [ ] **Implementation:** Use `Config.redacted` for all secrets (passwords, API keys).
-  - [ ] **Implementation:** Create a `ConfigLive` layer that provides the configuration from environment variables.
-  - [ ] **Testing:** Write a unit test for the `Config` schema, using `ConfigProvider.fromMap` to provide mock values and verify that the schema loads correctly.
-  - [ ] **Documentation:** Add a section to `README.md` explaining the required environment variables.
+- [x] **1.3: Typed Configuration Service**
+  - [x] **Implementation:** Create a `Config` schema for all application settings (Neo4j URI, user, password; LLM provider API keys).
+  - [x] **Implementation:** Use `Config.redacted` for all secrets (passwords, API keys).
+  - [x] **Implementation:** Create a `ConfigLive` layer that provides the configuration from environment variables.
+  - [x] **Testing:** Write a unit test for the `Config` schema, using `ConfigProvider.fromMap` to provide mock values and verify that the schema loads correctly.
+  - [x] **Documentation:** Add a section to `README.md` explaining the required environment variables.
 
-- [ ] **1.4: Neo4j Client Service**
-  - [ ] **Implementation:** Create a `Neo4jClient` service (`Effect.Tag`) that wraps the `neo4j-driver`.
-  - [ ] **Implementation:** The service will expose `runQuery(query, params): Effect<Result, PersistenceError>` and a higher-level `transactionally(effect): Effect<A, E | PersistenceError>`.
-  - [ ] **Implementation:** Create a `Neo4jClientLive` layer that manages the driver's lifecycle using `Scope`.
-  - [ ] **Testing:** Write an integration test for the `Neo4jClientLive` layer that connects to a test database, runs a simple query, and verifies a transaction.
+- [x] **1.4: Neo4j Client Service**
+  - [x] **Implementation:** Create a `Neo4jClient` service (`Effect.Tag`) that wraps the `neo4j-driver`.
+  - [x] **Implementation:** The service will expose `runQuery(query, params): Effect<Result, PersistenceError>` and a higher-level `transactionally(effect): Effect<A, E | PersistenceError>`.
+  - [x] **Implementation:** Create a `Neo4jClientLive` layer that manages the driver's lifecycle using `Scope`.
+  - [x] **Testing:** Write an integration test for the `Neo4jClientLive` layer that connects to a test database, runs a simple query, and verifies a transaction.
 
 ## Phase 2: Snippet Management
 
