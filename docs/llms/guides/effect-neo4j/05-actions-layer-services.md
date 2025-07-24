@@ -353,6 +353,87 @@ export const Neo4jTest = (mockData: Map<string, unknown[]> = new Map()) =>
   );
 ```
 
+### Naming Convention for Lookup Functions (Maybe/Must Pattern)
+
+When creating functions that look up entities by identifier, use the **maybe/must** pattern to clearly communicate behavior:
+
+#### Must Pattern - Expects Entity to Exist
+```typescript
+// Use "must" prefix when the entity is expected to exist
+// Fails with NotFoundError when not found
+export const mustGetSnippetByName = (name: Slug) =>
+  Effect.gen(function* () {
+    const neo4j = yield* Neo4jService;
+    const query = cypher`MATCH (s:Snippet {name: $name}) RETURN s`;
+    const params = yield* queryParams({ name });
+    const results = yield* neo4j.runQuery<{ s: unknown }>(query, params);
+    
+    if (results.length === 0) {
+      return yield* Effect.fail(
+        new NotFoundError({
+          entityType: 'snippet' as const,
+          slug: name,
+        })
+      );
+    }
+    
+    return yield* Schema.decode(Snippet)(results[0].s);
+  });
+```
+
+#### Maybe Pattern - Entity Might Not Exist
+```typescript
+// Use "maybe" prefix when the entity might not exist
+// Returns Option<T> - Some when found, None when not found
+export const maybeGetSnippetByName = (name: Slug) =>
+  mustGetSnippetByName(name).pipe(
+    Effect.map(Option.some),
+    Effect.catchTag('NotFoundError', () => Effect.succeed(Option.none()))
+  );
+```
+
+#### Usage Examples
+```typescript
+// When composing snippets - all must exist
+const composeSnippets = (names: string[]) =>
+  Effect.gen(function* () {
+    const snippets = yield* Effect.forEach(names, name =>
+      mustGetSnippetByName(Schema.decodeSync(Slug)(name))
+    );
+    // Fails fast with clear error if any snippet is missing
+    return buildComposition(snippets);
+  });
+
+// When checking before creation - might not exist
+const createIfNotExists = (name: Slug, description: string) =>
+  Effect.gen(function* () {
+    const existing = yield* maybeGetSnippetByName(name);
+    
+    if (Option.isSome(existing)) {
+      return existing.value;
+    }
+    
+    return yield* createSnippet(name, description);
+  });
+```
+
+#### When to Use Each Pattern
+
+**Use `must*` when:**
+- Updating an entity (it should exist)
+- Following a reference/foreign key
+- The absence indicates a programming error or data integrity issue
+- In CLI commands where the user specified an entity
+
+**Use `maybe*` when:**
+- Checking existence before creation
+- Implementing search/autocomplete
+- The absence is a normal, expected case
+- Building optional relationships
+
+This pattern makes the API more predictable and self-documenting, as developers can immediately understand from the function name whether they need to handle the absence case.
+
+
 ### Important Notes
 
 1. **No Currying**: Service methods use standard parameter passing, not currying, for better ergonomics with optional parameters
