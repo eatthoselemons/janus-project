@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   neo4j:
-    image: neo4j:5.28-community
+    image: neo4j:5.26-community
     container_name: janus-neo4j
     restart: unless-stopped
     ports:
