@@ -58,7 +58,7 @@ pnpm test
 
 ## Output
 
-Save as: `docs/llms/PRPs/{feature-name}.md`
+Save as: `docs/llms/PRPs/{section-number}-{feature-name}.md`
 
 ## Quality Checklist
 
