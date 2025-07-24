@@ -37,24 +37,24 @@ This phase establishes the bedrock of the application: the type system, configur
 
 ## Phase 2: Snippet Management
 
-- [ ] **2.1: Snippet Persistence Service**
-  - [ ] **Implementation:** Create `SnippetPersistence` service (`Effect.Tag`).
-  - [ ] **Implementation:** Implement all required persistence methods:
+- [x] **2.1: Snippet Persistence Service**
+  - [x] **Implementation:** Create `SnippetPersistence` service (`Effect.Tag`).
+  - [x] **Implementation:** Implement all required persistence methods:
     - `createSnippet(name: Slug, description: string): Effect<Snippet, PersistenceError>`
     - `createSnippetVersion(snippetId: SnippetId, content: string, commitMessage: string): Effect<SnippetVersion, PersistenceError>`
     - `findSnippetByName(name: Slug): Effect<Option<Snippet>, PersistenceError>`
     - `findLatestSnippetVersion(snippetId: SnippetId): Effect<Option<SnippetVersion>, PersistenceError>`
     - `listSnippets(): Effect<Snippet[], PersistenceError>`
     - `searchSnippets(query: string): Effect<Snippet[], PersistenceError>`
-  - [ ] **Testing:** Write integration tests for each persistence method using a test Neo4j database.
+  - [x] **Testing:** Write integration tests for each persistence method using a test Neo4j database.
 
-- [ ] **2.2: Snippet CLI Commands**
-  - [ ] **Implementation:** `janus snippet pull <snippet-name>`
-  - [ ] **Implementation:** `janus snippet push <file-path> -m <message>`
-  - [ ] **Implementation:** `janus snippet list`
-  - [ ] **Implementation:** `janus snippet search "<query>"`
-  - [ ] **Testing:** Write end-to-end tests for each CLI command.
-  - [ ] **Documentation:** Write user documentation for the `janus snippet` commands.
+- [x] **2.2: Snippet CLI Commands**
+  - [x] **Implementation:** `janus snippet pull <snippet-name>`
+  - [x] **Implementation:** `janus snippet push <file-path> -m <message>`
+  - [x] **Implementation:** `janus snippet list`
+  - [x] **Implementation:** `janus snippet search "<query>"`
+  - [x] **Testing:** Write end-to-end tests for each CLI command.
+  - [x] **Documentation:** Write user documentation for the `janus snippet` commands.
 
 ## Phase 3: Parameter Management
 

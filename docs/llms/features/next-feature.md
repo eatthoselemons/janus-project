@@ -11,11 +11,11 @@ You can find example projects at
 
 ## DOCUMENTATION:
 
-You can also find the entire neo4j documentation at `examples/neo4j-documentation`
+You can also find the entire neo4j documentation at `examples/neo4j-documentation/`
 
-You can find the entire vitest documentation in `examples/vitest/docs`
+You can find the entire vitest documentation in `examples/vitest/docs/`
 
-All effect documentation is available at `docs/llms/guides/effect-docs`
+All effect documentation is available at `docs/llms/guides/effect-docs/`
 
 You can find effect specific vitest instructions here: https://www.npmjs.com/package/@effect/vitest
 

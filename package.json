@@ -3,13 +3,17 @@
   "version": "0.0.1",
   "description": "A framework for the rigorous, empathetic, and reproducible testing of Large Language Models.",
   "main": "dist/index.js",
+  "bin": {
+    "janus": "./dist/cli/bin.js"
+  },
   "scripts": {
     "test": "vitest run",
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write .",
-    "preflight": "pnpm run format && pnpm run lint && pnpm run build && pnpm run test"
+    "preflight": "pnpm run format && pnpm run lint && pnpm run build && pnpm run test",
+    "docs:cli": "ts-node src/cli/generate-docs.ts"
   },
   "keywords": [
     "llm",

@@ -8,9 +8,13 @@
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
     "rootDir": "./src",
+    "baseUrl": "./src",
     "exactOptionalPropertyTypes": true,
     "declaration": true,
     "composite": true,
+    "paths": {
+      "@/*": ["*"]
+    },
     "plugins": [
       // other LSPs and as last
       {
