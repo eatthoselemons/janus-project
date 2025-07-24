@@ -33,6 +33,8 @@ Use this checklist to verify your code follows all required patterns and princip
 - [ ] Relationships defined as Schema.Struct
 - [ ] All schema properties use branded types
 - [ ] DateTimeUtc used for timestamps (not DateTimeInsert)
+- [ ] Branded types use Schema.pipe() pattern, not Brand.nominal()
+- [ ] Helper functions provided for complex branded type creation
 
 ### Calculations Layer
 
@@ -51,6 +53,8 @@ Use this checklist to verify your code follows all required patterns and princip
 - [ ] All Cypher parameters are typed
 - [ ] Query results parsed immediately
 - [ ] Option used for nullable values
+- [ ] Undefined values handled explicitly with errors (not silently dropped)
+- [ ] Effect.gen with yield* used inside Effect context (not async/await)
 
 ### Service Architecture
 
@@ -60,6 +64,8 @@ Use this checklist to verify your code follows all required patterns and princip
 - [ ] Each layer only depends on layers below
 - [ ] No circular dependencies
 - [ ] Dependencies explicit in Layer.provide()
+- [ ] Service methods use standard parameter passing (not currying) for optional params
+- [ ] Layer.scoped used for resource lifecycle management (drivers, connections)
 
 ### Error Handling
 
@@ -84,6 +90,9 @@ Use this checklist to verify your code follows all required patterns and princip
 - [ ] Unit tests for all pure calculations
 - [ ] Effect programs tested with `Effect.runPromise` or `Effect.runPromiseExit`
 - [ ] Test implementations are type-safe and use mocked services
+- [ ] Test utilities separated into .test-layers.ts files (not mixed with production code)
+- [ ] Reusable test layers created for common test scenarios
+- [ ] Test layers use proper branded type construction
 
 ## Observability & Security Checklist
 
@@ -110,6 +119,8 @@ Use this checklist to verify your code follows all required patterns and princip
 - [ ] No untyped `unknown` in domain logic
 - [ ] All external data parsed at boundaries
 - [ ] No type errors or warnings
+- [ ] Generic type parameters have descriptive names (not single letters)
+- [ ] `unknown` preferred over `any` in generic contexts
 
 ### Best Practices
 
@@ -125,6 +136,8 @@ Use this checklist to verify your code follows all required patterns and princip
 - [ ] Public APIs documented
 - [ ] README updated with new features
 - [ ] Environment variables documented
+- [ ] Generic type parameters explained in docstrings
+- [ ] Test layer usage examples provided in comments
 
 ## Pre-Commit Checklist
 

@@ -7,7 +7,7 @@ Template optimized for AI agents to implement features with sufficient context a
 
 ## Core Principles
 
-1. **Context is Complete but Focused**: Include ALL necessary documentation sections, specific examples, and discovered caveats
+1. **Context is Complete but Focused**: Include ALL necessary documentation sections, specific examples, and discovered caveats by linking specific documents
 2. **Validation Loops**: Provide executable tests/lints the AI can run and fix
 3. **Information Dense**: Use keywords and patterns from the codebase
 4. **Progressive Success**: Start simple, validate, then enhance

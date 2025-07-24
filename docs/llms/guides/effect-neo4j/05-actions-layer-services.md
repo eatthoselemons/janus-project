@@ -1,251 +1,366 @@
 > **Audience:** LLM / AI Agent (Focused Guide)
 
-# 5. Actions Layer - Effect Services
+# 5. Actions Layer - Effect Services (Updated)
 
-This section covers the Actions layer, including the Neo4j client, repositories, and service layer patterns.
+This section covers the Actions layer with the updated patterns from our implementation.
 
-### The Neo4j Client: A Context-Driven Approach
+### The Neo4j Service: Modern Pattern
 
-The foundation of our database interactions is a set of services that safely manage the Neo4j driver, sessions, and transactions as managed resources within the `Effect` context. This ensures that all database operations are part of the same computational graph and that resources are cleaned up automatically, even in the case of errors.
-
-#### 1. Core Services Definition
-
-We define three core services:
-
-- `Neo4jDriver`: A service that holds the global `neo4j.driver` instance. Its lifecycle is managed for the entire application.
-- `Neo4jTransaction`: A service that holds an active `neo4j.ManagedTransaction`. This service is only available _inside_ a transactional context.
-- `Neo4jClient`: The primary service used by repositories. It provides a `run` method for executing queries and a `transaction` method for wrapping operations in a transaction.
+Our Neo4j service provides multiple access patterns for different use cases:
 
 ```typescript
-import * as neo4j from 'neo4j-driver';
+export interface Neo4jImpl {
+  /**
+   * Execute a single query - best for simple operations
+   */
+  readonly runQuery: <T = unknown>(
+    query: CypherQuery,
+    params?: QueryParameters,
+  ) => Effect.Effect<T[], Neo4jError, never>;
 
-// Service to hold the raw neo4j driver
-export class Neo4jDriver extends Context.Tag('Neo4jDriver')<
-  Neo4jDriver,
-  neo4j.Driver
->() {}
+  /**
+   * Execute multiple operations in a transaction
+   * Automatically commits on success, rolls back on failure
+   */
+  readonly runInTransaction: <A>(
+    operations: (tx: TransactionContext) => Effect.Effect<A, Neo4jError, never>,
+  ) => Effect.Effect<A, Neo4jError, never>;
 
-// A service to represent an active transaction
-export class Neo4jTransaction extends Context.Tag('Neo4jTransaction')<
-  Neo4jTransaction,
-  neo4j.ManagedTransaction
->() {}
+  /**
+   * Execute multiple queries efficiently with the same session
+   */
+  readonly runBatch: <T = unknown>(
+    queries: Array<{
+      query: CypherQuery;
+      params?: QueryParameters;
+    }>,
+  ) => Effect.Effect<T[][], Neo4jError, never>;
 
-// The main client service
-export class Neo4jClient extends Context.Tag('Neo4jClient')<
-  Neo4jClient,
-  {
-    /**
-     * Runs a query inside a transaction.
-     * Requires a Neo4jTransaction to be in the context.
-     */
-    readonly run: <T extends neo4j.QueryResult>(
-      query: string,
-      params?: Record<string, unknown>,
-    ) => Effect.Effect<T, Neo4jError, Neo4jTransaction>;
+  /**
+   * For complex operations that need full session control
+   */
+  readonly withSession: <A>(
+    work: (session: Session) => Effect.Effect<A, Neo4jError, never>,
+  ) => Effect.Effect<A, Neo4jError, never>;
+}
 
-    /**
-     * Wraps an Effect in a managed transaction. It provides the Neo4jTransaction
-     * service to the effect, ensuring all `run` calls within it execute in the same transaction.
-     */
-    readonly transaction: <A, E, R>(
-      effect: Effect.Effect<A, E, R>,
-    ) => Effect.Effect<A, E | Neo4jError, R | Neo4jDriver>;
-  }
+export class Neo4jService extends Context.Tag('Neo4jService')<
+  Neo4jService,
+  Neo4jImpl
 >() {}
 ```
 
-#### 2. Live Implementation
+### Key Patterns and Best Practices
 
-The `Live` implementations manage the lifecycle of these resources. `Neo4jDriverLive` creates and closes the driver. `Neo4jClientLive` provides the logic for creating sessions and running transactions.
+#### 1. Branded Types for Query Safety
 
-**Critical:** The `transaction` function uses `session.executeWrite`. This function expects a callback that returns a `Promise`. We use `runtime.runPromise` to execute our `Effect` _within_ the transaction boundary provided by the driver, but we provide the transaction object `tx` back into the `Effect` context. This correctly bridges the Effect world with the Neo4j driver's Promise-based transaction management without losing the benefits of Effect.
+Always use branded types for queries and parameters:
 
 ```typescript
-// A layer to provide the driver, managing its lifecycle
-export const Neo4jDriverLive = Layer.scoped(
-  Neo4jDriver,
-  Effect.gen(function* () {
-    const config = yield* Config;
-    const driver = neo4j.driver(
-      config.neo4j.uri,
-      neo4j.auth.basic(config.neo4j.user, config.neo4j.password),
-    );
-    // Ensure the driver is closed when the application shuts down
-    yield* Effect.addFinalizer(() => Effect.promise(() => driver.close()));
-    return driver;
-  }),
-);
+// Helper function for template literal queries
+export const cypher = (
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+): CypherQuery => {
+  const query = strings.reduce((acc, str, i) => {
+    return acc + str + (values[i] !== undefined ? String(values[i]) : '');
+  }, '');
+  return Schema.decodeSync(CypherQuery)(query);
+};
 
-// The live implementation of the client
-export const Neo4jClientLive = Layer.effect(
-  Neo4jClient,
+// Helper for query parameters with error handling
+export const queryParams = (
+  params: Record<string, unknown>,
+): Effect.Effect<QueryParameters, UndefinedQueryParameterError> =>
   Effect.gen(function* () {
-    const driver = yield* Neo4jDriver;
-    const runtime = yield* Effect.runtime<any>();
-
-    const transaction = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-      Effect.scoped(
-        Effect.acquireRelease(
-          Effect.sync(() => driver.session({ database: 'neo4j' })),
-          (session) => Effect.sync(() => session.close()),
-        ),
-      ).pipe(
-        Effect.flatMap((session) =>
-          Effect.tryPromise({
-            try: () =>
-              session.executeWrite((tx) =>
-                runtime.runPromise(
-                  Effect.provideService(effect, Neo4jTransaction, tx),
-                ),
-              ),
-            catch: (e) => new Neo4jError({ message: String(e) }),
+    const result: QueryParameters = {};
+    for (const [key, value] of Object.entries(params)) {
+      if (value === undefined) {
+        return yield* Effect.fail(
+          new UndefinedQueryParameterError({
+            parameterName: key,
+            message: `Query parameter '${key}' has undefined value. Use null for absent values in Neo4j queries.`,
           }),
-        ),
-      );
-
-    const run = <T extends neo4j.QueryResult>(
-      query: string,
-      params?: Record<string, unknown>,
-    ) =>
-      Effect.flatMap(Neo4jTransaction, (tx) =>
-        Effect.tryPromise({
-          try: () => tx.run(query, params) as Promise<T>,
-          catch: (e) => new Neo4jError({ message: String(e) }),
-        }),
-      );
-
-    return Neo4jClient.of({ run, transaction });
-  }),
-).pipe(Layer.provide(Neo4jDriverLive));
+        );
+      }
+      result[Schema.decodeSync(QueryParameterName)(key)] = value;
+    }
+    return result;
+  });
 ```
 
-### Repository Pattern with the New Client
+#### 2. Repository/Data Access Patterns
 
-Repositories now depend on `Neo4jClient` and define functions that execute queries. Notice that repository functions like `findById` and `create` don't call `transaction` themselves. They simply `run` queries, which requires that a `Neo4jTransaction` is already available in the context. This makes them composable.
+There are two valid approaches in Effect for organizing data access functions:
+
+**Option A: Individual Function Exports (More Functional)**
+
+This approach exports each function individually, which is more aligned with functional programming principles:
 
 ```typescript
-// Build repository operations
+// In personDataAccess.ts
+export const findPersonById = (id: PersonId) =>
+  Effect.gen(function* () {
+    const neo4j = yield* Neo4jService;
+    const query = cypher`MATCH (p:Person {id: ${id}}) RETURN p`;
+    const params = yield* queryParams({ id });
+    const results = yield* neo4j.runQuery<{ p: unknown }>(query, params);
+
+    if (results.length === 0) return Option.none();
+
+    const person = yield* Schema.decode(PersonNode)(results[0].p);
+    return Option.some(person);
+  });
+
+export const createPerson = (person: PersonNode) =>
+  Effect.gen(function* () {
+    const neo4j = yield* Neo4jService;
+    const query = cypher`
+      CREATE (p:Person $props)
+      SET p.createdAt = datetime()
+      RETURN p
+    `;
+    const params = yield* queryParams({ props: person });
+    const results = yield* neo4j.runQuery<{ p: unknown }>(query, params);
+
+    return yield* Schema.decode(PersonNode)(results[0].p);
+  });
+
+export const createFollowsRelationship = (
+  followerId: PersonId,
+  targetId: PersonId,
+  relationship: FollowsRelationship,
+) =>
+  Effect.gen(function* () {
+    const neo4j = yield* Neo4jService;
+    const query = cypher`
+      MATCH (follower:Person {id: $followerId})
+      MATCH (target:Person {id: $targetId})
+      CREATE (follower)-[r:FOLLOWS $props]->(target)
+      RETURN r
+    `;
+    const params = yield* queryParams({
+      followerId,
+      targetId,
+      props: relationship,
+    });
+    yield* neo4j.runQuery(query, params);
+  });
+```
+
+**Option B: Grouped Repository Pattern**
+
+This approach groups related operations, useful when you want to swap implementations for testing:
+
+```typescript
 export const makePersonRepository = Effect.gen(function* () {
-  const neo4j = yield* Neo4jClient;
+  const neo4j = yield* Neo4jService;
 
   const findById = (id: PersonId) =>
-    neo4j.run(`MATCH (p:Person {id: $id}) RETURN p`, { id }).pipe(
-      Effect.map((result) => Option.fromNullable(result.records[0])),
-      Effect.flatMap(
-        Option.traverse((record) => Option.fromNullable(record.get('p'))),
-      ),
-      Effect.flatMap(Option.traverse(Schema.decode(PersonNode))),
-    );
+    Effect.gen(function* () {
+      const query = cypher`MATCH (p:Person {id: ${id}}) RETURN p`;
+      const params = yield* queryParams({ id });
+      const results = yield* neo4j.runQuery<{ p: unknown }>(query, params);
+
+      if (results.length === 0) return Option.none();
+
+      const person = yield* Schema.decode(PersonNode)(results[0].p);
+      return Option.some(person);
+    });
 
   const create = (person: PersonNode) =>
-    neo4j
-      .run(
-        `CREATE (p:Person $props)
-       SET p.createdAt = datetime()
-       RETURN p`,
-        { props: person },
-      )
-      .pipe(
-        Effect.map((result) => result.records[0].get('p')),
-        Effect.flatMap(Schema.decode(PersonNode)),
-      );
+    Effect.gen(function* () {
+      const query = cypher`
+        CREATE (p:Person $props)
+        SET p.createdAt = datetime()
+        RETURN p
+      `;
+      const params = yield* queryParams({ props: person });
+      const results = yield* neo4j.runQuery<{ p: unknown }>(query, params);
+
+      return yield* Schema.decode(PersonNode)(results[0].p);
+    });
 
   const createFollowsRelationship = (
-    fromId: PersonId,
-    toId: PersonId,
+    followerId: PersonId,
+    targetId: PersonId,
     relationship: FollowsRelationship,
   ) =>
-    neo4j
-      .run(
-        `MATCH (a:Person {id: $fromId}), (b:Person {id: $toId})
-       CREATE (a)-[r:FOLLOWS $props]->(b)
-       RETURN r`,
-        { fromId, toId, props: relationship },
-      )
-      .pipe(Effect.asVoid);
+    Effect.gen(function* () {
+      const query = cypher`
+        MATCH (follower:Person {id: $followerId})
+        MATCH (target:Person {id: $targetId})
+        CREATE (follower)-[r:FOLLOWS $props]->(target)
+        RETURN r
+      `;
+      const params = yield* queryParams({
+        followerId,
+        targetId,
+        props: relationship,
+      });
+      yield* neo4j.runQuery(query, params);
+    });
 
-  return {
-    findById,
-    create,
-    createFollowsRelationship,
-  } as const;
+  return { findById, create, createFollowsRelationship };
 });
 
-// Derive type from implementation
+// If using the grouped pattern, you might want to create a service:
 export type PersonRepository = Effect.Effect.Success<
   typeof makePersonRepository
 >;
 export const PersonRepository =
   Context.Tag<PersonRepository>('PersonRepository');
-
-// Create layer
 export const PersonRepositoryLive = Layer.effect(
   PersonRepository,
   makePersonRepository,
 );
 ```
 
-### Service Layer and Transaction Management
+**When to use each pattern:**
 
-The **Service Layer** is responsible for orchestrating units of work. It injects the `Neo4jClient` and the repositories it needs. When a service method involves multiple database writes that must be atomic, it uses `neo4j.transaction` to wrap the entire workflow.
+- **Individual functions**: Better for pure FP style, easier to test individual functions, more tree-shakeable
+- **Grouped repository**: Better when you need to swap implementations (test vs production), want to enforce consistent patterns across operations
 
-This is the "unit of work" pattern. The `followPerson` service method ensures that finding both people and creating the follow relationship all happen in a single, atomic transaction.
+````
+
+#### 3. Service Layer with Transactions
+
+For business logic, prefer individual function exports over grouped services:
 
 ```typescript
-// Build complete service
-export const makePersonService = Effect.gen(function* () {
-  const repo = yield* PersonRepository;
-  const neo4j = yield* Neo4jClient; // Inject the client to manage transactions
+// Option A: Individual function exports (PREFERRED for business logic)
+export const followPerson = (followerId: PersonId, targetId: PersonId) =>
+  Effect.gen(function* () {
+    const neo4j = yield* Neo4jService;
 
-  const followPerson = (followerId: PersonId, targetId: PersonId) =>
-    // Wrap the entire operation in a single transaction
-    neo4j.transaction(
+    return yield* neo4j.runInTransaction((tx) =>
       Effect.gen(function* () {
-        // All `repo` calls here will run in the same transaction
-        const follower = yield* repo.findById(followerId);
-        const target = yield* repo.findById(targetId);
-
-        if (Option.isNone(follower) || Option.isNone(target)) {
-          return yield* Effect.fail(
-            new UserNotFound({
-              userId: Option.isNone(follower) ? followerId : targetId,
-            }),
-          );
-        }
-
-        if (!canFollow(follower.value, target.value)) {
-          return yield* Effect.fail(
-            new InvalidFollow({
-              reason: 'Cannot follow this user',
-            }),
-          );
-        }
-
-        const relationship = yield* Schema.decode(FollowsRelationship)({
-          since: new Date(),
-          strength: 1.0,
-          mutual: false,
-        });
-
-        yield* repo.createFollowsRelationship(
-          followerId,
-          targetId,
-          relationship,
+        // All queries in this block run in the same transaction
+        const followerQuery = cypher`MATCH (p:Person {id: ${followerId}}) RETURN p`;
+        const followerParams = yield* queryParams({ id: followerId });
+        const followerResults = yield* tx.run<{ p: unknown }>(
+          followerQuery,
+          followerParams,
         );
+
+        if (followerResults.length === 0) {
+          return yield* Effect.fail(
+            new UserNotFound({ userId: followerId }),
+          );
+        }
+
+        const targetQuery = cypher`MATCH (p:Person {id: ${targetId}}) RETURN p`;
+        const targetParams = yield* queryParams({ id: targetId });
+        const targetResults = yield* tx.run<{ p: unknown }>(
+          targetQuery,
+          targetParams,
+        );
+
+        if (targetResults.length === 0) {
+          return yield* Effect.fail(
+            new UserNotFound({ userId: targetId }),
+          );
+        }
+
+        const follower = yield* Schema.decode(PersonNode)(followerResults[0].p);
+        const target = yield* Schema.decode(PersonNode)(targetResults[0].p);
+
+        if (!canFollow(follower, target)) {
+          return yield* Effect.fail(
+            new InvalidFollow({ reason: 'Cannot follow this user' }),
+          );
+        }
+
+        const createQuery = cypher`
+          MATCH (follower:Person {id: $followerId})
+          MATCH (target:Person {id: $targetId})
+          CREATE (follower)-[r:FOLLOWS {since: datetime(), strength: 1.0}]->(target)
+          RETURN r
+        `;
+        const createParams = yield* queryParams({ followerId, targetId });
+        yield* tx.run(createQuery, createParams);
       }),
     );
+  });
 
-  return {
-    findPerson: (id: PersonId) => neo4j.transaction(repo.findById(id)),
-    createPerson: (person: PersonNode) =>
-      neo4j.transaction(repo.create(person)),
-    followPerson,
-  } as const;
+// Import and use individual functions directly
+// In another file:
+import { followPerson, findPersonById, createPerson } from './personOperations';
+
+// Use directly without service objects
+const program = Effect.gen(function* () {
+  const person = yield* findPersonById(userId);
+  if (Option.isSome(person)) {
+    yield* followPerson(currentUserId, userId);
+  }
 });
+````
 
-export type PersonService = Effect.Effect.Success<typeof makePersonService>;
-export const PersonService = Context.Tag<PersonService>('PersonService');
+### Testing with Test Layers
 
-export const PersonServiceLive = Layer.effect(PersonService, makePersonService);
+Create test layers for the Neo4j service:
+
+```typescript
+export const Neo4jTest = (mockData: Map<string, unknown[]> = new Map()) =>
+  Layer.succeed(
+    Neo4jService,
+    Neo4jService.of({
+      runQuery: <T = unknown>(
+        query: CypherQuery,
+        _params: QueryParameters = {},
+      ) =>
+        Effect.gen(function* () {
+          const data = mockData.get(query) || [];
+          yield* Effect.logDebug(`Mock query: ${query}`);
+          return data as T[];
+        }),
+
+      runInTransaction: (operations) =>
+        Effect.gen(function* () {
+          const txContext: TransactionContext = {
+            run: <T = unknown>(
+              query: CypherQuery,
+              _params: QueryParameters = {},
+            ) =>
+              Effect.gen(function* () {
+                const data = mockData.get(query) || [];
+                yield* Effect.logDebug(`Mock transaction query: ${query}`);
+                return data as T[];
+              }),
+          };
+          return yield* operations(txContext);
+        }),
+
+      runBatch: <T = unknown>(
+        queries: Array<{ query: CypherQuery; params?: QueryParameters }>,
+      ) =>
+        Effect.gen(function* () {
+          const results: T[][] = [];
+          for (const { query } of queries) {
+            const data = mockData.get(query) || [];
+            yield* Effect.logDebug(`Mock batch query: ${query}`);
+            results.push(data as T[]);
+          }
+          return results;
+        }),
+
+      withSession: (work) =>
+        Effect.gen(function* () {
+          const mockSession = createMockSession(mockData);
+          return yield* work(mockSession);
+        }),
+    }),
+  );
 ```
+
+### Important Notes
+
+1. **No Currying**: Service methods use standard parameter passing, not currying, for better ergonomics with optional parameters
+2. **Error Handling**: Undefined query parameters result in explicit errors, not silent failures
+3. **Resource Management**: Use `Layer.scoped` for driver lifecycle management
+4. **Type Safety**: All queries and parameters use branded types
+5. **Effect Context**: Use `Effect.gen` with `yield*` inside Effect context, never `async/await`
+6. **Function Organization**:
+   - Infrastructure services (Neo4j, HTTP clients) can use grouped methods as they manage resources
+   - Business logic should prefer individual function exports for better FP style
+   - Data access can use either pattern depending on whether you need test swapping
