@@ -23,6 +23,8 @@ follow the best practices as laid out in the effect-neo4j guides. Usage instruct
 
 use the `docs/llms/effect/effect-compliance-checklist.md` to ensure that you have implemented the changes according to the best practices
 
+best practices for our repo about making generic persistance layer functions is: `docs/llms/best-practices/generic-persistence-patterns.md`
+
 ## OTHER CONSIDERATIONS:
 
 all code is in the `src/` folder
