@@ -8,6 +8,7 @@ describe('Tag', () => {
       const validTag = {
         id: '890bc123-e89b-42d3-a456-426614174012',
         name: 'customer-support',
+        description: 'Tags for customer support related items',
       };
 
       const result = yield* Schema.decode(Tag)(validTag);
@@ -32,6 +33,7 @@ describe('Tag', () => {
         const tag = {
           id: '890bc123-e89b-42d3-a456-426614174012',
           name,
+          description: `Description for ${name} tag`,
         };
 
         const result = yield* Schema.decode(Tag)(tag);
@@ -57,6 +59,7 @@ describe('Tag', () => {
         const tag = {
           id: '890bc123-e89b-42d3-a456-426614174012',
           name,
+          description: 'Valid description',
         };
 
         const result = yield* Effect.either(Schema.decode(Tag)(tag));
@@ -70,6 +73,7 @@ describe('Tag', () => {
       const invalidTag = {
         id: 'not-a-valid-uuid',
         name: 'valid-name',
+        description: 'Valid description',
       };
 
       const result = yield* Effect.either(Schema.decode(Tag)(invalidTag));
@@ -82,6 +86,7 @@ describe('Tag', () => {
       const validTag = {
         id: '890bc123-e89b-42d3-a456-426614174012',
         name: 'a',
+        description: 'Single character tag for testing',
       };
 
       const result = yield* Schema.decode(Tag)(validTag);
@@ -97,6 +102,7 @@ describe('Tag', () => {
         const tag = {
           id: '890bc123-e89b-42d3-a456-426614174012',
           name,
+          description: `Numeric tag ${name}`,
         };
 
         const result = yield* Schema.decode(Tag)(tag);
@@ -114,6 +120,7 @@ describe('Tag', () => {
       const validTag = {
         id: '890bc123-e89b-42d3-a456-426614174012',
         name: longName,
+        description: 'Tag with maximum length name',
       };
 
       const result = yield* Schema.decode(Tag)(validTag);
@@ -121,15 +128,42 @@ describe('Tag', () => {
     }),
   );
 
-  it.effect('should reject tag with missing fields', () =>
+  it.effect('should reject tag with missing name', () =>
     Effect.gen(function* () {
       const incompleteTag = {
         id: '890bc123-e89b-42d3-a456-426614174012',
+        description: 'Has description but missing name',
         // missing name
       };
 
       const result = yield* Effect.either(Schema.decode(Tag)(incompleteTag));
       expect(result._tag).toBe('Left');
+    }),
+  );
+
+  it.effect('should reject tag with missing description', () =>
+    Effect.gen(function* () {
+      const incompleteTag = {
+        id: '890bc123-e89b-42d3-a456-426614174012',
+        name: 'valid-name',
+        // missing description
+      };
+
+      const result = yield* Effect.either(Schema.decode(Tag)(incompleteTag));
+      expect(result._tag).toBe('Left');
+    }),
+  );
+
+  it.effect('should accept empty description', () =>
+    Effect.gen(function* () {
+      const tagWithEmptyDescription = {
+        id: '890bc123-e89b-42d3-a456-426614174012',
+        name: 'valid-name',
+        description: '',
+      };
+
+      const result = yield* Schema.decode(Tag)(tagWithEmptyDescription);
+      expect(result.description).toBe('');
     }),
   );
 });
