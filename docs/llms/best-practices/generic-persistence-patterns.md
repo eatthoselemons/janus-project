@@ -8,6 +8,7 @@ This document describes the recommended patterns for creating generic persistenc
 2. **Work with Schema types directly** - Leverage Effect's Schema system for runtime validation
 3. **Maintain type safety** - Use TypeScript's type system to ensure schemas have required fields
 4. **Follow Effect patterns** - Use `Effect.gen`, `yield*`, and proper error handling
+5. **Avoid type casting** - Let Schema.decode handle validation instead of using `as` type assertions
 
 ## Generic Function Pattern
 
@@ -39,13 +40,20 @@ export const createNamedEntity = <A, I, R>(
     }
     
     // Generate ID and create
-    const id = yield* generateId();
-    const fullEntity = { ...entity, id } as Schema.Schema.Type<typeof schema>;
+    const uuid = yield* generateId();
+    
+    // Instead of type casting, we can use a more type-safe approach:
+    // 1. Create the full object
+    const entityWithId = { ...entity, id: uuid };
+    
+    // 2. Validate it through the schema to ensure type safety
+    const validatedEntity = yield* Schema.decode(schema)(entityWithId);
     
     const query = cypher`CREATE (n:${nodeLabel} $props) RETURN n`;
-    const params = yield* queryParams({ props: fullEntity });
+    const params = yield* queryParams({ props: validatedEntity });
     const results = yield* neo4j.runQuery<{ n: unknown }>(query, params);
     
+    // Schema.decode validates the data from the database
     return yield* Schema.decode(schema)(results[0].n);
   });
 ```
@@ -159,12 +167,17 @@ export const createVersion = <A, I, R>(
         const prevResults = yield* tx.run(prevQuery, parentParams);
         
         // Create new version
-        const id = yield* generateId();
-        const fullVersion = {
+        const uuid = yield* generateId();
+        
+        // Create the full version object
+        const versionWithIdAndDate = {
           ...versionData,
-          id,
+          id: uuid,
           createdAt: new Date()
-        } as Schema.Schema.Type<typeof schema>;
+        };
+        
+        // Validate through schema to ensure type safety
+        const validatedVersion = yield* Schema.decode(schema)(versionWithIdAndDate);
         
         // Create with or without previous link
         if (prevResults.length > 0) {
@@ -180,7 +193,7 @@ export const createVersion = <A, I, R>(
           const params = yield* queryParams({ 
             parentId, 
             prevId, 
-            props: fullVersion 
+            props: validatedVersion 
           });
           const results = yield* tx.run(createQuery, params);
           return yield* Schema.decode(schema)(results[0].v);
@@ -193,7 +206,7 @@ export const createVersion = <A, I, R>(
           `;
           const params = yield* queryParams({ 
             parentId, 
-            props: fullVersion 
+            props: validatedVersion 
           });
           const results = yield* tx.run(createQuery, params);
           return yield* Schema.decode(schema)(results[0].v);
@@ -301,7 +314,7 @@ describe('Generic Persistence Functions', () => {
         'TestEntity',
         TestEntity,
         { 
-          name: 'test-entity' as Slug,
+          name: Schema.decodeSync(Slug)('test-entity'),
           description: 'Test description',
           customField: 'custom value'
         }
@@ -323,7 +336,7 @@ describe('Snippet Persistence Type Safety', () => {
   it.effect('should return properly typed Snippet from createSnippet', () =>
     Effect.gen(function* () {
       const created = yield* createSnippet(
-        'test-snippet' as Slug,
+        Schema.decodeSync(Slug)('test-snippet'),
         'Test snippet description'
       );
       
@@ -358,7 +371,7 @@ describe('Snippet Persistence Type Safety', () => {
       });
       
       const result = yield* Effect.either(
-        mustGetSnippetByName('test' as Slug).pipe(
+        mustGetSnippetByName(Schema.decodeSync(Slug)('test')).pipe(
           Effect.provide(Layer.succeed(Neo4jService, mockNeo4j))
         )
       );
@@ -377,11 +390,11 @@ describe('Type Differentiation Tests', () => {
     Effect.gen(function* () {
       // Create different entities
       const snippet = yield* createSnippet(
-        'test-snippet' as Slug,
+        Schema.decodeSync(Slug)('test-snippet'),
         'Snippet description'
       );
       const tag = yield* createTag(
-        'test-tag' as Slug,
+        Schema.decodeSync(Slug)('test-tag'),
         'Tag description'
       );
       
@@ -413,7 +426,7 @@ describe('Schema Validation Edge Cases', () => {
       });
       
       const result = yield* Effect.either(
-        mustGetSnippetByName('valid-name' as Slug).pipe(
+        mustGetSnippetByName(Schema.decodeSync(Slug)('valid-name')).pipe(
           Effect.provide(Layer.succeed(Neo4jService, mockNeo4j))
         )
       );
@@ -435,13 +448,13 @@ describe('Schema Validation Edge Cases', () => {
         }])
       });
       
-      const snippet = yield* mustGetSnippetByName('valid-name' as Slug).pipe(
+      const snippet = yield* mustGetSnippetByName(Schema.decodeSync(Slug)('valid-name')).pipe(
         Effect.provide(Layer.succeed(Neo4jService, mockNeo4j))
       );
       
       // Should succeed and ignore extra field
       expect(snippet.name).toBe('valid-name');
-      expect((snippet as any).extraField).toBeUndefined();
+      expect('extraField' in snippet).toBe(false);
     })
   );
 });
