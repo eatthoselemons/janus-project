@@ -52,6 +52,7 @@ Use this checklist to verify your code follows all required patterns and princip
 - [ ] Types derived from implementations
 - [ ] All Cypher parameters are typed
 - [ ] Query results parsed immediately
+- [ ] Schema.decodeUnknown used for parsing data from database/external sources
 - [ ] Option used for nullable values
 - [ ] Undefined values handled explicitly with errors (not silently dropped)
 - [ ] Effect.gen with yield* used inside Effect context (not async/await)
