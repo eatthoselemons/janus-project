@@ -33,8 +33,10 @@ const generateId = () =>
     Effect.tap((uuid) =>
       globalThis.crypto?.randomUUID !== undefined
         ? Effect.void
-        : Effect.logInfo('Using fallback UUID generation - crypto.randomUUID() not available')
-    )
+        : Effect.logInfo(
+            'Using fallback UUID generation - crypto.randomUUID() not available',
+          ),
+    ),
   );
 
 /**
