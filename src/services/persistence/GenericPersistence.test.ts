@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@effect/vitest';
 import { Effect, Schema, Option, Layer } from 'effect';
-import * as GP from './GenericPersistence';
+import * as GenericPersistence from './GenericPersistence';
 import { Neo4jTestWithGenericData } from './GenericPersistence.test-layers';
 import { Snippet } from '../../domain/types/snippet';
 import { Tag } from '../../domain/types/tag';
@@ -30,7 +30,7 @@ describe('Generic Persistence Functions', () => {
   describe('createNamedEntity', () => {
     it.effect('should create entity with generated ID', () =>
       Effect.gen(function* () {
-        const created = yield* GP.createNamedEntity('TestEntity', TestEntity, {
+        const created = yield* GenericPersistence.createNamedEntity('TestEntity', TestEntity, {
           name: Schema.decodeSync(Slug)('test-entity'),
           description: 'Test description',
           customField: 'custom value',
@@ -46,7 +46,7 @@ describe('Generic Persistence Functions', () => {
     it.effect('should fail when entity with same name already exists', () =>
       Effect.gen(function* () {
         const result = yield* Effect.either(
-          GP.createNamedEntity('Snippet', Snippet, {
+          GenericPersistence.createNamedEntity('Snippet', Snippet, {
             name: Schema.decodeSync(Slug)('existing-snippet'),
             description: 'Should fail',
           }),
@@ -62,7 +62,7 @@ describe('Generic Persistence Functions', () => {
 
     it.effect('should work with Snippet schema', () =>
       Effect.gen(function* () {
-        const created = yield* GP.createNamedEntity('Snippet', Snippet, {
+        const created = yield* GenericPersistence.createNamedEntity('Snippet', Snippet, {
           name: Schema.decodeSync(Slug)('new-snippet'),
           description: 'Test snippet',
         });
@@ -75,7 +75,7 @@ describe('Generic Persistence Functions', () => {
 
     it.effect('should work with Tag schema', () =>
       Effect.gen(function* () {
-        const created = yield* GP.createNamedEntity('Tag', Tag, {
+        const created = yield* GenericPersistence.createNamedEntity('Tag', Tag, {
           name: Schema.decodeSync(Slug)('new-tag'),
           description: 'Test tag',
         });
@@ -88,7 +88,7 @@ describe('Generic Persistence Functions', () => {
 
     it.effect('should work with Parameter schema', () =>
       Effect.gen(function* () {
-        const created = yield* GP.createNamedEntity('Parameter', Parameter, {
+        const created = yield* GenericPersistence.createNamedEntity('Parameter', Parameter, {
           name: Schema.decodeSync(Slug)('new-parameter'),
           description: 'Test parameter',
         });
@@ -101,7 +101,7 @@ describe('Generic Persistence Functions', () => {
 
     it.effect('should work with Composition schema', () =>
       Effect.gen(function* () {
-        const created = yield* GP.createNamedEntity(
+        const created = yield* GenericPersistence.createNamedEntity(
           'Composition',
           Composition,
           {
@@ -120,7 +120,7 @@ describe('Generic Persistence Functions', () => {
   describe('findByName', () => {
     it.effect('should find existing entity by name', () =>
       Effect.gen(function* () {
-        const result = yield* GP.findByName(
+        const result = yield* GenericPersistence.findByName(
           'Snippet',
           Snippet,
           Schema.decodeSync(Slug)('existing-snippet'),
@@ -136,7 +136,7 @@ describe('Generic Persistence Functions', () => {
 
     it.effect('should return None when entity not found', () =>
       Effect.gen(function* () {
-        const result = yield* GP.findByName(
+        const result = yield* GenericPersistence.findByName(
           'Snippet',
           Snippet,
           Schema.decodeSync(Slug)('non-existent-snippet'),
@@ -166,7 +166,7 @@ describe('Generic Persistence Functions', () => {
         });
 
         const result = yield* Effect.either(
-          GP.findByName(
+          GenericPersistence.findByName(
             'Test',
             TestEntity,
             Schema.decodeSync(Slug)('test'),
@@ -187,7 +187,7 @@ describe('Generic Persistence Functions', () => {
   describe('mustFindByName', () => {
     it.effect('should return entity when found', () =>
       Effect.gen(function* () {
-        const snippet = yield* GP.mustFindByName(
+        const snippet = yield* GenericPersistence.mustFindByName(
           'Snippet',
           'snippet',
           Snippet,
@@ -202,7 +202,7 @@ describe('Generic Persistence Functions', () => {
     it.effect('should fail with NotFoundError when entity not found', () =>
       Effect.gen(function* () {
         const result = yield* Effect.either(
-          GP.mustFindByName(
+          GenericPersistence.mustFindByName(
             'Snippet',
             'snippet',
             Snippet,
@@ -223,7 +223,7 @@ describe('Generic Persistence Functions', () => {
   describe('listAll', () => {
     it.effect('should return all entities ordered by name', () =>
       Effect.gen(function* () {
-        const snippets = yield* GP.listAll('Snippet', Snippet);
+        const snippets = yield* GenericPersistence.listAll('Snippet', Snippet);
 
         expect(snippets.length).toBe(2);
         expect(snippets[0].name).toBe('existing-snippet');
@@ -243,7 +243,7 @@ describe('Generic Persistence Functions', () => {
           compositionVersions: [],
         };
 
-        const results = yield* GP.listAll('Snippet', Snippet).pipe(
+        const results = yield* GenericPersistence.listAll('Snippet', Snippet).pipe(
           Effect.provide(Neo4jTestWithGenericData(emptyData)),
         );
 
@@ -277,7 +277,7 @@ describe('Generic Persistence Functions', () => {
         });
 
         const result = yield* Effect.either(
-          GP.listAll('Snippet', Snippet).pipe(
+          GenericPersistence.listAll('Snippet', Snippet).pipe(
             Effect.provide(Layer.succeed(Neo4jService, mockNeo4j)),
           ),
         );
@@ -302,7 +302,7 @@ describe('Generic Persistence Functions', () => {
       });
 
       // @ts-expect-error - Schema missing required 'description' field
-      const _invalidCall1 = GP.createNamedEntity('Bad', BadSchema1, {
+      const _invalidCall1 = GenericPersistence.createNamedEntity('Bad', BadSchema1, {
         name: Schema.decodeSync(Slug)('test'),
       });
 
@@ -313,7 +313,7 @@ describe('Generic Persistence Functions', () => {
       });
 
       // @ts-expect-error - Schema missing required 'name' field
-      const _invalidCall2 = GP.findByName(
+      const _invalidCall2 = GenericPersistence.findByName(
         'Bad',
         BadSchema2,
         Schema.decodeSync(Slug)('test'),
@@ -328,7 +328,7 @@ describe('Generic Persistence Functions', () => {
       });
 
       // This should compile successfully
-      const _validCall = GP.createNamedEntity('Good', GoodSchema, {
+      const _validCall = GenericPersistence.createNamedEntity('Good', GoodSchema, {
         name: Schema.decodeSync(Slug)('test'),
         description: 'Test',
         extraField: 'Extra',
@@ -358,7 +358,7 @@ describe('Generic Persistence Functions', () => {
         });
 
         const result = yield* Effect.either(
-          GP.mustFindByName(
+          GenericPersistence.mustFindByName(
             'Snippet',
             'snippet',
             Snippet,
@@ -392,7 +392,7 @@ describe('Generic Persistence Functions', () => {
           withSession: () => Effect.die('Not implemented'),
         });
 
-        const snippet = yield* GP.mustFindByName(
+        const snippet = yield* GenericPersistence.mustFindByName(
           'Snippet',
           'snippet',
           Snippet,
@@ -424,7 +424,7 @@ describe('Generic Persistence Functions', () => {
         });
 
         const result = yield* Effect.either(
-          GP.findByName(
+          GenericPersistence.findByName(
             'Snippet',
             Snippet,
             Schema.decodeSync(Slug)('test'),
