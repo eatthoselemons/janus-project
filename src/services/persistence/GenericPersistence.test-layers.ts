@@ -98,6 +98,21 @@ export const generateTestComposition = (
 });
 
 /**
+ * Generate test snippet version data (raw format for database)
+ */
+export const generateTestSnippetVersionRaw = (
+  id: string,
+  content: string,
+  commitMessage: string = 'Test commit',
+  createdAt: string = '2024-01-01T00:00:00.000Z',
+) => ({
+  id,
+  content,
+  createdAt,
+  commit_message: commitMessage,
+});
+
+/**
  * Generate test snippet version data
  */
 export const generateTestSnippetVersion = (
@@ -109,6 +124,21 @@ export const generateTestSnippetVersion = (
   id: Schema.decodeSync(SnippetVersionId)(id),
   content,
   createdAt: Schema.decodeSync(Schema.DateTimeUtc)(createdAt),
+  commit_message: commitMessage,
+});
+
+/**
+ * Generate test parameter option data (raw format for database)
+ */
+export const generateTestParameterOptionRaw = (
+  id: string,
+  value: string,
+  commitMessage: string = 'Test commit',
+  createdAt: string = '2024-01-01T00:00:00.000Z',
+) => ({
+  id,
+  value,
+  createdAt,
   commit_message: commitMessage,
 });
 
@@ -160,23 +190,29 @@ const defaultTestData: GenericPersistenceTestData = {
   ],
   snippetVersions: [
     {
-      version: generateTestSnippetVersion(
-        '650e8400-e29b-41d4-a716-446655440001',
-        'You {{obligation_level}} answer the question',
-        'Initial version',
-        '2024-01-01T00:00:00.000Z',
-      ),
+      // Store raw version for mock returns
+      version: {
+        ...generateTestSnippetVersionRaw(
+          '650e8400-e29b-41d4-a716-446655440001',
+          'You {{obligation_level}} answer the question',
+          'Initial version',
+          '2024-01-01T00:00:00.000Z',
+        ),
+      } as any,
       snippetId: Schema.decodeSync(SnippetId)(
         '550e8400-e29b-41d4-a716-446655440001',
       ),
     },
     {
-      version: generateTestSnippetVersion(
-        '650e8400-e29b-41d4-a716-446655440002',
-        'You {{obligation_level}} provide a helpful response',
-        'Updated wording',
-        '2024-01-02T00:00:00.000Z',
-      ),
+      // Store raw version for mock returns
+      version: {
+        ...generateTestSnippetVersionRaw(
+          '650e8400-e29b-41d4-a716-446655440002',
+          'You {{obligation_level}} provide a helpful response',
+          'Updated wording',
+          '2024-01-02T00:00:00.000Z',
+        ),
+      } as any,
       snippetId: Schema.decodeSync(SnippetId)(
         '550e8400-e29b-41d4-a716-446655440001',
       ),
@@ -206,12 +242,15 @@ const defaultTestData: GenericPersistenceTestData = {
   ],
   parameterOptions: [
     {
-      option: generateTestParameterOption(
-        '950e8400-e29b-41d4-a716-446655440001',
-        'must',
-        'Initial option',
-        '2024-01-01T00:00:00.000Z',
-      ),
+      // Store raw option for mock returns
+      option: {
+        ...generateTestParameterOptionRaw(
+          '950e8400-e29b-41d4-a716-446655440001',
+          'must',
+          'Initial option',
+          '2024-01-01T00:00:00.000Z',
+        ),
+      } as any,
       parameterId: Schema.decodeSync(ParameterId)(
         '850e8400-e29b-41d4-a716-446655440001',
       ),
@@ -228,14 +267,30 @@ const defaultTestData: GenericPersistenceTestData = {
 };
 
 /**
+ * Query tracking for tests
+ */
+export interface QueryTracker {
+  queries: Array<{
+    query: string;
+    params: any;
+  }>;
+}
+
+/**
  * Create Neo4j test layer with generic data
  */
 export const Neo4jTestWithGenericData = (
   testData: GenericPersistenceTestData = defaultTestData,
+  queryTracker?: QueryTracker,
 ) => {
   // Mock function to handle parameter-based queries
   const handleQuery = (query: string, params: any = {}): unknown[] => {
     const queryStr = query.toString();
+    
+    // Track queries if tracker provided
+    if (queryTracker) {
+      queryTracker.queries.push({ query: queryStr, params });
+    }
 
     // Generic find by name query
     if (queryStr.match(/MATCH \(n:(\w+) \{name: \$name\}\) RETURN n/)) {
@@ -244,26 +299,30 @@ export const Neo4jTestWithGenericData = (
 
       let results: unknown[] = [];
       switch (nodeLabel) {
-        case 'Snippet':
+        case 'Snippet': {
           results = testData.snippets
             .filter((s) => s.name === name)
             .map((s) => ({ n: s }));
           break;
-        case 'Tag':
+        }
+        case 'Tag': {
           results = testData.tags
             .filter((t) => t.name === name)
             .map((t) => ({ n: t }));
           break;
-        case 'Parameter':
+        }
+        case 'Parameter': {
           results = testData.parameters
             .filter((p) => p.name === name)
             .map((p) => ({ n: p }));
           break;
-        case 'Composition':
+        }
+        case 'Composition': {
           results = testData.compositions
             .filter((c) => c.name === name)
             .map((c) => ({ n: c }));
           break;
+        }
       }
       return results;
     }
@@ -279,32 +338,155 @@ export const Neo4jTestWithGenericData = (
 
       let results: unknown[] = [];
       switch (nodeLabel) {
-        case 'Snippet':
+        case 'Snippet': {
           results = testData.snippets
             .sort((a, b) => a.name.localeCompare(b.name))
             .map((s) => ({ n: s }));
           break;
-        case 'Tag':
+        }
+        case 'Tag': {
           results = testData.tags
             .sort((a, b) => a.name.localeCompare(b.name))
             .map((t) => ({ n: t }));
           break;
-        case 'Parameter':
+        }
+        case 'Parameter': {
           results = testData.parameters
             .sort((a, b) => a.name.localeCompare(b.name))
             .map((p) => ({ n: p }));
           break;
-        case 'Composition':
+        }
+        case 'Composition': {
           results = testData.compositions
             .sort((a, b) => a.name.localeCompare(b.name))
             .map((c) => ({ n: c }));
           break;
+        }
       }
       return results;
     }
 
-    // Version queries would be handled here for createVersion and getLatestVersion
-    // For brevity, returning empty arrays for unmatched queries
+    // Check parent exists for version creation
+    if (queryStr.match(/MATCH \(p:(\w+) \{id: \$id\}\) RETURN p/)) {
+      const nodeLabel = queryStr.match(/MATCH \(p:(\w+)/)?.[1];
+      const id = params.id || params.parentId;
+
+      switch (nodeLabel) {
+        case 'Snippet': {
+          const snippet = testData.snippets.find((s) => s.id === id);
+          return snippet ? [{ p: snippet }] : [];
+        }
+        case 'Parameter': {
+          const parameter = testData.parameters.find((p) => p.id === id);
+          return parameter ? [{ p: parameter }] : [];
+        }
+        case 'Composition': {
+          const composition = testData.compositions.find((c) => c.id === id);
+          return composition ? [{ p: composition }] : [];
+        }
+        case 'Tag': {
+          const tag = testData.tags.find((t) => t.id === id);
+          return tag ? [{ p: tag }] : [];
+        }
+      }
+    }
+
+    // Find previous version
+    if (
+      queryStr.includes('VERSION_OF') &&
+      queryStr.includes('ORDER BY v.createdAt DESC')
+    ) {
+      const parentId = params.id || params.parentId;
+
+      if (queryStr.includes('SnippetVersion')) {
+        const versions = testData.snippetVersions
+          .filter((sv) => sv.snippetId === parentId)
+          .sort((a, b) => {
+            const dateA = new Date(
+              typeof a.version.createdAt === 'string'
+                ? a.version.createdAt
+                : String(a.version.createdAt),
+            );
+            const dateB = new Date(
+              typeof b.version.createdAt === 'string'
+                ? b.version.createdAt
+                : String(b.version.createdAt),
+            );
+            return dateB.getTime() - dateA.getTime();
+          });
+        // Return raw data format (version is already raw)
+        if (versions.length > 0) {
+          return [{ v: versions[0].version }];
+        }
+        return [];
+      }
+      if (queryStr.includes('ParameterOption')) {
+        const options = testData.parameterOptions
+          .filter((po) => po.parameterId === parentId)
+          .sort((a, b) => {
+            const dateA = new Date(
+              typeof a.option.createdAt === 'string'
+                ? a.option.createdAt
+                : String(a.option.createdAt),
+            );
+            const dateB = new Date(
+              typeof b.option.createdAt === 'string'
+                ? b.option.createdAt
+                : String(b.option.createdAt),
+            );
+            return dateB.getTime() - dateA.getTime();
+          });
+        // Return raw data format (option is already raw)
+        if (options.length > 0) {
+          return [{ v: options[0].option }];
+        }
+        return [];
+      }
+      if (queryStr.includes('CompositionVersion')) {
+        const versions = testData.compositionVersions
+          .filter((cv) => cv.compositionId === parentId)
+          .sort((a, b) => {
+            const dateA = new Date(
+              typeof a.version.createdAt === 'string'
+                ? a.version.createdAt
+                : String(a.version.createdAt),
+            );
+            const dateB = new Date(
+              typeof b.version.createdAt === 'string'
+                ? b.version.createdAt
+                : String(b.version.createdAt),
+            );
+            return dateB.getTime() - dateA.getTime();
+          });
+        // Return raw data format (version is already raw if using raw generators)
+        if (versions.length > 0) {
+          return [{ v: versions[0].version }];
+        }
+        return [];
+      }
+    }
+
+    // Create version query
+    if (queryStr.includes('CREATE (v:') && queryStr.includes('VERSION_OF')) {
+      // Return raw format - if createdAt is a Date/DateTime object, convert to string
+      const props = params.props;
+      const rawProps = {
+        ...props,
+        createdAt:
+          typeof props.createdAt === 'string'
+            ? props.createdAt
+            : typeof props.createdAt === 'object' && props.createdAt.toString
+              ? // Extract ISO string from DateTime.Utc(...) format
+                props.createdAt
+                  .toString()
+                  .match(/DateTime\.Utc\((.*?)\)/)?.[1] ||
+                String(props.createdAt)
+              : String(props.createdAt),
+      };
+      return [{ v: rawProps }];
+    }
+
+    // Default: return empty array for unmatched queries
     return [];
   };
 
