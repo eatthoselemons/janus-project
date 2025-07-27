@@ -465,7 +465,7 @@ export const createVersion = <
             const versionWithIdAndDate = {
               ...versionData,
               id: uuid,
-              createdAt: new Date(),
+              createdAt: new Date().toISOString(),
             };
 
             // Validate through schema to ensure type safety
