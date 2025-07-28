@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "description": "A framework for the rigorous, empathetic, and reproducible testing of Large Language Models.",
   "main": "dist/index.js",
+  "bin": {
+    "janus": "./dist/bin/janus.js"
+  },
   "scripts": {
     "test": "vitest run",
     "build": "tsc",
