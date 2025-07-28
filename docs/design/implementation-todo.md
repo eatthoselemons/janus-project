@@ -48,6 +48,15 @@ This phase establishes the bedrock of the application: the type system, configur
   - [x] **Testing:** Write comprehensive tests for the generic functions using test schemas
   - [x] **Documentation:** Update examples in the generic persistence patterns document with actual implementation
 
+**IMPORTANT NOTE:** The generic persistence functions in `src/services/persistence/GenericPersistence.ts` handle all standard CRUD operations for entities. Do NOT create separate persistence services for Snippet, Parameter, Composition, etc. Use the generic functions directly:
+```typescript
+// Examples:
+GenericPersistence.createNamedEntity('Snippet', Snippet, {...})
+GenericPersistence.findByName('Parameter', Parameter, slug)
+GenericPersistence.createVersion('SnippetVersion', 'Snippet', parentId, SnippetVersion, {...})
+```
+Only create entity-specific services if you need domain-specific operations beyond standard CRUD.
+
 ## Phase 3: Snippet Management
 
 - [ ] **3.1: Snippet CLI Commands**
@@ -84,13 +93,14 @@ This phase establishes the bedrock of the application: the type system, configur
   - [ ] **Implementation:** Create a `LlmApiLive` layer that reads the provider and API key from the `Config` service.
   - [ ] **Testing:** Write an integration test for the `LlmApiLive` layer that makes a real API call (can be mocked in CI environments).
 
-- [ ] **6.2: TestRun & DataPoint Persistence Service**
-  - [ ] **Implementation:** Create `TestRunPersistence` service (`Effect.Tag`).
-  - [ ] **Implementation:** Implement methods:
-    - `createTestRun(name: string, llmProvider: string, llmModel: string, metadata: Record<string, any>): Effect<TestRun, PersistenceError>`
-    - `createDataPoint(testRunId: TestRunId, compositionVersionId: CompositionVersionId, finalPrompt: string, responseText: string, metrics: Record<string, any>): Effect<DataPoint, PersistenceError>`
-    - `listTestRuns(): Effect<TestRun[], PersistenceError>`
-  - [ ] **Testing:** Write integration tests for each persistence method.
+- [ ] **6.2: TestRun & DataPoint Persistence**
+  - [ ] **Implementation:** Use the generic persistence functions for standard operations:
+    - For TestRun: Use `GenericPersistence.createNamedEntity('TestRun', TestRun, {...})`
+    - For TestRun listing: Use `GenericPersistence.listAll('TestRun', TestRun)`
+  - [ ] **Implementation:** Only if needed, create a `TestRunPersistence` service for complex domain-specific operations:
+    - `createDataPoint(...)` - This might need custom logic for linking to TestRun and CompositionVersion
+    - Any complex queries that can't be handled by generic functions
+  - [ ] **Testing:** Write integration tests for any custom persistence methods.
 
 - [ ] **6.3: Test Execution Service (Business Logic)**
   - [ ] **Implementation:** Create `TestExecutionService` (`Effect.Tag`). This is a business logic service, distinct from the persistence services.
