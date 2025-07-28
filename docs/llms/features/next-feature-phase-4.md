@@ -1,6 +1,6 @@
 ## FEATURE:
 
-Implement the next unchecked subsection as laid out in "docs/design/implementation-todo.md"
+Implement the next unchecked subsection of phase 4 as laid out in "docs/design/implementation-todo.md"
 ie write a prp for section 1.3 or 2.1 etc
 
 ## EXAMPLES:
