@@ -113,21 +113,6 @@ export const generateTestSnippetVersionRaw = (
 });
 
 /**
- * Generate test snippet version data
- */
-export const generateTestSnippetVersion = (
-  id: string,
-  content: string,
-  commitMessage: string = 'Test commit',
-  createdAt: string = '2024-01-01T00:00:00.000Z',
-): SnippetVersion => ({
-  id: Schema.decodeSync(SnippetVersionId)(id),
-  content,
-  createdAt: Schema.decodeSync(Schema.DateTimeUtc)(createdAt),
-  commit_message: commitMessage,
-});
-
-/**
  * Generate test parameter option data (raw format for database)
  */
 export const generateTestParameterOptionRaw = (
@@ -143,32 +128,21 @@ export const generateTestParameterOptionRaw = (
 });
 
 /**
- * Generate test parameter option data
+ * Generate raw composition version data for test mocks
  */
-export const generateTestParameterOption = (
+export const generateTestCompositionVersionRaw = (
   id: string,
-  value: string,
+  snippets: Array<{
+    snippetVersionId: string;
+    role: string;
+    sequence: number;
+  }>,
   commitMessage: string = 'Test commit',
   createdAt: string = '2024-01-01T00:00:00.000Z',
-): ParameterOption => ({
-  id: Schema.decodeSync(ParameterOptionId)(id),
-  value,
-  createdAt: Schema.decodeSync(Schema.DateTimeUtc)(createdAt),
-  commit_message: commitMessage,
-});
-
-/**
- * Generate test composition version data
- */
-export const generateTestCompositionVersion = (
-  id: string,
-  snippets: CompositionVersion['snippets'] = [],
-  commitMessage: string = 'Test commit',
-  createdAt: string = '2024-01-01T00:00:00.000Z',
-): CompositionVersion => ({
-  id: Schema.decodeSync(CompositionVersionId)(id),
+) => ({
+  id,
   snippets,
-  createdAt: Schema.decodeSync(Schema.DateTimeUtc)(createdAt),
+  createdAt,
   commit_message: commitMessage,
 });
 
@@ -263,7 +237,51 @@ const defaultTestData: GenericPersistenceTestData = {
       'A test composition',
     ),
   ],
-  compositionVersions: [],
+  compositionVersions: [
+    {
+      version: {
+        ...generateTestCompositionVersionRaw(
+          'b50e8400-e29b-41d4-a716-446655440001',
+          [
+            {
+              snippetVersionId: '650e8400-e29b-41d4-a716-446655440001',
+              role: 'system',
+              sequence: 0,
+            },
+          ],
+          'Initial composition',
+          '2024-01-01T00:00:00.000Z',
+        ),
+      } as any,
+      compositionId: Schema.decodeSync(CompositionId)(
+        'a50e8400-e29b-41d4-a716-446655440001',
+      ),
+    },
+    {
+      version: {
+        ...generateTestCompositionVersionRaw(
+          'b50e8400-e29b-41d4-a716-446655440002',
+          [
+            {
+              snippetVersionId: '650e8400-e29b-41d4-a716-446655440001',
+              role: 'system',
+              sequence: 0,
+            },
+            {
+              snippetVersionId: '650e8400-e29b-41d4-a716-446655440002',
+              role: 'user_prompt',
+              sequence: 0,
+            },
+          ],
+          'Added second snippet',
+          '2024-01-02T00:00:00.000Z',
+        ),
+      } as any,
+      compositionId: Schema.decodeSync(CompositionId)(
+        'a50e8400-e29b-41d4-a716-446655440001',
+      ),
+    },
+  ],
 };
 
 /**
@@ -286,7 +304,7 @@ export const Neo4jTestWithGenericData = (
   // Mock function to handle parameter-based queries
   const handleQuery = (query: string, params: any = {}): unknown[] => {
     const queryStr = query.toString();
-    
+
     // Track queries if tracker provided
     if (queryTracker) {
       queryTracker.queries.push({ query: queryStr, params });

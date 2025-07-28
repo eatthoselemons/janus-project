@@ -4,17 +4,26 @@ import * as GenericPersistence from './GenericPersistence';
 import {
   Neo4jTestWithGenericData,
   generateTestSnippet,
-  generateTestSnippetVersion,
   generateTestSnippetVersionRaw,
   generateTestComposition,
+  generateTestCompositionVersionRaw,
   generateTestParameter,
   QueryTracker,
 } from './GenericPersistence.test-layers';
 import { Snippet, SnippetVersion } from '../../domain/types/snippet';
 import { Tag } from '../../domain/types/tag';
 import { Parameter, ParameterOption } from '../../domain/types/parameter';
-import { Composition, CompositionVersion } from '../../domain/types/composition';
-import { SnippetId, ParameterId, CompositionId, Slug } from '../../domain/types/branded';
+import {
+  Composition,
+  CompositionVersion,
+} from '../../domain/types/composition';
+import {
+  SnippetId,
+  SnippetVersionId,
+  ParameterId,
+  CompositionId,
+  Slug,
+} from '../../domain/types/branded';
 import { Neo4jService } from '../neo4j';
 
 describe('Generic Persistence Functions', () => {
@@ -479,7 +488,7 @@ describe('Generic Persistence Functions', () => {
     it.effect('should create first version without previous link', () =>
       Effect.gen(function* () {
         const queryTracker: QueryTracker = { queries: [] };
-        
+
         // Set up test data with an existing snippet but no versions
         const testData = {
           snippets: [
@@ -509,24 +518,26 @@ describe('Generic Persistence Functions', () => {
             content: 'New snippet content',
             commit_message: 'Initial version',
           },
-        ).pipe(Effect.provide(Neo4jTestWithGenericData(testData, queryTracker)));
+        ).pipe(
+          Effect.provide(Neo4jTestWithGenericData(testData, queryTracker)),
+        );
 
         expect(version.content).toBe('New snippet content');
         expect(version.commit_message).toBe('Initial version');
-        
+
         // Verify the queries executed by the actual implementation
         expect(queryTracker.queries.length).toBeGreaterThan(0);
-        
+
         // Find the CREATE query
-        const createQuery = queryTracker.queries.find(q => 
-          q.query.includes('CREATE (v:SnippetVersion')
+        const createQuery = queryTracker.queries.find((q) =>
+          q.query.includes('CREATE (v:SnippetVersion'),
         );
         expect(createQuery).toBeDefined();
-        
+
         // Most importantly: verify NO PREVIOUS_VERSION relationship was created
         expect(createQuery?.query).not.toContain('PREVIOUS_VERSION');
         expect(createQuery?.query).toContain('VERSION_OF');
-        
+
         // Verify it's the simpler create query without previous version matching
         expect(createQuery?.query).not.toContain('MATCH (prev:SnippetVersion');
       }),
@@ -537,7 +548,7 @@ describe('Generic Persistence Functions', () => {
       () =>
         Effect.gen(function* () {
           const queryTracker: QueryTracker = { queries: [] };
-          
+
           // Set up test data with existing version
           const testData = {
             snippets: [
@@ -581,45 +592,53 @@ describe('Generic Persistence Functions', () => {
               content: 'Updated content',
               commit_message: 'Update content',
             },
-          ).pipe(Effect.provide(Neo4jTestWithGenericData(testData, queryTracker)));
+          ).pipe(
+            Effect.provide(Neo4jTestWithGenericData(testData, queryTracker)),
+          );
 
           expect(version.content).toBe('Updated content');
           expect(version.commit_message).toBe('Update content');
-          
+
           // Verify the queries executed by the actual implementation
-          const queries = queryTracker.queries.map(q => q.query);
-          
+          const queries = queryTracker.queries.map((q) => q.query);
+
           // Should have multiple queries in a transaction
           expect(queries.length).toBeGreaterThanOrEqual(3);
-          
+
           // 1. Check parent exists
-          const parentCheckQuery = queries.find(q => 
-            q.includes('MATCH (p:Snippet {id: $') && q.includes('}) RETURN p')
+          const parentCheckQuery = queries.find(
+            (q) =>
+              q.includes('MATCH (p:Snippet {id: $') &&
+              q.includes('}) RETURN p'),
           );
           expect(parentCheckQuery).toBeDefined();
-          
+
           // 2. Find previous version
-          const findPrevQuery = queries.find(q => 
-            q.includes('VERSION_OF') && q.includes('ORDER BY v.createdAt DESC')
+          const findPrevQuery = queries.find(
+            (q) =>
+              q.includes('VERSION_OF') &&
+              q.includes('ORDER BY v.createdAt DESC'),
           );
           expect(findPrevQuery).toBeDefined();
-          
+
           // 3. Create with previous link
-          const createQuery = queries.find(q => 
-            q.includes('CREATE (v:SnippetVersion')
+          const createQuery = queries.find((q) =>
+            q.includes('CREATE (v:SnippetVersion'),
           );
           expect(createQuery).toBeDefined();
-          
+
           // Verify it uses the more complex query with previous version
           expect(createQuery).toContain('MATCH (prev:SnippetVersion');
           expect(createQuery).toContain('PREVIOUS_VERSION');
           expect(createQuery).toContain('VERSION_OF');
-          
+
           // Check that prevId was passed correctly
-          const createQueryData = queryTracker.queries.find(q => 
-            q.query.includes('CREATE (v:SnippetVersion')
+          const createQueryData = queryTracker.queries.find((q) =>
+            q.query.includes('CREATE (v:SnippetVersion'),
           );
-          expect(createQueryData?.params.prevId).toBe('650e8400-e29b-41d4-a716-446655440001');
+          expect(createQueryData?.params.prevId).toBe(
+            '650e8400-e29b-41d4-a716-446655440001',
+          );
         }),
     );
 
@@ -670,6 +689,51 @@ describe('Generic Persistence Functions', () => {
         expect(option.value).toBe('should');
         expect(option.commit_message).toBe('Add should option');
         const isValid = Schema.is(ParameterOption)(option);
+        expect(isValid).toBe(true);
+      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
+    );
+
+    it.effect('should work with Composition and CompositionVersion', () =>
+      Effect.gen(function* () {
+        const compositionId = Schema.decodeSync(CompositionId)(
+          'a50e8400-e29b-41d4-a716-446655440001',
+        );
+
+        const version = yield* GenericPersistence.createVersion(
+          'CompositionVersion',
+          'Composition',
+          compositionId,
+          CompositionVersion,
+          {
+            snippets: [
+              {
+                snippetVersionId: Schema.decodeSync(SnippetVersionId)(
+                  '650e8400-e29b-41d4-a716-446655440001',
+                ),
+                role: 'system' as const,
+                sequence: 0,
+              },
+              {
+                snippetVersionId: Schema.decodeSync(SnippetVersionId)(
+                  '650e8400-e29b-41d4-a716-446655440002',
+                ),
+                role: 'user_prompt' as const,
+                sequence: 0,
+              },
+            ],
+            commit_message: 'Add composition with two snippets',
+          },
+        );
+
+        expect(version.snippets).toHaveLength(2);
+        expect(version.snippets[0].sequence).toBe(0);
+        expect(version.snippets[0].role).toBe('system');
+        expect(version.snippets[1].sequence).toBe(0);
+        expect(version.snippets[1].role).toBe('user_prompt');
+        expect(version.commit_message).toBe(
+          'Add composition with two snippets',
+        );
+        const isValid = Schema.is(CompositionVersion)(version);
         expect(isValid).toBe(true);
       }).pipe(Effect.provide(Neo4jTestWithGenericData())),
     );
@@ -807,6 +871,48 @@ describe('Generic Persistence Functions', () => {
           expect(result.value.commit_message).toBe('Latest');
         }
       }),
+    );
+
+    it.effect('should work with ParameterOption', () =>
+      Effect.gen(function* () {
+        const parameterId = Schema.decodeSync(ParameterId)(
+          '850e8400-e29b-41d4-a716-446655440001',
+        );
+
+        const result = yield* GenericPersistence.getLatestVersion(
+          'ParameterOption',
+          'Parameter',
+          parameterId,
+          ParameterOption,
+        );
+
+        expect(Option.isSome(result)).toBe(true);
+        if (Option.isSome(result)) {
+          expect(result.value.value).toBe('must');
+          expect(result.value.commit_message).toBe('Initial option');
+        }
+      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
+    );
+
+    it.effect('should work with CompositionVersion', () =>
+      Effect.gen(function* () {
+        const compositionId = Schema.decodeSync(CompositionId)(
+          'a50e8400-e29b-41d4-a716-446655440001',
+        );
+
+        const result = yield* GenericPersistence.getLatestVersion(
+          'CompositionVersion',
+          'Composition',
+          compositionId,
+          CompositionVersion,
+        );
+
+        expect(Option.isSome(result)).toBe(true);
+        if (Option.isSome(result)) {
+          expect(result.value.snippets).toHaveLength(2);
+          expect(result.value.commit_message).toBe('Added second snippet');
+        }
+      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
     );
   });
 });
