@@ -37,16 +37,16 @@ This phase establishes the bedrock of the application: the type system, configur
 
 ## Phase 2: Generic Persistence Foundation
 
-- [ ] **2.1: Generic Persistence Functions**
-  - [ ] **Implementation:** Create generic persistence functions following the patterns in `docs/llms/best-practices/generic-persistence-patterns.md`:
-    - [ ] Implement `createNamedEntity` generic function for entities with id/name/description
-    - [ ] Implement `findByName` (maybe pattern) generic function
-    - [ ] Implement `mustFindByName` (must pattern) generic function
-    - [ ] Implement `listAll` generic function for listing entities
-    - [ ] Implement `createVersion` generic function for versioned entities
-    - [ ] Implement `getLatestVersion` generic function
-  - [ ] **Testing:** Write comprehensive tests for the generic functions using test schemas
-  - [ ] **Documentation:** Update examples in the generic persistence patterns document with actual implementation
+- [x] **2.1: Generic Persistence Functions**
+  - [x] **Implementation:** Create generic persistence functions following the patterns in `docs/llms/best-practices/generic-persistence-patterns.md`:
+    - [x] Implement `createNamedEntity` generic function for entities with id/name/description
+    - [x] Implement `findByName` (maybe pattern) generic function
+    - [x] Implement `mustFindByName` (must pattern) generic function
+    - [x] Implement `listAll` generic function for listing entities
+    - [x] Implement `createVersion` generic function for versioned entities
+    - [x] Implement `getLatestVersion` generic function
+  - [x] **Testing:** Write comprehensive tests for the generic functions using test schemas
+  - [x] **Documentation:** Update examples in the generic persistence patterns document with actual implementation
 
 ## Phase 3: Snippet Management
 
