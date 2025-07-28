@@ -1,12 +1,16 @@
 import { Layer } from 'effect';
 import { ConfigServiceLive } from './configuration';
 import { Neo4jLive } from './neo4j';
+import { LlmApiLive } from './llm-api';
 
 /**
  * Main application layer that combines all service layers
- * This provides both ConfigService and Neo4jService
+ * This provides ConfigService, Neo4jService, and LlmApiService
  */
-export const MainLive = Neo4jLive.pipe(Layer.provide(ConfigServiceLive));
+export const MainLive = Layer.mergeAll(
+  Neo4jLive.pipe(Layer.provide(ConfigServiceLive)),
+  LlmApiLive.pipe(Layer.provide(ConfigServiceLive)),
+);
 
 /**
  * All services layer - alias for MainLive
@@ -34,13 +38,16 @@ export const AllServicesTest = (config?: {
     >;
   };
   neo4jMockData?: Map<string, unknown[]>;
+  llmApiTestData?: import('./llm-api').LlmApiTestData;
 }) => {
   const { ConfigServiceTest } = require('./configuration');
   const { Neo4jTest } = require('./neo4j');
+  const { LlmApiTest } = require('./llm-api');
 
   return Layer.mergeAll(
     ConfigServiceTest(config),
     Neo4jTest(config?.neo4jMockData),
+    LlmApiTest(config?.llmApiTestData),
   );
 };
 
@@ -57,6 +64,7 @@ export {
   Neo4jTestPartial,
   fromEnv as Neo4jFromEnv,
 } from './neo4j';
+export { LlmApiLive, LlmApiTest, defaultLlmApiTestData } from './llm-api';
 
 // Re-export test utilities
 export {

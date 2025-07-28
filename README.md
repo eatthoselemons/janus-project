@@ -74,3 +74,24 @@ LLM_MYCORP_API_KEY=my-api-key
 LLM_MYCORP_BASE_URL=https://api.mycorp.com/v1
 LLM_MYCORP_MODEL=mycorp-large
 ```
+
+## Testing
+
+### Running Tests
+
+```bash
+# Run all tests
+pnpm test
+
+# Run tests with build and lint
+pnpm preflight
+```
+
+### Integration Tests
+
+Integration tests make real API calls and are **skipped by default**. To run them:
+
+1. **Set up environment**: `cp .env.example .env` and add your API keys
+2. **Run integration tests**: `INTEGRATION_TEST=true pnpm test src/services/llm-api/LlmApi.integration.test.ts`
+
+Integration tests verify real API connectivity with Anthropic Claude and Google Gemini.

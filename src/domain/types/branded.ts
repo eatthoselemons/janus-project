@@ -103,6 +103,36 @@ export const RelationshipStrength = Schema.Number.pipe(
 export type RelationshipStrength = typeof RelationshipStrength.Type;
 
 /**
+ * System Prompt - Defines the assistant's behavior
+ * Non-empty string with maximum length constraint
+ */
+export const SystemPrompt = Schema.String.pipe(
+  Schema.nonEmptyString({
+    message: () => 'System prompt cannot be empty',
+  }),
+  Schema.maxLength(2000, {
+    message: () => 'System prompt must be 2000 characters or less',
+  }),
+  Schema.brand('SystemPrompt'),
+);
+export type SystemPrompt = typeof SystemPrompt.Type;
+
+/**
+ * User Prompt - The actual query from the user
+ * Non-empty string with higher maximum length than system prompt
+ */
+export const UserPrompt = Schema.String.pipe(
+  Schema.nonEmptyString({
+    message: () => 'User prompt cannot be empty',
+  }),
+  Schema.maxLength(10000, {
+    message: () => 'User prompt must be 10000 characters or less',
+  }),
+  Schema.brand('UserPrompt'),
+);
+export type UserPrompt = typeof UserPrompt.Type;
+
+/**
  * Union of all ID types in the system
  * Useful for error types and generic ID handling
  */
