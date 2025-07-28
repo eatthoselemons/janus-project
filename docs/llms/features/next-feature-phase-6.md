@@ -1,7 +1,6 @@
 ## FEATURE:
 
-Implement the next unchecked subsection of phase 4 as laid out in "docs/design/implementation-todo.md"
-ie write a prp for section 1.3 or 2.1 etc
+Write the prp for section 6.1 of the `docs/design/implementation-todo.md`
 
 ## EXAMPLES:
 
@@ -25,8 +24,13 @@ use the `docs/llms/effect/effect-compliance-checklist.md` to ensure that you hav
 
 best practices for our repo about making generic persistance layer functions is: `docs/llms/best-practices/generic-persistence-patterns.md`
 
+the code and docs for the effect packages can be found in `docs/llms/guides/effect-packages/`
+
+effect platform node examples can be found in the packages repo `docs/llms/guides/effect-packages/platform-node/examples/`
+
 ## OTHER CONSIDERATIONS:
 
 all code is in the `src/` folder
 When making the PRP name it after the subsection
 Only implement a single subsection, don't combine sections which makes prs too big that they are difficult to review
+Note that there is `@effect/platform-node` that should have the methods we need to make the api calls
