@@ -16,12 +16,12 @@ Implement a radically simplified content model by unifying all prompt-building e
 
 Replace the existing 6 content types with 2 unified types:
 - `ContentNode`: Abstract container with id, name, description
-- `ContentNodeVersion`: Versioned content with optional content field and explicit operation type
+- `ContentNodeVersion`: Versioned content with optional content field
 
 Structural relationships managed entirely by Neo4j:
-- Tree structure via INCLUDES relationships
+- Tree structure via INCLUDES relationships with operation and role on edges
 - Versioning via VERSION_OF and PREVIOUS_VERSION
-- Role-based flexibility via edge properties
+- Operations (insert/concatenate) and roles stored as edge properties
 
 ### Success Criteria
 
@@ -132,6 +132,20 @@ src/
 ### Data models and structure
 
 ```typescript
+// Individual role types - explicit and type-safe
+export const SystemRole = Schema.Literal('system');
+export type SystemRole = typeof SystemRole.Type;
+
+export const UserRole = Schema.Literal('user');
+export type UserRole = typeof UserRole.Type;
+
+export const AssistantRole = Schema.Literal('assistant');
+export type AssistantRole = typeof AssistantRole.Type;
+
+// Composed role type
+export const ContentRole = Schema.Union(SystemRole, UserRole, AssistantRole);
+export type ContentRole = typeof ContentRole.Type;
+
 // ContentNode - unified container type
 export const ContentNode = Schema.Struct({
   id: ContentNodeId,  // New branded type
@@ -142,16 +156,20 @@ export const ContentNode = Schema.Struct({
 // ContentNodeVersion - unified version type  
 export const ContentNodeVersion = Schema.Struct({
   id: ContentNodeVersionId,  // New branded type
-  content: Schema.optional(Schema.String), // Optional - branches may not have content
-  operation: Schema.Literal('insert', 'concatenate'), // Explicit operation
+  content: Schema.optional(Schema.String), // Optional - role containers have no content
   createdAt: Schema.DateTimeUtc,
   commitMessage: Schema.String, // Align with existing convention
 });
 
+// Special marker for role containers
+export const ROLE_CONTAINER_PREFIX = 'role-container-' as const;
+
 // Neo4j Relationships:
 // (ContentNodeVersion) -[:VERSION_OF]-> (ContentNode)
-// (ContentNodeVersion) -[:INCLUDES {role?: string}]-> (ContentNodeVersion)  
+// (Parent:ContentNodeVersion) -[:INCLUDES {role?: ContentRole, operation: EdgeOperation, key?: string}]-> (Child:ContentNodeVersion)  
 // (ContentNodeVersion) -[:PREVIOUS_VERSION]-> (ContentNodeVersion)
+// Note: Every tree starts with a role container node that has no content but establishes the prompt type
+// Role containers are identified by names starting with 'role-container-'
 ```
 
 ### List of tasks to be completed
@@ -174,7 +192,7 @@ CREATE src/domain/types/tests/contentNode.test.ts:
   - FOLLOW pattern from other schema tests
   - TEST valid ContentNode creation
   - TEST invalid data rejection
-  - TEST operation enum validation
+  - TEST EdgeOperation and IncludesEdgeProperties validation
 
 Task 4: Create ContentService
 CREATE src/services/content/ContentService.ts:
@@ -218,7 +236,8 @@ MODIFY throughout codebase:
 export const createContentNode = (
   name: Slug,
   description: string
-) => Effect.gen(function* () {
+): Effect.Effect<ContentNode, PersistenceError, Neo4jService> => 
+  Effect.gen(function* () {
   // PATTERN: Use existing createNamedEntity from GenericPersistence
   return yield* createNamedEntity('ContentNode', ContentNode, {
     name,
@@ -226,16 +245,40 @@ export const createContentNode = (
   });
 });
 
+// Helper to create role containers
+export const createRoleContainer = (
+  role: ContentRole
+): Effect.Effect<{ node: ContentNode; version: ContentNodeVersion }, PersistenceError, Neo4jService> => 
+  Effect.gen(function* () {
+  const node = yield* createContentNode(
+    `${ROLE_CONTAINER_PREFIX}${role}` as Slug,
+    `Role container for ${role} prompts`
+  );
+  
+  const version = yield* createContentNodeVersion(
+    node.id,
+    undefined, // No content
+    `Created ${role} role container`
+  );
+  
+  return { node, version };
+});
+
 export const createContentNodeVersion = (
   nodeId: ContentNodeId,
   content: string | undefined,
-  operation: 'insert' | 'concatenate',
   commitMessage: string,
-  includes?: Array<{ versionId: ContentNodeVersionId; role?: string }>
-) => Effect.gen(function* () {
-  const neo4j = yield* Neo4jService;
-  
-  return yield* neo4j.runInTransaction((tx) => 
+  parents?: Array<{ 
+    versionId: ContentNodeVersionId;
+    role?: ContentRole; // Role on the edge
+    operation: 'insert' | 'concatenate';
+    key?: string; // For insert operations - which placeholder to fill
+  }>
+): Effect.Effect<ContentNodeVersion, NotFoundError | PersistenceError, Neo4jService> => 
+  Effect.gen(function* () {
+    const neo4j = yield* Neo4jService;
+    
+    return yield* neo4j.runInTransaction((tx) => 
     Effect.gen(function* () {
       // Create version using existing pattern
       const version = yield* createVersion(
@@ -243,21 +286,23 @@ export const createContentNodeVersion = (
         'ContentNode', 
         nodeId,
         ContentNodeVersion,
-        { content, operation, commitMessage }
+        { content, commitMessage }
       );
       
-      // Add INCLUDES relationships if specified
-      if (includes && includes.length > 0) {
-        for (const include of includes) {
+      // Link this version as a child of its parents
+      if (parents && parents.length > 0) {
+        for (const parent of parents) {
           const query = cypher`
             MATCH (parent:ContentNodeVersion {id: $parentId})
             MATCH (child:ContentNodeVersion {id: $childId})
-            CREATE (parent)-[:INCLUDES {role: $role}]->(child)
+            CREATE (parent)-[:INCLUDES {role: $role, operation: $operation, key: $key}]->(child)
           `;
           const params = yield* queryParams({
-            parentId: version.id,
-            childId: include.versionId,
-            role: include.role || null
+            parentId: parent.versionId,
+            childId: version.id,  // The new version is the child
+            role: parent.role || null,
+            operation: parent.operation,
+            key: parent.key || null
           });
           yield* tx.run(query, params);
         }
@@ -270,7 +315,8 @@ export const createContentNodeVersion = (
 
 export const getContentTree = (
   versionId: ContentNodeVersionId
-) => Effect.gen(function* () {
+): Effect.Effect<ContentTree, PersistenceError, Neo4jService> => 
+  Effect.gen(function* () {
   const neo4j = yield* Neo4jService;
   
   // PATTERN: Recursive query to get entire tree
@@ -289,30 +335,112 @@ export const getContentTree = (
   return buildTreeFromResults(results);
 });
 
+// Type-safe edge retrieval
+export const getChildren = (
+  nodeVersionId: ContentNodeVersionId
+): Effect.Effect<readonly ChildNode[], PersistenceError, Neo4jService> => 
+  Effect.gen(function* () {
+    const neo4j = yield* Neo4jService;
+  const query = cypher`
+    MATCH (parent:ContentNodeVersion {id: $parentId})-[r:INCLUDES]->(child:ContentNodeVersion)
+    RETURN child, r
+  `;
+  const params = yield* queryParams({ parentId: nodeVersionId });
+  const results = yield* neo4j.runQuery<{ child: unknown, r: unknown }>(query, params);
+  
+  // Decode and validate edge properties
+  return yield* Effect.forEach(results, (result) =>
+    Effect.gen(function* () {
+      const child = yield* Schema.decodeUnknown(ContentNodeVersion)(result.child);
+      const edgeProps = yield* Schema.decodeUnknown(IncludesEdgeProperties)(result.r);
+      return { node: child, edge: edgeProps } as ChildNode;
+    })
+  );
+});
+
 export const processContent = (
-  tree: ContentTree,
-  context: Record<string, string> = {}
-) => Effect.gen(function* () {
-  // Recursive processing based on operation type
-  if (tree.operation === 'insert') {
-    // This node's content replaces placeholders in parent
-    return tree.content || '';
-  } else { // concatenate
-    // Process children first (alphabetical order by name)
-    const childrenContent = yield* Effect.forEach(
-      tree.children.sort((a, b) => a.name.localeCompare(b.name)),
-      (child) => processContent(child, context)
-    );
-    
-    // Replace placeholders in this node's content
-    let processed = tree.content || '';
-    for (const [key, value] of Object.entries(context)) {
-      processed = processed.replace(new RegExp(`{{${key}}}`, 'g'), value);
+  nodeVersion: ContentNodeVersion,
+  parentContext: Record<string, string> = {}
+): Effect.Effect<string, PersistenceError, Neo4jService> => 
+  Effect.gen(function* () {
+    const children = yield* getChildren(nodeVersion.id); // Type-safe retrieval
+  
+  // Build context from insert operations
+  const localContext = yield* Effect.reduce(
+    children.filter(c => c.edge.operation === 'insert'),
+    { ...parentContext },
+    (context, child) => 
+      Effect.gen(function* () {
+        const value = yield* processContent(child.node, context);
+        return { ...context, [child.edge.key]: value };
+      })
+  );
+  
+  // Apply context to current node's content
+  let processed = nodeVersion.content || '';
+  for (const [key, value] of Object.entries(localContext)) {
+    processed = processed.replace(new RegExp(`{{${key}}}`, 'g'), value);
+  }
+  
+  // Process concatenation children with the built context
+  const concatenated = yield* Effect.forEach(
+    children
+      .filter(c => c.edge.operation === 'concatenate')
+      .sort((a, b) => a.node.name.localeCompare(b.node.name)), // Alphabetical order
+    (child) => processContent(child.node, localContext)
+  ).pipe(Effect.map(results => results.join('\n')));
+  
+  return processed + (concatenated ? '\n' + concatenated : '');
+});
+
+// Determine the role of a tree by finding its role container
+export const getTreeRole = (
+  tree: ContentTree
+): Effect.Effect<ContentRole, Error, never> => 
+  Effect.gen(function* () {
+  // Role containers are leaf nodes with names starting with ROLE_CONTAINER_PREFIX
+  const findRoleContainer = (node: ContentTree): ContentRole | null => {
+    if (node.name.startsWith(ROLE_CONTAINER_PREFIX) && node.children.length === 0) {
+      return node.name.replace(ROLE_CONTAINER_PREFIX, '') as ContentRole;
     }
     
-    // Concatenate with children
-    return [processed, ...childrenContent].filter(Boolean).join('\n');
+    for (const child of node.children) {
+      const role = findRoleContainer(child);
+      if (role) return role;
+    }
+    
+    return null;
+  };
+  
+  const role = findRoleContainer(tree);
+  if (!role) {
+    return yield* Effect.fail(new Error('No role container found in tree'));
   }
+  
+  return role;
+});
+
+// Build complete prompts by processing trees based on their role containers
+export const buildPrompts = (
+  compositionVersions: ContentNodeVersionId[]
+): Effect.Effect<{ system: string; user: string; assistant: string }, Error | PersistenceError, Neo4jService> => 
+  Effect.gen(function* () {
+  const prompts = {
+    system: '',
+    user: '',
+    assistant: ''
+  };
+  
+  // Process each composition
+  for (const versionId of compositionVersions) {
+    const tree = yield* getContentTree(versionId);
+    const role = yield* getTreeRole(tree);
+    const content = yield* processContent(tree);
+    
+    prompts[role] = prompts[role] ? `${prompts[role]}\n${content}` : content;
+  }
+  
+  return prompts;
 });
 ```
 
@@ -327,13 +455,26 @@ DATABASE:
 
 RELATIONSHIPS:
   - VERSION_OF: Links versions to their parent node
-  - INCLUDES: Forms the tree structure with optional role property
+  - INCLUDES: Forms the tree structure with properties:
+    - role: Optional role override for A/B testing
+    - operation: How to combine child with parent (insert or concatenate)
+    - key: For insert operations, which placeholder to fill
   - PREVIOUS_VERSION: Links to previous version for history
 
+ROLE BEHAVIOR:
+  - Every prompt tree has a role container as a leaf node
+  - Role containers have no content, just establish the tree's role
+  - Role is stored on INCLUDES edges for flexible A/B testing
+  - Same content can have different roles in different contexts
+  - Role containers are named 'role-container-system', 'role-container-user', etc.
+
 MIGRATION:
-  - Map Snippet -> ContentNode with operation='concatenate'
-  - Map Parameter -> ContentNode with operation='insert'  
-  - Map Composition -> ContentNode with operation='concatenate'
+  - Map Snippet -> ContentNode (operation will be on edges)
+  - Map Parameter -> ContentNode (operation='insert' on parent edges)
+  - Map Composition -> ContentNode (operation='concatenate' on child edges)
+  - Create role containers for each existing composition based on its usage
+  - Attach role containers as leaf nodes to maintain tree structure
+  - Move role from CompositionSnippet to INCLUDES edge property
   - Preserve all version history and relationships
 ```
 
@@ -365,23 +506,34 @@ it('should create valid ContentNode', () => {
 // ContentService tests  
 it.effect('should create content tree', () =>
   Effect.gen(function* () {
+    // Create role container first
+    const roleContainer = yield* createRoleContainer('system');
+    
     // Create parent node
     const parent = yield* createContentNode('parent', 'Parent node');
     const parentVersion = yield* createContentNodeVersion(
       parent.id,
       'Parent {{childValue}}',
-      'concatenate',
       'Initial parent'
     );
+    
+    // Link parent to role container
+    yield* linkNodes(parentVersion.id, roleContainer.version.id, {
+      role: 'system',
+      operation: 'concatenate'
+    });
     
     // Create child node
     const child = yield* createContentNode('child', 'Child node');
     const childVersion = yield* createContentNodeVersion(
       child.id,
       'content',
-      'insert',
       'Initial child',
-      [{ versionId: parentVersion.id }]
+      [{ 
+        versionId: parentVersion.id,
+        operation: 'insert',
+        key: 'childValue'
+      }]
     );
     
     // Process tree
@@ -389,6 +541,43 @@ it.effect('should create content tree', () =>
     const result = yield* processContent(tree, { childValue: 'replaced' });
     
     expect(result).toBe('Parent replaced\ncontent');
+  })
+);
+
+// A/B Testing example - same content, different roles
+it.effect('should support A/B testing with role containers', () =>
+  Effect.gen(function* () {
+    // Create shared content
+    const sharedNode = yield* createContentNode('be-concise', 'Conciseness instruction');
+    const sharedVersion = yield* createContentNodeVersion(
+      sharedNode.id,
+      'Be concise and direct in your responses',
+      'Initial version'
+    );
+    
+    // Test A: As system prompt
+    const systemRole = yield* createRoleContainer('system');
+    yield* linkNodes(sharedVersion.id, systemRole.version.id, {
+      role: 'system',
+      operation: 'concatenate'
+    });
+    
+    // Test B: As user prompt
+    const userRole = yield* createRoleContainer('user');
+    yield* linkNodes(sharedVersion.id, userRole.version.id, {
+      role: 'user',
+      operation: 'concatenate'
+    });
+    
+    // Build prompts for both tests
+    const testA = yield* buildPrompts([sharedVersion.id]); // Finds system role container
+    const testB = yield* buildPrompts([sharedVersion.id]); // Same content, different role
+    
+    expect(testA.system).toContain('Be concise');
+    expect(testA.user).toBe('');
+    
+    expect(testB.user).toContain('Be concise');
+    expect(testB.system).toBe('');
   })
 );
 ```
@@ -427,7 +616,8 @@ pnpm tsx src/migration/unifyContentTypes.ts
 - ❌ Don't store relationships in type fields - use Neo4j edges
 - ❌ Don't pass undefined to Neo4j - use null
 - ❌ Don't skip the queryParams helper
-- ❌ Don't assume operation type - make it explicit
+- ❌ Don't put operation on nodes - it belongs on edges
+- ❌ Don't forget role containers - every tree needs one
 - ❌ Don't forget to handle recursive cycles in tree traversal
 - ❌ Don't mutate content - keep everything immutable
 
