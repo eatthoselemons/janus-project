@@ -1,9 +1,9 @@
-name: "Git-Based Persistence Layer with Unified Content Types"
+name: "Unified Storage Layer with Git and Neo4j Backends"
 description: |
 
 ## Purpose
 
-Create a Git-based persistence layer that uses the simplified ContentNode model, storing entities as JSON files and leveraging Git's native versioning while maintaining Neo4jService interface compatibility.
+Create a unified StorageService interface that abstracts persistence operations, with swappable Git and Neo4j implementations using the simplified ContentNode model.
 
 ## Core Principles
 
@@ -18,33 +18,33 @@ Create a Git-based persistence layer that uses the simplified ContentNode model,
 
 ## Goal
 
-Implement a Git-based backend using the unified ContentNode/ContentNodeVersion model that eliminates the need for Neo4j while providing identical functionality through file storage and Git history.
+Replace direct Neo4jService usage with an abstract StorageService interface, enabling seamless switching between Git-based file storage and Neo4j graph database backends while using the unified ContentNode/ContentNodeVersion model.
 
 ## Why
 
-- **Simplified Model**: Only two types (ContentNode + ContentNodeVersion) instead of six
-- **Natural Versioning**: Git commits replace VERSION_OF relationships
-- **Tree-Native Storage**: Filesystem naturally represents tree structures
-- **No Database Setup**: Clone and run immediately
-- **Direct Editing**: JSON files can be edited with any text editor
+- **Backend Flexibility**: Switch storage without changing business logic
+- **Simplified Testing**: Mock storage easily without database setup
+- **Future Extensibility**: Add new backends (PostgreSQL, S3, etc.) without touching existing code
+- **Clean Architecture**: Follow Dependency Inversion Principle
+- **Development Freedom**: Use Git locally, Neo4j in production
 
 ## What
 
-A Git persistence layer that:
-- Uses the unified ContentNode type for all content (snippets, parameters, compositions)
-- Stores nodes as JSON files with relationships as file references
-- Leverages Git history for version tracking
-- Maintains tree structure through directory organization
-- Supports the same Neo4jService interface
+A storage abstraction layer that:
+- Defines a backend-agnostic StorageService interface
+- Implements the interface for both Neo4j and Git
+- Uses unified ContentNode/ContentNodeVersion types
+- Allows runtime backend selection via configuration
+- Maintains identical behavior across implementations
 
 ### Success Criteria
 
-- [ ] All content types unified into ContentNode/ContentNodeVersion
-- [ ] Tree relationships preserved in filesystem structure
-- [ ] Git history provides version traversal
-- [ ] Operation types (insert/concatenate) properly handled
-- [ ] Role-based includes work through file references
-- [ ] All existing tests pass with new model
+- [ ] All code uses StorageService instead of Neo4jService
+- [ ] Both Git and Neo4j backends pass identical tests
+- [ ] Backend switching requires only config change
+- [ ] No implementation details leak through interface
+- [ ] Performance remains acceptable for both backends
+- [ ] Migration tools work between backends
 
 ## All Needed Context
 
@@ -54,57 +54,149 @@ A Git persistence layer that:
 # MUST READ - Include these specific sections in your context window
 
 - file: /home/user/git/janus-project/docs/llms/features/unified-content-types.md
-  why: [New unified type model to implement]
+  why: [Unified type model both backends must support]
   critical: |
     ContentNode: abstract container (id, name, description)
     ContentNodeVersion: content + operation (insert/concatenate)
-    Relationships define structure, not arrays in types
-    Children processed alphabetically by node name
+    Tree structure with VERSION_OF, INCLUDES relationships
 
 - file: /home/user/git/janus-project/src/services/neo4j/Neo4j.service.ts
-  why: [Interface to implement - must match exactly]
+  why: [Current interface to abstract into StorageService]
   critical: |
     Four methods: runQuery, runInTransaction, runBatch, withSession
     All return Effect<T, Neo4jError, never>
+    Must maintain this interface shape
+
+- file: /home/user/git/janus-project/src/services/persistence/GenericPersistence.ts
+  sections: [All usages of Neo4jService]
+  why: [Shows all places that need StorageService]
+  discovered_caveat: |
+    Always accessed via: const neo4j = yield* Neo4jService
+    Need to change to: const storage = yield* StorageService
 
 - docfile: docs/llms/guides/effect-docs/platform/command.mdx
-  include_sections: ['Creating Commands', 'Running Commands', 'Output Formats']
-  why: [Git operations via Command module]
+  include_sections: ['Creating Commands', 'Running Commands']
+  why: [Git backend implementation]
   
 - docfile: docs/llms/guides/effect-docs/platform/file-system.mdx
   include_sections: ['Basic Usage', 'Operations table']
-  why: [File operations for entity storage]
+  why: [File operations for Git backend]
 
-- file: /home/user/git/janus-project/src/services/persistence/GenericPersistence.ts
-  sections: [lines 99-232 for query patterns, 276-419 for version creation]
-  why: [Shows query patterns to support]
-  discovered_caveat: |
-    Main patterns:
-    - MATCH by name or id
-    - CREATE with properties
-    - Relationship queries: VERSION_OF, INCLUDES, HAS_TAG
-    - ORDER BY name or createdAt
+- file: /home/user/git/janus-project/src/layers/neo4j/Neo4j.layer.ts
+  sections: [Layer creation pattern]
+  why: [Pattern for creating service layers]
 
 - docfile: docs/llms/best-practices/generic-persistence-patterns.md
-  why: [Type-safe persistence patterns]
+  why: [Patterns for type-safe persistence]
   critical: |
-    Use Schema.decode for validation
-    Follow Effect.gen patterns
-    Generic functions with type constraints
+    Use Context.Tag for services
+    Layer composition patterns
+    Effect.gen usage
 ```
 
-### Current vs Desired Type Model
+### Current Service Usage
 
 ```typescript
-// OLD MODEL (to replace)
-type Snippet = { id, name, description }
-type SnippetVersion = { id, content, createdAt, commitMessage }
-type Parameter = { id, name, description }
-type ParameterOption = { id, value, createdAt, commitMessage }
-type Composition = { id, name, description }
-type CompositionVersion = { id, snippets[], createdAt, commitMessage }
+// CURRENT: Direct Neo4j dependency
+import { Neo4jService } from '../services/neo4j';
 
-// NEW UNIFIED MODEL
+const doSomething = Effect.gen(function* () {
+  const neo4j = yield* Neo4jService;
+  return yield* neo4j.runQuery('MATCH (n) RETURN n');
+});
+
+// DESIRED: Abstract storage dependency
+import { StorageService } from '../services/storage';
+
+const doSomething = Effect.gen(function* () {
+  const storage = yield* StorageService;
+  return yield* storage.runQuery('MATCH (n) RETURN n');
+});
+```
+
+### Interface Design
+
+```typescript
+// StorageService - Abstract interface (replaces direct Neo4jService usage)
+export interface StorageImpl {
+  readonly runQuery: <T = unknown>(
+    query: Query,
+    params?: QueryParameters,
+  ) => Effect.Effect<T[], StorageError, never>;
+
+  readonly runInTransaction: <A>(
+    operations: (tx: TransactionContext) => Effect.Effect<A, StorageError, never>,
+  ) => Effect.Effect<A, StorageError, never>;
+
+  readonly runBatch: <T = unknown>(
+    queries: Array<{
+      query: Query;
+      params?: QueryParameters;
+    }>,
+  ) => Effect.Effect<T[][], StorageError, never>;
+
+  readonly withSession: <A>(
+    work: (session: Session) => Effect.Effect<A, StorageError, never>,
+  ) => Effect.Effect<A, StorageError, never>;
+}
+
+export class StorageService extends Context.Tag('StorageService')<
+  StorageService,
+  StorageImpl
+>() {}
+
+// Query type can be Cypher for Neo4j or structured query for Git
+type Query = CypherQuery | StructuredQuery;
+
+// Unified error type
+export class StorageError extends Data.TaggedError("StorageError")<{
+  readonly query?: string;
+  readonly operation: 'create' | 'read' | 'update' | 'delete' | 'transaction';
+  readonly originalMessage: string;
+}> {}
+```
+
+### Backend Implementations
+
+```typescript
+// Neo4j implementation
+export const Neo4jStorageLive = Layer.effect(
+  StorageService,
+  Effect.gen(function* () {
+    const driver = yield* createNeo4jDriver();
+    
+    return StorageService.of({
+      runQuery: (query, params) => {
+        // Existing Neo4j implementation
+        // Just wrap Neo4jError as StorageError
+      },
+      // ... other methods
+    });
+  })
+);
+
+// Git implementation  
+export const GitStorageLive = Layer.effect(
+  StorageService,
+  Effect.gen(function* () {
+    const git = yield* GitService;
+    const fs = yield* FileSystem.FileSystem;
+    
+    return StorageService.of({
+      runQuery: (query, params) => {
+        // Translate query to file operations
+        // Return same shape as Neo4j
+      },
+      // ... other methods
+    });
+  })
+);
+```
+
+### Unified Type Model
+
+```typescript
+// Single types for both backends
 type ContentNode = {
   id: ContentNodeId;
   name: Slug;
@@ -113,130 +205,65 @@ type ContentNode = {
 
 type ContentNodeVersion = {
   id: ContentNodeVersionId;
-  content?: string; // Optional - branches might not have content
+  content?: string;
   operation: 'insert' | 'concatenate';
   createdAt: Date;
   commitMessage: string;
 }
 
-// Relationships (stored as file references)
-// VERSION_OF: version file references its node
-// INCLUDES: version file lists included version IDs with roles
-// HAS_TAG: node file lists tag names
-// PREVIOUS_VERSION: Git history handles this
+// Relationships handled by backend
+// Neo4j: Graph edges
+// Git: File references in _meta
 ```
 
-### File Storage Structure
+### File Structure (Git Backend)
 
 ```bash
 data/
-├── nodes/                      # All ContentNode entities
-│   ├── greeting.json          # A snippet node
-│   ├── tone.json             # A parameter node
-│   └── welcome-prompt.json    # A composition node
-├── versions/                  # All ContentNodeVersion entities
+├── nodes/                      # ContentNode entities
+│   ├── greeting.json          
+│   ├── tone.json             
+│   └── welcome-prompt.json    
+├── versions/                  # ContentNodeVersion entities
 │   ├── greeting/
-│   │   └── v1.json           # Version of greeting node
+│   │   └── v1.json           
 │   ├── tone/
-│   │   ├── v1.json          # "professional" option
-│   │   └── v2.json          # "casual" option
+│   │   ├── v1.json          
+│   │   └── v2.json          
 │   └── welcome-prompt/
-│       └── v1.json          # Composition version
-└── tags/                     # Tag definitions
+│       └── v1.json          
+└── tags/                     
     ├── cli.json
     └── greeting.json
 ```
 
-### Storage Format Examples
+### Configuration
 
 ```typescript
-// File: data/nodes/greeting.json
-{
-  "id": "cn_550e8400-e29b-41d4-a716-446655440000",
-  "name": "greeting",
-  "description": "A friendly greeting template",
-  "_meta": {
-    "type": "ContentNode",
-    "tags": ["greeting", "cli"],  // HAS_TAG relationships
-    "created": "2024-01-15T10:30:00Z",
-    "updated": "2024-01-15T10:30:00Z"
-  }
-}
+// Config schema with storage backend selection
+export const ConfigSchema = Schema.Struct({
+  storageBackend: Schema.Literal('neo4j', 'git').pipe(
+    Schema.withDefault(() => 'neo4j')
+  ),
+  neo4j: Neo4jConfigSchema,
+  git: Schema.Struct({
+    dataPath: Schema.String.pipe(Schema.withDefault(() => './data'))
+  })
+});
 
-// File: data/versions/greeting/v1.json
-{
-  "id": "cnv_660e8400-e29b-41d4-a716-446655440000",
-  "content": "Hello! Reply in a {{tone}} manner.",
-  "operation": "concatenate",
-  "createdAt": "2024-01-15T10:30:00Z",
-  "commitMessage": "Initial greeting template",
-  "_meta": {
-    "nodeId": "cn_550e8400-e29b-41d4-a716-446655440000", // VERSION_OF
-    "includes": [  // INCLUDES relationships
-      {
-        "versionId": "cnv_770e8400-e29b-41d4-a716-446655440000",
-        "role": "parameter"  // Edge property
-      }
-    ]
-  }
-}
-
-// File: data/versions/tone/v1.json (parameter)
-{
-  "id": "cnv_770e8400-e29b-41d4-a716-446655440000",
-  "content": "professional",
-  "operation": "insert",
-  "createdAt": "2024-01-15T10:30:00Z",
-  "commitMessage": "Professional tone option",
-  "_meta": {
-    "nodeId": "cn_880e8400-e29b-41d4-a716-446655440000"
-  }
-}
-```
-
-### Query Pattern Mappings
-
-```yaml
-# Cypher to File Operations
-MATCH (n:ContentNode {name: $name}):
-  - Read data/nodes/${name}.json
-
-CREATE (n:ContentNode $props):
-  - Write data/nodes/${props.name}.json
-  - Git add & commit
-
-MATCH (n:ContentNode)<-[:VERSION_OF]-(v:ContentNodeVersion):
-  - Read node file to get ID
-  - List data/versions/${nodeName}/*.json
-  - Filter by _meta.nodeId
-
-MATCH (v:ContentNodeVersion)-[:INCLUDES]->(included:ContentNodeVersion):
-  - Read version file
-  - Map _meta.includes array to load referenced versions
-
-ORDER BY v.createdAt DESC:
-  - Sort files by createdAt field
-  - Or use git log for true chronological order
-```
-
-### Known Gotchas & Library Quirks
-
-```typescript
-// CRITICAL: Children processed alphabetically by node name
-// When listing includes, sort by the included node's name, not version ID
-
-// CRITICAL: Operation type determines processing
-// 'insert': content replaces placeholders in parent
-// 'concatenate': content appends to result
-
-// CRITICAL: File paths must handle special characters in slugs
-// Use encodeURIComponent for safety
-
-// DISCOVERED: No complex graph traversals needed
-// Max depth is composition -> snippet -> parameter (3 levels)
-
-// CRITICAL: Concurrent writes need coordination
-// Use file locking or queue for write operations
+// Layer selection based on config
+export const StorageLive = Layer.effect(
+  StorageService,
+  Effect.gen(function* () {
+    const config = yield* ConfigService;
+    
+    if (config.storageBackend === 'git') {
+      return yield* Layer.buildSync(GitStorageLive);
+    } else {
+      return yield* Layer.buildSync(Neo4jStorageLive);
+    }
+  })
+).pipe(Layer.flatten);
 ```
 
 ## Implementation Blueprint
@@ -244,287 +271,338 @@ ORDER BY v.createdAt DESC:
 ### List of tasks to be completed
 
 ```yaml
-Task 1: Create Unified Domain Types
+Task 1: Create Storage Service Interface
+CREATE src/services/storage/Storage.service.ts:
+  - Define StorageService with Context.Tag
+  - Copy interface from Neo4jService but rename
+  - Define StorageError to replace Neo4jError
+  - Create TransactionContext interface
+  - Export Query type (union of CypherQuery | StructuredQuery)
+
+Task 2: Create Unified Domain Types
 CREATE src/domain/types/content.ts:
-  - Define ContentNode schema with id, name, description
-  - Define ContentNodeVersion with content, operation, dates
-  - Define Operation as Schema.Literal('insert', 'concatenate')
-  - Export branded IDs for type safety
+  - ContentNode with id, name, description
+  - ContentNodeVersion with content, operation
+  - Operation type: 'insert' | 'concatenate'
+  - Branded IDs for type safety
 
-Task 2: Create Git Service Layer
-CREATE src/services/git/Git.service.ts:
-  - GitService interface with Context.Tag
-  - Methods: log, show, add, commit, status, init
-  - Error handling with GitError type
+Task 3: Update All Service Imports
+MODIFY all files importing Neo4jService:
+  - Change import to StorageService
+  - Update yield* Neo4jService to yield* StorageService
+  - Update error handling from Neo4jError to StorageError
+  - Files to update:
+    - src/services/persistence/GenericPersistence.ts
+    - src/services/snippet/SnippetPersistence.ts
+    - src/cli/commands/snippet/search.ts
+    - All test files
 
-CREATE src/layers/git/Git.layer.ts:
-  - Implement using Command module
-  - Auto-initialize repo if needed
-  - Export GitLive and GitTest
+Task 4: Create Neo4j Storage Implementation
+CREATE src/services/storage/neo4j/Neo4jStorage.ts:
+  - Implement StorageService interface
+  - Wrap existing Neo4j logic
+  - Convert Neo4jError to StorageError
+  - Handle ContentNode queries
 
-Task 3: Create Unified File Storage
-CREATE src/services/git-persistence/unified-storage.ts:
-  - nodePath(name): Generate node file path
-  - versionPath(nodeName, versionId): Version file path
-  - readNode(name): Read and validate ContentNode
-  - writeNode(node): Write with _meta
-  - readVersion(nodeName, versionId): Read ContentNodeVersion
-  - writeVersion(nodeName, version): Write with relationships
-  - listVersions(nodeName): Get all versions for a node
+CREATE src/layers/storage/Neo4jStorage.layer.ts:
+  - Create Neo4jStorageLive layer
+  - Reuse existing Neo4j driver setup
 
-Task 4: Create Relationship Manager
-CREATE src/services/git-persistence/relationships.ts:
-  - addInclude(versionId, includedId, role): Add to _meta.includes
-  - getIncludes(versionId): Retrieve with roles
-  - addTag(nodeId, tag): Add to _meta.tags
-  - getTags(nodeId): Get all tags
-  - getVersionHistory(nodeName): Use git log for history
+Task 5: Create Git Storage Implementation
+CREATE src/services/storage/git/GitStorage.ts:
+  - Implement StorageService interface
+  - Translate queries to file operations
+  - Use Git for version history
+  - Process tree relationships
 
-Task 5: Create Query Translator for Unified Model
-CREATE src/services/git-persistence/unified-query-translator.ts:
-  - Parse ContentNode queries (no more Snippet/Parameter/Composition)
-  - Handle VERSION_OF through file structure
-  - Handle INCLUDES through _meta references
-  - Support operation-based filtering
+CREATE src/services/storage/git/query-translator.ts:
+  - Parse Cypher-like queries
+  - Map to file operations
+  - Support ContentNode queries
 
-Task 6: Implement GitPersistence with Unified Types
-CREATE src/services/git-persistence/GitPersistence.service.ts:
-  - runQuery: Route to appropriate storage operation
-  - runInTransaction: Batch file operations with git commit
-  - Handle tree traversal for compositions
-  - Process children alphabetically by node name
+CREATE src/layers/storage/GitStorage.layer.ts:
+  - Create GitStorageLive layer
+  - Initialize Git repo if needed
 
-Task 7: Create Content Tree Processor
-CREATE src/services/git-persistence/tree-processor.ts:
-  - processContentTree(rootVersionId): Recursive processing
-  - handleInsertOperation(content, params): Replace placeholders
-  - handleConcatenateOperation(contents): Join contents
-  - Sort children by node name for deterministic order
+Task 6: Create Storage Layer Selector
+CREATE src/layers/storage/Storage.layer.ts:
+  - Read config to determine backend
+  - Export appropriate implementation
+  - Maintain backward compatibility
 
-Task 8: Update Persistence Layer
-CREATE src/layers/git/GitPersistence.layer.ts:
-  - Compose Git and FileSystem services
-  - Initialize directory structure
-  - Export GitPersistenceLive
+MODIFY src/layers/index.ts:
+  - Export StorageLive instead of Neo4jLive
+  - Update dependent layers
 
-Task 9: Migration from Old Types
-CREATE src/tools/migrate-to-unified.ts:
-  - Convert Snippet → ContentNode with operation='concatenate'
-  - Convert Parameter → ContentNode with operation='insert'
-  - Convert relationships to file references
-  - Preserve version history
+Task 7: Update Configuration
+MODIFY src/domain/types/config.ts:
+  - Add storageBackend field
+  - Add git configuration section
 
-Task 10: Comprehensive Testing
-CREATE src/services/git-persistence/GitPersistence.test.ts:
-  - Test unified type CRUD operations
-  - Test tree processing with operations
-  - Test alphabetical ordering
-  - Verify Git history tracking
+MODIFY src/services/config/index.ts:
+  - Handle new config fields
+  - Set appropriate defaults
+
+Task 8: Create Migration Tools
+CREATE src/tools/migrate-storage.ts:
+  - Export from Neo4j to Git format
+  - Import from Git to Neo4j
+  - Handle unified types
+
+Task 9: Update Tests
+MODIFY all test files:
+  - Use StorageService instead of Neo4jService
+  - Create tests that run against both backends
+  - Ensure identical behavior
+
+CREATE src/services/storage/Storage.test.ts:
+  - Test both implementations
+  - Verify interface compliance
+  - Performance benchmarks
+
+Task 10: Documentation
+CREATE docs/storage-backends.md:
+  - Configuration instructions
+  - Migration guide
+  - Performance characteristics
 ```
 
 ### Per task pseudocode
 
 ```typescript
-// Task 1: Unified Domain Types
-// src/domain/types/content.ts
-export const ContentNodeId = Schema.String.pipe(
-  Schema.brand('ContentNodeId'),
-  Schema.pattern(/^cn_[0-9a-f-]+$/)
+// Task 1: Storage Service Interface
+// src/services/storage/Storage.service.ts
+import { Context, Effect, Data } from 'effect';
+
+export class StorageError extends Data.TaggedError("StorageError")<{
+  readonly query?: string;
+  readonly operation: 'create' | 'read' | 'update' | 'delete' | 'transaction';
+  readonly originalMessage: string;
+}> {}
+
+export interface TransactionContext {
+  readonly run: <T = unknown>(
+    query: Query,
+    params?: QueryParameters,
+  ) => Effect.Effect<T[], StorageError, never>;
+}
+
+export interface StorageImpl {
+  readonly runQuery: <T = unknown>(
+    query: Query,
+    params?: QueryParameters,
+  ) => Effect.Effect<T[], StorageError, never>;
+
+  readonly runInTransaction: <A>(
+    operations: (tx: TransactionContext) => Effect.Effect<A, StorageError, never>,
+  ) => Effect.Effect<A, StorageError, never>;
+
+  readonly runBatch: <T = unknown>(
+    queries: Array<{
+      query: Query;
+      params?: QueryParameters;
+    }>,
+  ) => Effect.Effect<T[][], StorageError, never>;
+
+  readonly withSession: <A>(
+    work: (session: Session) => Effect.Effect<A, StorageError, never>,
+  ) => Effect.Effect<A, StorageError, never>;
+}
+
+export class StorageService extends Context.Tag('StorageService')<
+  StorageService,
+  StorageImpl
+>() {}
+
+// Task 3: Update service usage
+// Before:
+const neo4j = yield* Neo4jService;
+const results = yield* neo4j.runQuery(query, params);
+
+// After:
+const storage = yield* StorageService;
+const results = yield* storage.runQuery(query, params);
+
+// Task 4: Neo4j Storage Implementation
+// src/services/storage/neo4j/Neo4jStorage.ts
+export const createNeo4jStorage = (driver: Driver): StorageImpl => ({
+  runQuery: (query, params) =>
+    Effect.gen(function* () {
+      // Reuse existing Neo4j implementation
+      const session = driver.session();
+      try {
+        const result = yield* Effect.tryPromise({
+          try: () => session.run(query as string, params),
+          catch: (e) => new StorageError({
+            query: query as string,
+            operation: 'read',
+            originalMessage: e instanceof Error ? e.message : String(e)
+          })
+        });
+        return result.records.map(r => r.toObject());
+      } finally {
+        yield* Effect.promise(() => session.close());
+      }
+    }),
+
+  runInTransaction: (operations) =>
+    // Existing transaction logic, wrapped with StorageError
+    
+  // ... other methods
+});
+
+// Task 5: Git Storage Implementation
+// src/services/storage/git/GitStorage.ts
+export const createGitStorage = (
+  git: GitService,
+  fs: FileSystem.FileSystem
+): StorageImpl => ({
+  runQuery: (query, params) =>
+    Effect.gen(function* () {
+      const { operation, entityType, filters } = yield* parseQuery(query);
+      
+      switch (operation) {
+        case 'MATCH':
+          if (entityType === 'ContentNode' && filters.name) {
+            const path = `data/nodes/${filters.name}.json`;
+            const exists = yield* fs.exists(path);
+            if (!exists) return [];
+            
+            const content = yield* fs.readFileString(path);
+            const node = JSON.parse(content);
+            const { _meta, ...data } = node;
+            return [{ n: data }];
+          }
+          // Handle other patterns
+          
+        case 'CREATE':
+          if (entityType === 'ContentNode') {
+            const node = params?.props;
+            const path = `data/nodes/${node.name}.json`;
+            
+            const fileContent = {
+              ...node,
+              _meta: {
+                type: 'ContentNode',
+                created: new Date().toISOString(),
+                tags: []
+              }
+            };
+            
+            yield* fs.writeFileString(path, JSON.stringify(fileContent, null, 2));
+            yield* git.add(path);
+            yield* git.commit(`Create ContentNode: ${node.name}`);
+            
+            return [{ n: node }];
+          }
+          // Handle other types
+      }
+    }),
+
+  runInTransaction: (operations) =>
+    Effect.gen(function* () {
+      const filesWritten: string[] = [];
+      
+      const txContext: TransactionContext = {
+        run: (query, params) =>
+          Effect.gen(function* () {
+            const result = yield* runQuery(query, params);
+            
+            // Track files for batch commit
+            const { operation, entityType } = yield* parseQuery(query);
+            if (operation === 'CREATE' || operation === 'UPDATE') {
+              filesWritten.push(/* file path */);
+            }
+            
+            return result;
+          })
+      };
+      
+      const result = yield* operations(txContext);
+      
+      // Commit all changes at once
+      if (filesWritten.length > 0) {
+        yield* Effect.all(
+          filesWritten.map(f => git.add(f)),
+          { concurrency: "unbounded" }
+        );
+        yield* git.commit("Transaction commit");
+      }
+      
+      return result;
+    }),
+    
+  // ... other methods
+});
+
+// Task 6: Layer Selector
+// src/layers/storage/Storage.layer.ts
+export const StorageLive = Layer.unwrapEffect(
+  Effect.gen(function* () {
+    const config = yield* ConfigService;
+    
+    if (config.storageBackend === 'git') {
+      return GitStorageLive;
+    } else {
+      return Neo4jStorageLive;
+    }
+  })
 );
 
-export const ContentNode = Schema.Struct({
-  id: ContentNodeId,
-  name: Slug,
-  description: Schema.String,
-});
+// Task 9: Cross-backend testing
+// src/services/storage/Storage.test.ts
+const backends = [
+  { name: 'Neo4j', layer: Neo4jStorageLive },
+  { name: 'Git', layer: GitStorageLive }
+];
 
-export const Operation = Schema.Literal('insert', 'concatenate');
-
-export const ContentNodeVersion = Schema.Struct({
-  id: ContentNodeVersionId,
-  content: Schema.optional(Schema.String),
-  operation: Operation,
-  createdAt: Schema.DateTimeUtc,
-  commitMessage: Schema.String,
-});
-
-// Task 3: Unified Storage
-const writeNode = (node: ContentNode) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = nodePath(node.name);
-    
-    const data = {
-      ...node,
-      _meta: {
-        type: 'ContentNode',
-        tags: [],
-        created: new Date().toISOString(),
-        updated: new Date().toISOString()
-      }
-    };
-    
-    yield* fs.writeFileString(path, JSON.stringify(data, null, 2));
-    
-    // Track in git
-    const git = yield* GitService;
-    yield* git.add(path);
-  });
-
-// Task 4: Relationship Manager
-const addInclude = (
-  versionPath: string, 
-  includedId: string, 
-  role: string
-) => Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const content = yield* fs.readFileString(versionPath);
-  const data = JSON.parse(content);
-  
-  // Add to includes array
-  data._meta.includes = data._meta.includes || [];
-  data._meta.includes.push({ versionId: includedId, role });
-  
-  // Sort by included node name for deterministic order
-  // This requires loading each included version to get its node name
-  const sortedIncludes = yield* Effect.all(
-    data._meta.includes.map(inc =>
+backends.forEach(({ name, layer }) => {
+  describe(`${name} Storage Backend`, () => {
+    it.effect('should create and retrieve ContentNode', () =>
       Effect.gen(function* () {
-        const version = yield* readVersionById(inc.versionId);
-        const node = yield* readNodeById(version._meta.nodeId);
-        return { ...inc, nodeName: node.name };
-      })
-    )
-  );
-  
-  data._meta.includes = sortedIncludes
-    .sort((a, b) => a.nodeName.localeCompare(b.nodeName))
-    .map(({ nodeName, ...inc }) => inc);
-  
-  yield* fs.writeFileString(versionPath, JSON.stringify(data, null, 2));
+        const storage = yield* StorageService;
+        
+        // Create
+        yield* storage.runQuery(
+          'CREATE (n:ContentNode $props) RETURN n',
+          { props: { id: 'cn_123', name: 'test', description: 'Test node' } }
+        );
+        
+        // Retrieve
+        const results = yield* storage.runQuery(
+          'MATCH (n:ContentNode {name: $name}) RETURN n',
+          { name: 'test' }
+        );
+        
+        expect(results).toHaveLength(1);
+        expect(results[0].n.name).toBe('test');
+      }).pipe(Effect.provide(layer))
+    );
+    
+    // All other tests...
+  });
 });
+```
 
-// Task 5: Query Translation
-const translateQuery = (query: CypherQuery) => {
-  // MATCH (n:ContentNode {name: $name})
-  if (query.match(/MATCH.*:ContentNode.*{name:/)) {
-    return {
-      operation: 'findNodeByName',
-      params: extractParams(query)
-    };
-  }
-  
-  // MATCH (n:ContentNode)<-[:VERSION_OF]-(v:ContentNodeVersion)
-  if (query.match(/VERSION_OF/)) {
-    return {
-      operation: 'findVersionsForNode',
-      params: extractParams(query)
-    };
-  }
-  
-  // CREATE (n:ContentNode $props)
-  if (query.match(/CREATE.*:ContentNode/)) {
-    return {
-      operation: 'createNode',
-      params: extractParams(query)
-    };
-  }
-  
-  // CREATE (v:ContentNodeVersion $props)
-  if (query.match(/CREATE.*:ContentNodeVersion/)) {
-    return {
-      operation: 'createVersion',
-      params: extractParams(query)
-    };
-  }
-};
+### Integration Points
 
-// Task 7: Tree Processor
-const processContentTree = (
-  rootVersionId: string
-): Effect.Effect<string, ProcessingError> =>
-  Effect.gen(function* () {
-    const version = yield* readVersionById(rootVersionId);
-    
-    if (!version._meta.includes || version._meta.includes.length === 0) {
-      // Leaf node - return content as is
-      return version.content || '';
-    }
-    
-    // Process children in alphabetical order by node name
-    const childResults = yield* Effect.all(
-      version._meta.includes.map(inc =>
-        Effect.gen(function* () {
-          const childVersion = yield* readVersionById(inc.versionId);
-          const childNode = yield* readNodeById(childVersion._meta.nodeId);
-          const childContent = yield* processContentTree(inc.versionId);
-          return { 
-            content: childContent, 
-            operation: childVersion.operation,
-            nodeName: childNode.name,
-            role: inc.role
-          };
-        })
-      )
-    );
-    
-    // Sort by node name for deterministic order
-    const sortedChildren = childResults.sort((a, b) => 
-      a.nodeName.localeCompare(b.nodeName)
-    );
-    
-    // Apply operations based on type
-    let result = version.content || '';
-    
-    for (const child of sortedChildren) {
-      if (child.operation === 'insert') {
-        // Replace {{nodeName}} with content
-        const placeholder = `{{${child.nodeName}}}`;
-        result = result.replace(placeholder, child.content);
-      } else if (child.operation === 'concatenate') {
-        // Append with role-based formatting
-        if (child.role === 'system') {
-          result = child.content + '\n\n' + result;
-        } else {
-          result = result + '\n\n' + child.content;
-        }
-      }
-    }
-    
-    return result;
-  });
+```yaml
+CONFIGURATION:
+  - add to: src/domain/types/config.ts
+  - field: "storageBackend: Schema.Literal('neo4j', 'git')"
+  - default: 'neo4j' for backward compatibility
 
-// Task 6: Main GitPersistence Implementation
-const runQuery = <T>(query: CypherQuery, params?: QueryParameters) =>
-  Effect.gen(function* () {
-    const { operation, params: queryParams } = translateQuery(query);
-    
-    switch (operation) {
-      case 'findNodeByName':
-        const node = yield* readNode(queryParams.name);
-        return Option.match(node, {
-          onNone: () => [],
-          onSome: (n) => [{ n }] as T[]
-        });
-        
-      case 'createNode':
-        const newNode = yield* Schema.decode(ContentNode)(queryParams.props);
-        yield* writeNode(newNode);
-        yield* commitChanges(`Create ContentNode: ${newNode.name}`);
-        return [{ n: newNode }] as T[];
-        
-      case 'findVersionsForNode':
-        const versions = yield* listVersions(queryParams.nodeName);
-        return versions.map(v => ({ v })) as T[];
-        
-      case 'createVersion':
-        const newVersion = yield* Schema.decode(ContentNodeVersion)(queryParams.props);
-        const nodeName = yield* getNodeNameFromId(queryParams.nodeId);
-        yield* writeVersion(nodeName, newVersion);
-        yield* commitChanges(`Create version for ${nodeName}: ${newVersion.commitMessage}`);
-        return [{ v: newVersion }] as T[];
-    }
-  });
+ENVIRONMENT:
+  - STORAGE_BACKEND=git for Git backend
+  - STORAGE_BACKEND=neo4j for Neo4j backend (default)
+
+LAYERS:
+  - All layers that depended on Neo4jLive now depend on StorageLive
+  - No changes needed in business logic layers
+
+MIGRATION:
+  - npm run migrate:export -- --from neo4j --to git
+  - npm run migrate:import -- --from git --to neo4j
 ```
 
 ## Validation Loop
@@ -542,91 +620,49 @@ pnpm run lint                     # ESLint checking
 ### Level 2: Unit Tests
 
 ```typescript
-// Test unified types
-describe('Unified ContentNode Storage', () => {
-  it.effect('should store and retrieve ContentNode', () =>
+// Test storage abstraction
+describe('Storage Service Abstraction', () => {
+  it.effect('should hide implementation details', () =>
     Effect.gen(function* () {
-      const node: ContentNode = {
-        id: Schema.decodeSync(ContentNodeId)('cn_test-123'),
-        name: Schema.decodeSync(Slug)('greeting'),
-        description: 'A greeting node'
-      };
+      const storage = yield* StorageService;
       
-      yield* writeNode(node);
-      const retrieved = yield* readNode('greeting');
+      // Should not expose Neo4j or Git specifics
+      expect(storage).not.toHaveProperty('driver');
+      expect(storage).not.toHaveProperty('git');
       
-      expect(Option.isSome(retrieved)).toBe(true);
-      if (Option.isSome(retrieved)) {
-        expect(retrieved.value.name).toBe('greeting');
-      }
-    }).pipe(Effect.provide(TestLayers))
-  );
-  
-  it.effect('should handle insert operations', () =>
-    Effect.gen(function* () {
-      // Create parameter node and version
-      const paramVersion: ContentNodeVersion = {
-        id: Schema.decodeSync(ContentNodeVersionId)('cnv_param-1'),
-        content: 'friendly',
-        operation: 'insert',
-        createdAt: new Date(),
-        commitMessage: 'Friendly tone'
-      };
-      
-      // Create template that uses it
-      const templateVersion: ContentNodeVersion = {
-        id: Schema.decodeSync(ContentNodeVersionId)('cnv_template-1'),
-        content: 'Please respond in a {{tone}} manner',
-        operation: 'concatenate',
-        createdAt: new Date(),
-        commitMessage: 'Template with tone'
-      };
-      
-      // Process tree
-      const result = yield* processContentTree('cnv_template-1');
-      expect(result).toBe('Please respond in a friendly manner');
-    }).pipe(Effect.provide(TestLayers))
-  );
-  
-  it.effect('should process children alphabetically', () =>
-    Effect.gen(function* () {
-      // Create composition with multiple children
-      const compVersion = {
-        id: 'cnv_comp-1',
-        content: '',
-        operation: 'concatenate',
-        _meta: {
-          includes: [
-            { versionId: 'cnv_zebra-1', role: 'content' },
-            { versionId: 'cnv_alpha-1', role: 'content' },
-            { versionId: 'cnv_beta-1', role: 'content' }
-          ]
-        }
-      };
-      
-      // Children should be processed: alpha, beta, zebra
-      const result = yield* processContentTree('cnv_comp-1');
-      expect(result).toBe('Alpha content\n\nBeta content\n\nZebra content');
-    }).pipe(Effect.provide(TestLayers))
+      // Should only have interface methods
+      expect(storage).toHaveProperty('runQuery');
+      expect(storage).toHaveProperty('runInTransaction');
+      expect(storage).toHaveProperty('runBatch');
+      expect(storage).toHaveProperty('withSession');
+    }).pipe(Effect.provide(StorageLive))
   );
 });
 
-// Test Neo4j interface compatibility
-describe('GitPersistence Neo4j Compatibility', () => {
-  it.effect('should support VERSION_OF queries', () =>
+// Test backend switching
+describe('Backend Switching', () => {
+  it.effect('should use Git when configured', () =>
     Effect.gen(function* () {
-      const service = yield* Neo4jService;
+      const storage = yield* StorageService;
       
-      // Query for versions of a node
-      const versions = yield* service.runQuery(
-        'MATCH (n:ContentNode {name: $name})<-[:VERSION_OF]-(v:ContentNodeVersion) RETURN v',
-        { name: 'greeting' }
+      // Create a node
+      yield* storage.runQuery(
+        'CREATE (n:ContentNode $props) RETURN n',
+        { props: { id: 'cn_1', name: 'git-test', description: 'Testing Git' } }
       );
       
-      expect(versions.length).toBeGreaterThan(0);
-      expect(versions[0].v).toHaveProperty('content');
-      expect(versions[0].v).toHaveProperty('operation');
-    }).pipe(Effect.provide(GitPersistenceLive))
+      // Verify file was created
+      const fs = yield* FileSystem.FileSystem;
+      const exists = yield* fs.exists('data/nodes/git-test.json');
+      expect(exists).toBe(true);
+    }).pipe(
+      Effect.provide(
+        Layer.merge(
+          Layer.succeed(ConfigService, { storageBackend: 'git' }),
+          GitStorageLive
+        )
+      )
+    )
   );
 });
 ```
@@ -634,47 +670,27 @@ describe('GitPersistence Neo4j Compatibility', () => {
 ### Level 3: Integration Test
 
 ```bash
-# Test with git backend
-PERSISTENCE_BACKEND=git pnpm run dev
+# Test with Neo4j backend (default)
+pnpm run dev
 
-# Create a parameter node
-echo '{
-  "name": "tone",
-  "description": "Response tone",
-  "content": "professional",
-  "operation": "insert"
-}' | janus content create parameter
+# Create content
+janus content create node --name "test" --description "Test node"
 
-# Create a snippet that uses it
-echo '{
-  "name": "greeting",
-  "description": "Greeting template",
-  "content": "Hello! Please respond in a {{tone}} manner.",
-  "operation": "concatenate",
-  "includes": [{"name": "tone", "role": "parameter"}]
-}' | janus content create snippet
+# Switch to Git backend
+STORAGE_BACKEND=git pnpm run dev
 
-# Create a composition
-echo '{
-  "name": "welcome",
-  "description": "Welcome message",
-  "operation": "concatenate",
-  "includes": [
-    {"name": "greeting", "role": "user"}
-  ]
-}' | janus content create composition
+# Same command should work
+janus content create node --name "test2" --description "Test node 2"
 
-# Test tree processing
-janus content render welcome
-# Expected: "Hello! Please respond in a professional manner."
+# Verify file created
+ls data/nodes/test2.json
 
-# Check git history
-cd data && git log --oneline
-# Should show creation commits
+# Test migration
+npm run migrate:export -- --from neo4j --to git
+# Should export all Neo4j data to Git format
 
-# Verify file structure
-tree data/
-# Should show nodes/, versions/, tags/ structure
+npm run migrate:import -- --from git --to neo4j  
+# Should import Git data back to Neo4j
 ```
 
 ## Final validation Checklist
@@ -683,54 +699,55 @@ tree data/
 - [ ] No linting errors: `pnpm run lint`
 - [ ] No type errors: `pnpm run build`
 - [ ] Preflight passes: `pnpm run preflight`
-- [ ] Unified types work for all content (snippets, parameters, compositions)
-- [ ] Tree processing respects operation types
-- [ ] Children processed alphabetically by node name
-- [ ] Git history tracks all changes
-- [ ] File structure represents relationships clearly
-- [ ] Performance <100ms for typical operations
+- [ ] All code uses StorageService (no direct Neo4jService usage)
+- [ ] Backend switching works with just config change
+- [ ] Both backends pass identical test suites
+- [ ] Migration tools work bidirectionally
+- [ ] No implementation details leak through interface
+- [ ] Performance benchmarks acceptable for both backends
 - [ ] Effect compliance checklist from `docs/llms/effect/effect-compliance-checklist.md`
 
 ---
 
 ## Anti-Patterns to Avoid
 
-- ❌ Don't store relationships in type arrays - use file references
-- ❌ Don't mix old types (Snippet/Parameter) with new (ContentNode)
-- ❌ Don't process children in random order - use alphabetical
-- ❌ Don't ignore operation type - it determines processing behavior
-- ❌ Don't duplicate node data in version files
-- ❌ Don't use sync file operations - always Effect's FileSystem
-- ❌ Don't forget _meta fields for relationships
-- ❌ Don't break Neo4jService interface compatibility
+- ❌ Don't expose backend-specific types through StorageService
+- ❌ Don't use different method names for different backends
+- ❌ Don't let implementation details leak (e.g., Driver, git commands)
+- ❌ Don't hardcode backend checks in business logic
+- ❌ Don't skip the abstraction "for performance" 
+- ❌ Don't create backend-specific error types
+- ❌ Don't break existing code that uses Neo4jService
+- ❌ Don't forget to update all imports and yields
 
-## Benefits of Unified Model
+## Benefits of Storage Abstraction
 
-1. **Simplicity**: Two types instead of six
-2. **Flexibility**: Any node can have content and children
-3. **Consistency**: All content follows same patterns
-4. **Natural Storage**: Filesystem mirrors tree structure
-5. **Easy Extension**: New operations are just enum values
+1. **True Backend Independence**: Swap storage without touching business logic
+2. **Easier Testing**: Mock storage without databases
+3. **Future Proof**: Add new backends easily
+4. **Clean Architecture**: Proper dependency inversion
+5. **Development Flexibility**: Different backends for different environments
 
-## Migration Path
+## Migration Strategy
 
-1. Implement new types alongside old ones
-2. Create migration tool to convert existing data
-3. Update services to use unified types
-4. Run parallel tests to ensure compatibility
-5. Remove old types once fully migrated
+1. Create StorageService interface alongside Neo4jService
+2. Implement Neo4j backend that delegates to existing code
+3. Update imports incrementally (can be done file by file)
+4. Implement Git backend
+5. Remove direct Neo4jService usage
+6. Deprecate Neo4jService once migration complete
 
 ---
 
-## Confidence Score: 8/10
+## Confidence Score: 9/10
 
-High confidence due to:
-- Simpler type model (2 vs 6 types)
-- Clear operation semantics
-- Natural filesystem representation
-- Existing Effect patterns
+High confidence because:
+- Clear abstraction boundary
+- Existing Neo4j code can be wrapped
+- Simple interface to implement
+- Effect patterns well-established
+- Can migrate incrementally
 
-Slight uncertainty around:
-- Migration complexity from existing data
-- Performance with deep content trees
-- Edge cases in tree processing logic
+Minor uncertainty:
+- Query abstraction complexity (Cypher vs structured queries)
+- Performance overhead of abstraction layer
