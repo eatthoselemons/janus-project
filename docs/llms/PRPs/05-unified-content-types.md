@@ -172,6 +172,66 @@ export const ROLE_CONTAINER_PREFIX = 'role-container-' as const;
 // Role containers are identified by names starting with 'role-container-'
 ```
 
+### Type Safety and Data Models
+
+```typescript
+import { Chunk } from 'effect';
+
+// Operation types for edges
+export const InsertOperation = Schema.Literal('insert');
+export type InsertOperation = typeof InsertOperation.Type;
+
+export const ConcatenateOperation = Schema.Literal('concatenate');
+export type ConcatenateOperation = typeof ConcatenateOperation.Type;
+
+export const EdgeOperation = Schema.Union(InsertOperation, ConcatenateOperation);
+export type EdgeOperation = typeof EdgeOperation.Type;
+
+// Edge properties schema for type safety
+export const IncludesEdgeProperties = Schema.Struct({
+  role: Schema.optional(ContentRole),
+  operation: EdgeOperation,
+  key: Schema.optional(Schema.String), // Only for insert operations
+});
+export type IncludesEdgeProperties = typeof IncludesEdgeProperties.Type;
+
+// Parameter types to avoid primitive obsession
+export const ParameterKey = Schema.String.pipe(
+  Schema.pattern(/^[a-zA-Z][a-zA-Z0-9_]*$/),
+  Schema.brand('ParameterKey')
+);
+export type ParameterKey = typeof ParameterKey.Type;
+
+export const ParameterValue = Schema.String.pipe(Schema.brand('ParameterValue'));
+export type ParameterValue = typeof ParameterValue.Type;
+
+export const ParameterContext = Schema.HashMap(ParameterKey, ParameterValue);
+export type ParameterContext = typeof ParameterContext.Type;
+
+// Message and Conversation types for LLM APIs
+export const Message = Schema.Struct({
+  role: ContentRole,
+  content: Schema.String
+});
+export type Message = typeof Message.Type;
+
+// Use Chunk for efficient immutable collections
+export type Conversation = Chunk.Chunk<Message>;
+
+// Processing options for filtering
+export const ProcessingOptions = Schema.Struct({
+  includeTags: Schema.optional(Schema.Array(Schema.String)),
+  excludeVersionIds: Schema.optional(Schema.Array(ContentNodeVersionId))
+});
+export type ProcessingOptions = typeof ProcessingOptions.Type;
+
+// Type-safe child node structure
+export type ChildNode = {
+  node: ContentNodeVersion;
+  edge: IncludesEdgeProperties;
+};
+```
+
 ### List of tasks to be completed
 
 ```yaml
@@ -313,27 +373,49 @@ export const createContentNodeVersion = (
   );
 });
 
-export const getContentTree = (
-  versionId: ContentNodeVersionId
-): Effect.Effect<ContentTree, PersistenceError, Neo4jService> => 
+// Lazy processing - only load what's needed
+export const processContentFromId = (
+  versionId: ContentNodeVersionId,
+  context: ParameterContext = HashMap.empty<ParameterKey, ParameterValue>(),
+  options: ProcessingOptions = {}
+): Effect.Effect<string, PersistenceError, Neo4jService> => 
   Effect.gen(function* () {
-  const neo4j = yield* Neo4jService;
-  
-  // PATTERN: Recursive query to get entire tree
-  const query = cypher`
-    MATCH (root:ContentNodeVersion {id: $versionId})
-    OPTIONAL MATCH path = (root)-[:INCLUDES*]->(child:ContentNodeVersion)
-    WITH root, collect({node: child, depth: length(path), relationships: relationships(path)}) as children
-    RETURN root, children
-    ORDER BY children.depth
-  `;
-  
-  const params = yield* queryParams({ versionId });
-  const results = yield* neo4j.runQuery(query, params);
-  
-  // Build tree structure from results
-  return buildTreeFromResults(results);
-});
+    const neo4j = yield* Neo4jService;
+    
+    // Check if this version should be excluded
+    if (options.excludeVersionIds?.includes(versionId)) {
+      return '';
+    }
+    
+    // Get just this node and its immediate children
+    const query = cypher`
+      MATCH (node:ContentNodeVersion {id: $versionId})
+      OPTIONAL MATCH (node)-[r:INCLUDES]->(child:ContentNodeVersion)
+      RETURN node, collect({child: child, edge: r}) as children
+    `;
+    
+    const params = yield* queryParams({ versionId });
+    const result = yield* neo4j.runQuery<{ 
+      node: unknown, 
+      children: Array<{ child: unknown, edge: unknown }> 
+    }>(query, params);
+    
+    if (result.length === 0) {
+      return yield* Effect.fail(new NotFoundError({ entityType: 'content-node-version', id: versionId }));
+    }
+    
+    const nodeVersion = yield* Schema.decodeUnknown(ContentNodeVersion)(result[0].node);
+    const children = yield* Effect.forEach(result[0].children, (item) => 
+      Effect.gen(function* () {
+        const child = yield* Schema.decodeUnknown(ContentNodeVersion)(item.child);
+        const edge = yield* Schema.decodeUnknown(IncludesEdgeProperties)(item.edge);
+        return { node: child, edge };
+      })
+    );
+    
+    // Process based on edge operations
+    return yield* processNode(nodeVersion, children, context, options);
+  });
 
 // Type-safe edge retrieval
 export const getChildren = (
@@ -358,90 +440,130 @@ export const getChildren = (
   );
 });
 
-export const processContent = (
+// Process a node with its children
+const processNode = (
   nodeVersion: ContentNodeVersion,
-  parentContext: Record<string, string> = {}
+  children: readonly ChildNode[],
+  context: ParameterContext,
+  options: ProcessingOptions
 ): Effect.Effect<string, PersistenceError, Neo4jService> => 
   Effect.gen(function* () {
-    const children = yield* getChildren(nodeVersion.id); // Type-safe retrieval
-  
-  // Build context from insert operations
-  const localContext = yield* Effect.reduce(
-    children.filter(c => c.edge.operation === 'insert'),
-    { ...parentContext },
-    (context, child) => 
-      Effect.gen(function* () {
-        const value = yield* processContent(child.node, context);
-        return { ...context, [child.edge.key]: value };
-      })
-  );
-  
-  // Apply context to current node's content
-  let processed = nodeVersion.content || '';
-  for (const [key, value] of Object.entries(localContext)) {
-    processed = processed.replace(new RegExp(`{{${key}}}`, 'g'), value);
-  }
-  
-  // Process concatenation children with the built context
-  const concatenated = yield* Effect.forEach(
-    children
+    // Build context from insert operations
+    const insertChildren = children.filter(c => c.edge.operation === 'insert');
+    const updatedContext = yield* Effect.reduce(
+      insertChildren,
+      context,
+      (ctx, child) => 
+        Effect.gen(function* () {
+          if (!child.edge.key) {
+            return ctx; // Skip if no key specified
+          }
+          const key = yield* Schema.decodeUnknown(ParameterKey)(child.edge.key);
+          const value = yield* processContentFromId(child.node.id, ctx, options);
+          return HashMap.set(ctx, key, value as ParameterValue);
+        })
+    );
+    
+    // Apply context to current node's content
+    let processed = nodeVersion.content || '';
+    HashMap.forEach(updatedContext, (value, key) => {
+      processed = processed.replace(new RegExp(`{{${key}}}`, 'g'), value);
+    });
+    
+    // Process concatenation children
+    const concatChildren = children
       .filter(c => c.edge.operation === 'concatenate')
-      .sort((a, b) => a.node.name.localeCompare(b.node.name)), // Alphabetical order
-    (child) => processContent(child.node, localContext)
-  ).pipe(Effect.map(results => results.join('\n')));
-  
-  return processed + (concatenated ? '\n' + concatenated : '');
-});
+      .sort((a, b) => a.node.name.localeCompare(b.node.name));
+      
+    const concatenated = yield* Effect.forEach(
+      concatChildren,
+      (child) => processContentFromId(child.node.id, updatedContext, options)
+    ).pipe(Effect.map(results => results.filter(Boolean).join('\n')));
+    
+    return processed + (concatenated ? '\n' + concatenated : '');
+  });
 
-// Determine the role of a tree by finding its role container
+// Determine the role of a tree by finding its role container (lazy)
 export const getTreeRole = (
-  tree: ContentTree
-): Effect.Effect<ContentRole, Error, never> => 
+  versionId: ContentNodeVersionId
+): Effect.Effect<ContentRole, Error | PersistenceError, Neo4jService> => 
   Effect.gen(function* () {
-  // Role containers are leaf nodes with names starting with ROLE_CONTAINER_PREFIX
-  const findRoleContainer = (node: ContentTree): ContentRole | null => {
-    if (node.name.startsWith(ROLE_CONTAINER_PREFIX) && node.children.length === 0) {
-      return node.name.replace(ROLE_CONTAINER_PREFIX, '') as ContentRole;
+    const neo4j = yield* Neo4jService;
+    
+    // Find role container by traversing down to leaves
+    const query = cypher`
+      MATCH (start:ContentNodeVersion {id: $versionId})
+      MATCH path = (start)-[:INCLUDES*0..]->(leaf:ContentNodeVersion)
+      WHERE NOT (leaf)-[:INCLUDES]->(:ContentNodeVersion)
+      AND leaf.name STARTS WITH $prefix
+      RETURN leaf.name as roleName
+      LIMIT 1
+    `;
+    
+    const params = yield* queryParams({ 
+      versionId, 
+      prefix: ROLE_CONTAINER_PREFIX 
+    });
+    
+    const results = yield* neo4j.runQuery<{ roleName: string }>(query, params);
+    
+    if (results.length === 0) {
+      return yield* Effect.fail(new Error('No role container found in tree'));
     }
     
-    for (const child of node.children) {
-      const role = findRoleContainer(child);
-      if (role) return role;
-    }
-    
-    return null;
-  };
-  
-  const role = findRoleContainer(tree);
-  if (!role) {
-    return yield* Effect.fail(new Error('No role container found in tree'));
-  }
-  
-  return role;
-});
+    const role = results[0].roleName.replace(ROLE_CONTAINER_PREFIX, '') as ContentRole;
+    return role;
+  });
 
-// Build complete prompts by processing trees based on their role containers
-export const buildPrompts = (
-  compositionVersions: ContentNodeVersionId[]
-): Effect.Effect<{ system: string; user: string; assistant: string }, Error | PersistenceError, Neo4jService> => 
+// Build conversation as array of messages for LLM APIs
+export const buildConversation = (
+  compositionVersionIds: ContentNodeVersionId[],
+  parameterContext: ParameterContext = HashMap.empty<ParameterKey, ParameterValue>(),
+  options: ProcessingOptions = {}
+): Effect.Effect<Conversation, Error | PersistenceError, Neo4jService> => 
   Effect.gen(function* () {
-  const prompts = {
-    system: '',
-    user: '',
-    assistant: ''
-  };
-  
-  // Process each composition
-  for (const versionId of compositionVersions) {
-    const tree = yield* getContentTree(versionId);
-    const role = yield* getTreeRole(tree);
-    const content = yield* processContent(tree);
+    // Process each composition and collect messages
+    const messages = yield* Effect.forEach(
+      compositionVersionIds,
+      (versionId) => Effect.gen(function* () {
+        const role = yield* getTreeRole(versionId);
+        const content = yield* processContentFromId(versionId, parameterContext, options);
+        return { role, content } satisfies Message;
+      })
+    );
     
-    prompts[role] = prompts[role] ? `${prompts[role]}\n${content}` : content;
-  }
-  
-  return prompts;
-});
+    // Effect.forEach returns a Chunk by default
+    return messages;
+  });
+
+// Type-safe link creation
+export const linkNodes = (
+  parentId: ContentNodeVersionId,
+  childId: ContentNodeVersionId,
+  props: IncludesEdgeProperties
+): Effect.Effect<void, PersistenceError, Neo4jService> => 
+  Effect.gen(function* () {
+    const neo4j = yield* Neo4jService;
+    
+    // Validate properties
+    const validProps = yield* Schema.decodeUnknown(IncludesEdgeProperties)(props);
+    
+    const query = cypher`
+      MATCH (parent:ContentNodeVersion {id: $parentId})
+      MATCH (child:ContentNodeVersion {id: $childId})
+      CREATE (parent)-[:INCLUDES {role: $role, operation: $operation, key: $key}]->(child)
+    `;
+    
+    const params = yield* queryParams({
+      parentId,
+      childId,
+      role: validProps.role || null,
+      operation: validProps.operation,
+      key: validProps.key || null
+    });
+    
+    yield* neo4j.runQuery(query, params);
+  });
 ```
 
 ### Integration Points
@@ -455,10 +577,7 @@ DATABASE:
 
 RELATIONSHIPS:
   - VERSION_OF: Links versions to their parent node
-  - INCLUDES: Forms the tree structure with properties:
-    - role: Optional role override for A/B testing
-    - operation: How to combine child with parent (insert or concatenate)
-    - key: For insert operations, which placeholder to fill
+  - INCLUDES: Forms the tree structure with properties - role (optional), operation, key (for inserts)
   - PREVIOUS_VERSION: Links to previous version for history
 
 ROLE BEHAVIOR:
@@ -536,9 +655,11 @@ it.effect('should create content tree', () =>
       }]
     );
     
-    // Process tree
-    const tree = yield* getContentTree(parentVersion.id);
-    const result = yield* processContent(tree, { childValue: 'replaced' });
+    // Process content lazily
+    const context = HashMap.make<ParameterKey, ParameterValue>([
+      [Schema.decodeSync(ParameterKey)('childValue'), Schema.decodeSync(ParameterValue)('replaced')]
+    ]);
+    const result = yield* processContentFromId(parentVersion.id, context);
     
     expect(result).toBe('Parent replaced\ncontent');
   })
@@ -569,15 +690,74 @@ it.effect('should support A/B testing with role containers', () =>
       operation: 'concatenate'
     });
     
-    // Build prompts for both tests
-    const testA = yield* buildPrompts([sharedVersion.id]); // Finds system role container
-    const testB = yield* buildPrompts([sharedVersion.id]); // Same content, different role
+    // Build conversations for both tests
+    const conversationA = yield* buildConversation([sharedVersion.id]);
+    const conversationB = yield* buildConversation([sharedVersion.id]);
     
-    expect(testA.system).toContain('Be concise');
-    expect(testA.user).toBe('');
+    // Both should find their respective role containers
+    expect(Chunk.toReadonlyArray(conversationA)).toEqual([
+      { role: 'system', content: 'Be concise and direct in your responses' }
+    ]);
     
-    expect(testB.user).toContain('Be concise');
-    expect(testB.system).toBe('');
+    expect(Chunk.toReadonlyArray(conversationB)).toEqual([
+      { role: 'user', content: 'Be concise and direct in your responses' }
+    ]);
+  })
+);
+
+// Multi-turn conversation example
+it.effect('should build multi-turn conversations', () =>
+  Effect.gen(function* () {
+    // Create nodes for a conversation
+    const greeting = yield* createContentNode('user-greeting', 'User greeting');
+    const greetingV = yield* createContentNodeVersion(
+      greeting.id,
+      'Hello, can you help me?',
+      'Initial greeting'
+    );
+    const greetingRole = yield* createRoleContainer('user');
+    yield* linkNodes(greetingV.id, greetingRole.version.id, {
+      operation: 'concatenate'
+    });
+    
+    const response = yield* createContentNode('assistant-response', 'Assistant response');
+    const responseV = yield* createContentNodeVersion(
+      response.id,
+      'Hello! I\'d be happy to help.',
+      'Initial response'
+    );
+    const responseRole = yield* createRoleContainer('assistant');
+    yield* linkNodes(responseV.id, responseRole.version.id, {
+      operation: 'concatenate'
+    });
+    
+    const followup = yield* createContentNode('user-followup', 'User followup');
+    const followupV = yield* createContentNodeVersion(
+      followup.id,
+      'I need help with {{topic}}',
+      'Followup with parameter'
+    );
+    const followupRole = yield* createRoleContainer('user');
+    yield* linkNodes(followupV.id, followupRole.version.id, {
+      operation: 'concatenate'
+    });
+    
+    // Build conversation with parameters
+    const context = HashMap.make<ParameterKey, ParameterValue>([
+      [Schema.decodeSync(ParameterKey)('topic'), Schema.decodeSync(ParameterValue)('TypeScript')]
+    ]);
+    
+    const conversation = yield* buildConversation(
+      [greetingV.id, responseV.id, followupV.id],
+      context
+    );
+    
+    // Should create proper message array for LLM API
+    expect(Chunk.toReadonlyArray(conversation)).toEqual([
+      { role: 'user', content: 'Hello, can you help me?' },
+      { role: 'assistant', content: 'Hello! I\'d be happy to help.' },
+      { role: 'user', content: 'I need help with TypeScript' }
+    ]);
   })
 );
 ```
