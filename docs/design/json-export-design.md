@@ -22,12 +22,9 @@ The `data` object contains two primary keys: `nodes` and `relationships`.
 
 An object containing arrays of all the exported entities, grouped by their type.
 
-- **`snippets`**: `array` of Snippet objects.
-- **`snippet_versions`**: `array` of SnippetVersion objects.
-- **`parameters`**: `array` of Parameter objects.
-- **`parameter_options`**: `array` of ParameterOption objects.
-- **`compositions`**: `array` of Composition objects.
-- **`composition_versions`**: `array` of CompositionVersion objects.
+- **`content_nodes`**: `array` of ContentNode objects.
+- **`content_node_versions`**: `array` of ContentNodeVersion objects.
+- **`test_cases`**: `array` of TestCase objects.
 - **`test_runs`**: `array` of TestRun objects.
 - **`data_points`**: `array` of DataPoint objects.
 - **`tags`**: `array` of Tag objects.
@@ -48,7 +45,7 @@ Each relationship object has the following structure:
 | `properties` | object | (Optional) A key-value map of any properties stored on the relationship itself (e.g., `role` and `sequence` for the `INCLUDES` type). |
 
 **Valid Relationship `type` values:**
-`VERSION_OF`, `PREVIOUS_VERSION`, `DEFINES_PARAMETER`, `HAS_OPTION`, `DERIVED_FROM`, `INCLUDES`, `GENERATED`, `USING_COMPOSITION`, `HAS_TAG`.
+`VERSION_OF`, `PREVIOUS_VERSION`, `INCLUDES`, `GENERATED`, `USING_TEST_CASE`, `USED_CONTENT`, `HAS_TAG`.
 
 ---
 
@@ -62,41 +59,46 @@ Here is a concrete example of an exported JSON file representing a small experim
   "exported_at": "2025-07-03T12:00:00Z",
   "data": {
     "nodes": {
-      "snippets": [
+      "content_nodes": [
         {
-          "id": "snippet-uuid-01",
+          "id": "content-node-uuid-01",
           "name": "formal-greeting-persona",
           "description": "A formal, professional persona for starting a prompt."
-        }
-      ],
-      "snippet_versions": [
+        },
         {
-          "id": "snippet-version-uuid-01a",
-          "content": "You are a professional assistant. Your tone should be formal and respectful. The user's name is {{user_name}}.",
-          "createdAt": "2025-07-02T10:00:00Z",
-          "commit_message": "Initial version of formal persona."
-        }
-      ],
-      "parameters": [
-        {
-          "id": "param-uuid-01",
-          "name": "user_name",
+          "id": "content-node-uuid-02",
+          "name": "user-name",
           "description": "The name of the user to address."
         }
       ],
-      "parameter_options": [],
-      "compositions": [
+      "content_node_versions": [
         {
-          "id": "comp-uuid-01",
-          "name": "formal-greeting-test",
-          "description": "A simple test for the formal greeting."
+          "id": "content-version-uuid-01a",
+          "content": "You are a professional assistant. Your tone should be formal and respectful. The user's name is {{user_name}}.",
+          "createdAt": "2025-07-02T10:00:00Z",
+          "commitMessage": "Initial version of formal persona."
+        },
+        {
+          "id": "content-version-uuid-02a",
+          "content": "Alice",
+          "createdAt": "2025-07-02T10:30:00Z",
+          "commitMessage": "Default user name."
         }
       ],
-      "composition_versions": [
+      "test_cases": [
         {
-          "id": "comp-version-uuid-01a",
+          "id": "test-case-uuid-01",
+          "name": "formal-greeting-test",
+          "description": "A simple test for the formal greeting.",
           "createdAt": "2025-07-02T11:00:00Z",
-          "commit_message": "First composition for testing the formal greeting."
+          "llmModel": "gpt-4",
+          "messageSlots": [
+            {
+              "role": "system",
+              "tags": ["tag-uuid-01"],
+              "sequence": 0
+            }
+          ]
         }
       ],
       "test_runs": [
@@ -117,29 +119,34 @@ Here is a concrete example of an exported JSON file representing a small experim
           "metrics": { "latency_ms": 850, "completion_tokens": 12 }
         }
       ],
-      "tags": []
+      "tags": [
+        {
+          "id": "tag-uuid-01",
+          "name": "formal-persona"
+        }
+      ]
     },
     "relationships": [
       {
-        "from": "snippet-version-uuid-01a",
-        "to": "snippet-uuid-01",
+        "from": "content-version-uuid-01a",
+        "to": "content-node-uuid-01",
         "type": "VERSION_OF"
       },
       {
-        "from": "snippet-version-uuid-01a",
-        "to": "param-uuid-01",
-        "type": "DEFINES_PARAMETER"
-      },
-      {
-        "from": "comp-version-uuid-01a",
-        "to": "comp-uuid-01",
+        "from": "content-version-uuid-02a",
+        "to": "content-node-uuid-02",
         "type": "VERSION_OF"
       },
       {
-        "from": "comp-version-uuid-01a",
-        "to": "snippet-version-uuid-01a",
+        "from": "content-version-uuid-01a",
+        "to": "content-version-uuid-02a",
         "type": "INCLUDES",
-        "properties": { "role": "system", "sequence": 1 }
+        "properties": { "operation": "insert", "key": "user_name" }
+      },
+      {
+        "from": "content-node-uuid-01",
+        "to": "tag-uuid-01",
+        "type": "HAS_TAG"
       },
       {
         "from": "test-run-uuid-01",
@@ -148,8 +155,13 @@ Here is a concrete example of an exported JSON file representing a small experim
       },
       {
         "from": "datapoint-uuid-01",
-        "to": "comp-version-uuid-01a",
-        "type": "USING_COMPOSITION"
+        "to": "test-case-uuid-01",
+        "type": "USING_TEST_CASE"
+      },
+      {
+        "from": "datapoint-uuid-01",
+        "to": "content-version-uuid-01a",
+        "type": "USED_CONTENT"
       }
     ]
   }
