@@ -3,7 +3,7 @@ description: |
 
 ## Purpose
 
-Create a unified StorageService interface that abstracts persistence operations, with swappable Git and Neo4j implementations using the simplified ContentNode model.
+Create a unified StorageService interface that abstracts persistence operations, with swappable Git and Neo4j implementations using the simplified ContentNode model from the unified content types PRP.
 
 ## Core Principles
 
@@ -43,7 +43,6 @@ A storage abstraction layer that:
 - [ ] Both Git and Neo4j backends pass identical tests
 - [ ] Backend switching requires only config change
 - [ ] No implementation details leak through interface
-- [ ] Performance remains acceptable for both backends
 - [ ] Migration tools work between backends
 
 ## All Needed Context
@@ -92,6 +91,37 @@ A storage abstraction layer that:
     Use Context.Tag for services
     Layer composition patterns
     Effect.gen usage
+
+- file: /home/user/git/janus-project/docs/llms/PRPs/05-unified-content-types.md
+  why: [Complete unified type model specification]
+  critical: |
+    Operation goes on EDGES not nodes
+    TestCase defines roles, not content
+    Children processed alphabetically by node name
+    ContentNodeVersion has no operation field
+```
+
+### Known Gotchas & Critical Details
+
+```typescript
+// CRITICAL: Operation is on INCLUDES edges, NOT on ContentNodeVersion
+// Git backend must store this in _meta.includes array with each relationship
+
+// CRITICAL: Roles are defined in TestCase, NOT in content
+// Content is role-agnostic - same content can be system/user/assistant
+
+// CRITICAL: Children processed alphabetically by node name for determinism
+// When loading includes and concatenation, sort by the included node's name
+
+// CRITICAL: TestCase defines conversation structure
+// MessageSlots filter content by tags and explicit includes/excludes
+
+// CRITICAL: Edge properties must be preserved
+// operation: 'insert' | 'concatenate'
+// key: only for insert operations (parameter name)
+
+// CRITICAL: File paths must handle special characters in slugs
+// Use proper encoding for filesystem safety
 ```
 
 ### Current Service Usage
@@ -196,7 +226,7 @@ export const GitStorageLive = Layer.effect(
 ### Unified Type Model
 
 ```typescript
-// Single types for both backends
+// Core content types (from unified PRP)
 type ContentNode = {
   id: ContentNodeId;
   name: Slug;
@@ -205,15 +235,40 @@ type ContentNode = {
 
 type ContentNodeVersion = {
   id: ContentNodeVersionId;
-  content?: string;
-  operation: 'insert' | 'concatenate';
+  content?: string; // Optional - branches might not have content
   createdAt: Date;
   commitMessage: string;
+  // NOTE: operation is on EDGES, not nodes!
+}
+
+// Edge properties for INCLUDES relationship
+type IncludesEdgeProperties = {
+  operation: 'insert' | 'concatenate';
+  key?: string; // Only for insert operations
+}
+
+// TestCase defines conversation structure
+type TestCase = {
+  id: TestCaseId;
+  name: string;
+  description: string;
+  createdAt: Date;
+  llmModel: string;
+  messageSlots: MessageSlot[];
+  parameters?: Record<string, string>;
+}
+
+type MessageSlot = {
+  role: 'system' | 'user' | 'assistant';
+  tags?: string[];
+  excludeNodes?: string[];
+  includeNodes?: string[];
+  sequence: number;
 }
 
 // Relationships handled by backend
-// Neo4j: Graph edges
-// Git: File references in _meta
+// Neo4j: Native graph edges with properties
+// Git: File references with edge data in _meta
 ```
 
 ### File Structure (Git Backend)
@@ -232,9 +287,124 @@ data/
 │   │   └── v2.json          
 │   └── welcome-prompt/
 │       └── v1.json          
-└── tags/                     
-    ├── cli.json
-    └── greeting.json
+├── tags/                     # Tag definitions
+│   ├── cli.json
+│   └── greeting.json
+└── testcases/               # TestCase definitions
+    ├── support-conversation.json
+    └── concise-system-prompt.json
+```
+
+### Storage Format Examples
+
+```typescript
+// File: data/nodes/greeting.json
+{
+  "id": "cn_550e8400-e29b-41d4-a716-446655440000",
+  "name": "greeting",
+  "description": "A friendly greeting template",
+  "_meta": {
+    "type": "ContentNode",
+    "tags": ["greeting", "cli"],  // HAS_TAG relationships
+    "created": "2024-01-15T10:30:00Z",
+    "updated": "2024-01-15T10:30:00Z"
+  }
+}
+
+// File: data/versions/greeting/v1.json
+{
+  "id": "cnv_660e8400-e29b-41d4-a716-446655440000",
+  "content": "Hello! Reply in a {{tone}} manner.",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "commitMessage": "Initial greeting template",
+  "_meta": {
+    "nodeId": "cn_550e8400-e29b-41d4-a716-446655440000", // VERSION_OF
+    "includes": [  // INCLUDES relationships with edge properties
+      {
+        "versionId": "cnv_770e8400-e29b-41d4-a716-446655440000",
+        "operation": "insert",  // Edge property
+        "key": "tone"          // Edge property for insert operation
+      }
+    ]
+  }
+}
+
+// File: data/versions/tone/v1.json (parameter node version)
+{
+  "id": "cnv_770e8400-e29b-41d4-a716-446655440000",
+  "content": "professional",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "commitMessage": "Professional tone option",
+  "_meta": {
+    "nodeId": "cn_880e8400-e29b-41d4-a716-446655440000"
+    // No includes - this is a leaf node
+  }
+}
+
+// File: data/testcases/support-conversation.json
+{
+  "id": "tc_990e8400-e29b-41d4-a716-446655440000",
+  "name": "Support conversation flow",
+  "description": "Multi-turn support conversation",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "llmModel": "gpt-4",
+  "messageSlots": [
+    {
+      "role": "system",
+      "tags": ["instruction", "behavior"],
+      "sequence": 0
+    },
+    {
+      "role": "user",
+      "tags": ["greeting"],
+      "sequence": 1
+    },
+    {
+      "role": "assistant",
+      "tags": ["greeting-response"],
+      "sequence": 2
+    }
+  ],
+  "parameters": {
+    "tone": "helpful",
+    "style": "concise"
+  }
+}
+```
+
+### Query Pattern Mappings
+
+```yaml
+# Key queries that must be supported
+MATCH (n:ContentNode {name: $name}):
+  - Read data/nodes/${name}.json
+
+CREATE (n:ContentNode $props):
+  - Write data/nodes/${props.name}.json
+  - Add tags to _meta.tags
+  - Git add & commit
+
+MATCH (n:ContentNode)<-[:VERSION_OF]-(v:ContentNodeVersion):
+  - Read node file to get ID
+  - List data/versions/${nodeName}/*.json
+  - Filter by _meta.nodeId
+
+MATCH (parent:ContentNodeVersion)-[:INCLUDES]->(child:ContentNodeVersion):
+  - Read parent version file
+  - Map _meta.includes array with edge properties
+  - Load each referenced child version
+
+CREATE (parent)-[:INCLUDES {operation: $op, key: $key}]->(child):
+  - Add to parent's _meta.includes with edge properties
+  - Store operation and key on the relationship
+
+MATCH (n:ContentNode)-[:HAS_TAG]->(:Tag {name: $tag}):
+  - Read node's _meta.tags array
+  - Filter nodes by tag membership
+
+ORDER BY v.createdAt DESC:
+  - Sort files by createdAt field
+  - Or use git log for true chronological order
 ```
 
 ### Configuration
@@ -282,9 +452,11 @@ CREATE src/services/storage/Storage.service.ts:
 Task 2: Create Unified Domain Types
 CREATE src/domain/types/content.ts:
   - ContentNode with id, name, description
-  - ContentNodeVersion with content, operation
-  - Operation type: 'insert' | 'concatenate'
-  - Branded IDs for type safety
+  - ContentNodeVersion with content, createdAt, commitMessage
+  - EdgeOperation type: 'insert' | 'concatenate' (for edges)
+  - IncludesEdgeProperties with operation and optional key
+  - TestCase and MessageSlot types
+  - Branded IDs using makeIdType factory
 
 Task 3: Update All Service Imports
 MODIFY all files importing Neo4jService:
