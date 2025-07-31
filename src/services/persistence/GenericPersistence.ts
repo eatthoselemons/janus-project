@@ -85,7 +85,7 @@ const mapToPersistenceError =
  * @param name The slug name to search for
  * @returns Option of the entity (Some if found, None if not)
  */
-export const findByName = <A, I, R>(
+export const findEntityByName = <A, I, R>(
   nodeLabel: string,
   schema: Schema.Schema<A, I, R> & {
     Type: { name: Slug };
@@ -132,13 +132,7 @@ export const findByName = <A, I, R>(
  */
 export const mustFindByName = <A, I, R>(
   nodeLabel: string,
-  entityType:
-    | 'snippet'
-    | 'parameter'
-    | 'composition'
-    | 'tag'
-    | 'test-run'
-    | 'data-point',
+  entityType: 'content node' | 'tag' | 'test-run' | 'data-point',
   schema: Schema.Schema<A, I, R> & {
     Type: { name: Slug };
   },
@@ -148,7 +142,7 @@ export const mustFindByName = <A, I, R>(
   NotFoundError | PersistenceError,
   R | Neo4jService
 > =>
-  findByName(nodeLabel, schema, name).pipe(
+  findEntityByName(nodeLabel, schema, name).pipe(
     Effect.flatMap(
       Option.match({
         onNone: () =>
@@ -185,7 +179,7 @@ export const createNamedEntity = <
     const entityName = (entity as unknown as { name: Slug }).name;
 
     // Check uniqueness first
-    const existing = yield* findByName(nodeLabel, schema, entityName);
+    const existing = yield* findEntityByName(nodeLabel, schema, entityName);
     if (Option.isSome(existing)) {
       return yield* Effect.fail(
         new PersistenceError({
@@ -512,16 +506,11 @@ export const createVersion = <
             error.originalMessage.includes('Parent') &&
             error.originalMessage.includes('not found')
           ) {
-            const entityTypeMap: Record<
-              string,
-              'snippet' | 'parameter' | 'composition' | 'tag'
-            > = {
-              Snippet: 'snippet',
-              Parameter: 'parameter',
-              Composition: 'composition',
+            const entityTypeMap: Record<string, 'content node' | 'tag'> = {
+              ContentNode: 'content node',
               Tag: 'tag',
             };
-            const entityType = entityTypeMap[parentLabel] || 'snippet';
+            const entityType = entityTypeMap[parentLabel] || 'content node';
             return new NotFoundError({
               entityType,
               id: parentId as any,

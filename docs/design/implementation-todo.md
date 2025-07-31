@@ -8,10 +8,10 @@ This phase establishes the bedrock of the application: the type system, configur
 
 - [x] **1.1: Core Types & Schemas**
   - [x] **Branded IDs:** Define all branded ID types using `Schema.string.pipe(Schema.brand("..."))`:
-    - `SnippetId`, `SnippetVersionId`, `ParameterId`, `ParameterOptionId`, `CompositionId`, `CompositionVersionId`, `TestRunId`, `DataPointId`, `TagId`.
+    - `ContentNodeId`, `ContentNodeVersionId`, `TestCaseId`, `TestRunId`, `DataPointId`, `TagId`.
   - [x] **Slug Type:** Create a `Slug` branded type with a custom validation function to enforce `lowercase-with-hyphens` format.
   - [x] **Entity Schemas:** Define `Schema.Struct` for all core entities as specified in `domain-model.md`:
-    - `Snippet`, `SnippetVersion`, `Parameter`, `ParameterOption`, `Composition`, `CompositionVersion` (including `CompositionSnippet`), `TestRun`, `DataPoint`, `Tag`.
+    - `ContentNode`, `ContentNodeVersion`, `TestCase` (including `MessageSlot`), `TestRun`, `DataPoint`, `Tag`.
 
 - [x] **1.2: Error Sub-Types**
   - [x] Define a base `JanusError` using `Data.TaggedError`.
@@ -48,42 +48,44 @@ This phase establishes the bedrock of the application: the type system, configur
   - [x] **Testing:** Write comprehensive tests for the generic functions using test schemas
   - [x] **Documentation:** Update examples in the generic persistence patterns document with actual implementation
 
-**IMPORTANT NOTE:** The generic persistence functions in `src/services/persistence/GenericPersistence.ts` handle all standard CRUD operations for entities. Do NOT create separate persistence services for Snippet, Parameter, Composition, etc. Use the generic functions directly:
+**IMPORTANT NOTE:** The generic persistence functions in `src/services/persistence/GenericPersistence.ts` handle all standard CRUD operations for entities. For the unified content model, use the ContentService for content-specific operations and generic functions for basic CRUD:
 ```typescript
 // Examples:
-GenericPersistence.createNamedEntity('Snippet', Snippet, {...})
-GenericPersistence.findByName('Parameter', Parameter, slug)
-GenericPersistence.createVersion('SnippetVersion', 'Snippet', parentId, SnippetVersion, {...})
+ContentService.createContentNode(name, description)
+ContentService.createContentNodeVersion(nodeId, content, commitMessage, parents)
+ContentService.processContentFromId(versionId, parameters, options)
 ```
 Only create entity-specific services if you need domain-specific operations beyond standard CRUD.
 
-## Phase 3: Snippet Management
+## Phase 3: Content Management
 
-- [ ] **3.1: Snippet CLI Commands**
-  - [ ] **Implementation:** `janus snippet pull <snippet-name>`
-  - [ ] **Implementation:** `janus snippet push <file-path> -m <message>`
-  - [ ] **Implementation:** `janus snippet list`
-  - [ ] **Implementation:** `janus snippet search "<query>"`
+- [ ] **3.1: Content CLI Commands**
+  - [ ] **Implementation:** `janus content pull <content-name>`
+  - [ ] **Implementation:** `janus content push <file-path> -m <message>`
+  - [ ] **Implementation:** `janus content list`
+  - [ ] **Implementation:** `janus content search "<query>"`
+  - [ ] **Implementation:** `janus content tag <content-name> <tag-name>`
   - [ ] **Testing:** Write end-to-end tests for each CLI command.
-  - [ ] **Documentation:** Write user documentation for the `janus snippet` commands.
+  - [ ] **Documentation:** Write user documentation for the `janus content` commands.
 
-## Phase 4: Parameter Management
+## Phase 4: Tag Management
 
-- [ ] **4.1: Parameter CLI Commands**
-  - [ ] **Implementation:** `janus parameter create <name> --description "<desc>"`
-  - [ ] **Implementation:** `janus parameter add-option --parameter-name <name> <value> -m <message>`
-  - [ ] **Implementation:** `janus parameter list`
-  - [ ] **Implementation:** `janus parameter list-options <parameter-name>`
+- [ ] **4.1: Tag CLI Commands**
+  - [ ] **Implementation:** `janus tag create <name>`
+  - [ ] **Implementation:** `janus tag list`
+  - [ ] **Implementation:** `janus tag search "<query>"`
   - [ ] **Testing:** Write end-to-end tests for each CLI command.
-  - [ ] **Documentation:** Write user documentation for the `janus parameter` commands.
+  - [ ] **Documentation:** Write user documentation for the `janus tag` commands.
 
-## Phase 5: Composition Management
+## Phase 5: Test Case Management
 
-- [ ] **5.1: Composition CLI Commands**
-  - [ ] **Implementation:** `janus composition create-version --from-composition <id> | --from-group <name> -m <message>`
-  - [ ] **Implementation:** `janus composition list`
+- [ ] **5.1: Test Case CLI Commands**
+  - [ ] **Implementation:** `janus test-case create <name> --model <llm-model>`
+  - [ ] **Implementation:** `janus test-case add-slot <test-case-name> --role <role> --tags <tags> --sequence <number>`
+  - [ ] **Implementation:** `janus test-case list`
+  - [ ] **Implementation:** `janus test-case build <test-case-name>` (preview conversation)
   - [ ] **Testing:** Write end-to-end tests for each CLI command.
-  - [ ] **Documentation:** Write user documentation for the `janus composition` commands.
+  - [ ] **Documentation:** Write user documentation for the `janus test-case` commands.
 
 ## Phase 6: Test Execution & Results
 
@@ -98,7 +100,7 @@ Only create entity-specific services if you need domain-specific operations beyo
     - For TestRun: Use `GenericPersistence.createNamedEntity('TestRun', TestRun, {...})`
     - For TestRun listing: Use `GenericPersistence.listAll('TestRun', TestRun)`
   - [ ] **Implementation:** Only if needed, create a `TestRunPersistence` service for complex domain-specific operations:
-    - `createDataPoint(...)` - This might need custom logic for linking to TestRun and CompositionVersion
+    - `createDataPoint(...)` - This might need custom logic for linking to TestRun and TestCase
     - Any complex queries that can't be handled by generic functions
   - [ ] **Testing:** Write integration tests for any custom persistence methods.
 
@@ -106,7 +108,7 @@ Only create entity-specific services if you need domain-specific operations beyo
   - [ ] **Implementation:** Create `TestExecutionService` (`Effect.Tag`). This is a business logic service, distinct from the persistence services.
   - [ ] **Implementation:** Define a `Schema` for the `test_config.yaml` file to ensure type-safe parsing and validation.
   - [ ] **Implementation:** Implement `runFromFile(configPath: string): Effect<TestRun, JanusError>`.
-  - [ ] **Implementation:** This service will parse and validate the YAML, use the persistence services to create the `TestRun` and `CompositionVersion`, call the `LlmApi` service, and save `DataPoint`s.
+  - [ ] **Implementation:** This service will parse and validate the YAML, use the persistence services to create the `TestRun` and execute `TestCase`s, call the `LlmApi` service, and save `DataPoint`s.
   - [ ] **Testing:** Write integration tests for the service, providing test implementations of the persistence and `LlmApi` services.
 
 - [ ] **6.4: Run CLI Commands**

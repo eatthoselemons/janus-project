@@ -75,6 +75,24 @@ export const TagId = makeIdType('TagId');
 export type TagId = typeof TagId.Type;
 
 /**
+ * Content Node ID - Identifies a unified content container
+ */
+export const ContentNodeId = makeIdType('ContentNodeId');
+export type ContentNodeId = typeof ContentNodeId.Type;
+
+/**
+ * Content Node Version ID - Identifies a specific version of a content node
+ */
+export const ContentNodeVersionId = makeIdType('ContentNodeVersionId');
+export type ContentNodeVersionId = typeof ContentNodeVersionId.Type;
+
+/**
+ * Test Case ID - Identifies a test case
+ */
+export const TestCaseId = makeIdType('TestCaseId');
+export type TestCaseId = typeof TestCaseId.Type;
+
+/**
  * Slug - URL and command-line friendly string
  * Format: lowercase letters, numbers, and hyphens only
  * Must start and end with alphanumeric characters
@@ -116,5 +134,7 @@ export const AnyId = Schema.Union(
   TestRunId,
   DataPointId,
   TagId,
+  ContentNodeId,
+  ContentNodeVersionId,
 );
 export type AnyId = typeof AnyId.Type;

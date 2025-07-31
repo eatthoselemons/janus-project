@@ -72,14 +72,7 @@ export class FileSystemError extends Schema.TaggedError<FileSystemError>()(
 export class NotFoundError extends Schema.TaggedError<NotFoundError>()(
   'NotFoundError',
   {
-    entityType: Schema.Literal(
-      'snippet',
-      'parameter',
-      'composition',
-      'tag',
-      'test-run',
-      'data-point',
-    ),
+    entityType: Schema.Literal('content node', 'tag', 'test-run', 'data-point'),
     id: Schema.optional(AnyId),
     slug: Schema.optional(Slug),
   },
@@ -98,12 +91,8 @@ export class ConflictError extends Schema.TaggedError<ConflictError>()(
   'ConflictError',
   {
     entityType: Schema.Literal(
-      'snippet',
-      'snippet-version',
-      'parameter',
-      'parameter-option',
-      'composition',
-      'composition-version',
+      'content node',
+      'content node version',
       'tag',
       'test-run',
       'data-point',

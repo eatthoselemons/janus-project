@@ -1,5 +1,6 @@
 docs/gemini.local.md
 docs/llms/guides/effect-docs/
+docs/llms/guides/effect-packages/
 
 # exclude examples
 examples/*

@@ -8,14 +8,7 @@ import {
   NotFoundError,
   ConflictError,
 } from '../errors';
-import {
-  SnippetId,
-  SnippetVersionId,
-  ParameterId,
-  CompositionId,
-  TagId,
-  Slug,
-} from '../branded';
+import { ContentNodeId, ContentNodeVersionId, TagId, Slug } from '../branded';
 
 describe('Error Types', () => {
   describe('JanusError', () => {
@@ -183,16 +176,16 @@ describe('Error Types', () => {
   describe('NotFoundError', () => {
     it.effect('should create error with branded ID', () =>
       Effect.gen(function* () {
-        const id = yield* Schema.decode(SnippetId)(
+        const id = yield* Schema.decode(ContentNodeId)(
           '550e8400-e29b-41d4-a716-446655440000',
         );
         const error = new NotFoundError({
-          entityType: 'snippet',
+          entityType: 'content node',
           id: id,
         });
 
         expect(error._tag).toBe('NotFoundError');
-        expect(error.message).toBe(`snippet not found: ${id}`);
+        expect(error.message).toBe(`content node not found: ${id}`);
         expect(error.id).toBe(id);
         expect(error.slug).toBeUndefined();
       }),
@@ -200,14 +193,14 @@ describe('Error Types', () => {
 
     it.effect('should create error with slug', () =>
       Effect.gen(function* () {
-        const slug = yield* Schema.decode(Slug)('my-test-snippet');
+        const slug = yield* Schema.decode(Slug)('my-test-content-node');
         const error = new NotFoundError({
-          entityType: 'parameter',
+          entityType: 'content node',
           slug: slug,
         });
 
         expect(error._tag).toBe('NotFoundError');
-        expect(error.message).toBe(`parameter not found: ${slug}`);
+        expect(error.message).toBe(`content node not found: ${slug}`);
         expect(error.slug).toBe(slug);
         expect(error.id).toBeUndefined();
       }),
@@ -216,11 +209,11 @@ describe('Error Types', () => {
     it.effect('should create error without identifier', () =>
       Effect.gen(function* () {
         const error = new NotFoundError({
-          entityType: 'composition',
+          entityType: 'tag',
         });
 
         expect(error._tag).toBe('NotFoundError');
-        expect(error.message).toBe('composition not found: unknown');
+        expect(error.message).toBe('tag not found: unknown');
         expect(error.id).toBeUndefined();
         expect(error.slug).toBeUndefined();
       }),
@@ -229,9 +222,7 @@ describe('Error Types', () => {
     it.effect('should validate entity type literals', () =>
       Effect.gen(function* () {
         const entityTypes = [
-          'snippet',
-          'parameter',
-          'composition',
+          'content node',
           'tag',
           'test-run',
           'data-point',
@@ -247,11 +238,11 @@ describe('Error Types', () => {
     it.effect('should accept any ID type', () =>
       Effect.gen(function* () {
         // Test with a version ID
-        const versionId = yield* Schema.decode(SnippetVersionId)(
+        const versionId = yield* Schema.decode(ContentNodeVersionId)(
           '990e8400-e29b-41d4-a716-446655440000',
         );
         const error = new NotFoundError({
-          entityType: 'snippet',
+          entityType: 'content node',
           id: versionId,
         });
 
@@ -264,24 +255,25 @@ describe('Error Types', () => {
   describe('ConflictError', () => {
     it.effect('should create error with all properties', () =>
       Effect.gen(function* () {
-        const existingId = yield* Schema.decode(SnippetId)(
+        const existingId = yield* Schema.decode(ContentNodeId)(
           '550e8400-e29b-41d4-a716-446655440000',
         );
-        const importingId = yield* Schema.decode(SnippetId)(
+        const importingId = yield* Schema.decode(ContentNodeId)(
           '660e8400-e29b-41d4-a716-446655440001',
         );
 
         const error = new ConflictError({
-          entityType: 'snippet',
+          entityType: 'content node',
           existingId: existingId,
           importingId: importingId,
           conflictField: 'name',
-          originalMessage: "Snippet with name 'test-snippet' already exists",
+          originalMessage:
+            "Content node with name 'test-content-node' already exists",
         });
 
         expect(error._tag).toBe('ConflictError');
         expect(error.message).toBe(
-          `Import conflict for snippet: Snippet with name 'test-snippet' already exists ` +
+          `Import conflict for content node: Content node with name 'test-content-node' already exists ` +
             `(existing: ${existingId}, importing: ${importingId}, field: name)`,
         );
         expect(error.existingId).toBe(existingId);
@@ -293,36 +285,31 @@ describe('Error Types', () => {
     it.effect('should validate entity type literals', () =>
       Effect.gen(function* () {
         const entityTypes = [
-          'snippet',
-          'parameter',
-          'composition',
+          'content node',
+          'content node version',
           'tag',
         ] as const;
 
         for (const type of entityTypes) {
           // Use appropriate ID type based on entity type
-          const existingId = yield* type === 'snippet'
-            ? Schema.decode(SnippetId)('550e8400-e29b-41d4-a716-446655440000')
-            : type === 'parameter'
-              ? Schema.decode(ParameterId)(
+          const existingId = yield* type === 'content node'
+            ? Schema.decode(ContentNodeId)(
+                '550e8400-e29b-41d4-a716-446655440000',
+              )
+            : type === 'content node version'
+              ? Schema.decode(ContentNodeVersionId)(
                   '550e8400-e29b-41d4-a716-446655440001',
                 )
-              : type === 'composition'
-                ? Schema.decode(CompositionId)(
-                    '550e8400-e29b-41d4-a716-446655440002',
-                  )
-                : Schema.decode(TagId)('550e8400-e29b-41d4-a716-446655440003');
-          const importingId = yield* type === 'snippet'
-            ? Schema.decode(SnippetId)('660e8400-e29b-41d4-a716-446655440000')
-            : type === 'parameter'
-              ? Schema.decode(ParameterId)(
+              : Schema.decode(TagId)('550e8400-e29b-41d4-a716-446655440003');
+          const importingId = yield* type === 'content node'
+            ? Schema.decode(ContentNodeId)(
+                '660e8400-e29b-41d4-a716-446655440000',
+              )
+            : type === 'content node version'
+              ? Schema.decode(ContentNodeVersionId)(
                   '660e8400-e29b-41d4-a716-446655440001',
                 )
-              : type === 'composition'
-                ? Schema.decode(CompositionId)(
-                    '660e8400-e29b-41d4-a716-446655440002',
-                  )
-                : Schema.decode(TagId)('660e8400-e29b-41d4-a716-446655440003');
+              : Schema.decode(TagId)('660e8400-e29b-41d4-a716-446655440003');
 
           const error = new ConflictError({
             entityType: type,
@@ -338,15 +325,15 @@ describe('Error Types', () => {
 
     it.effect('should accept version IDs for conflicts', () =>
       Effect.gen(function* () {
-        const existingVersionId = yield* Schema.decode(SnippetVersionId)(
+        const existingVersionId = yield* Schema.decode(ContentNodeVersionId)(
           '770e8400-e29b-41d4-a716-446655440000',
         );
-        const importingVersionId = yield* Schema.decode(SnippetVersionId)(
+        const importingVersionId = yield* Schema.decode(ContentNodeVersionId)(
           '880e8400-e29b-41d4-a716-446655440001',
         );
 
         const error = new ConflictError({
-          entityType: 'snippet-version',
+          entityType: 'content node version',
           existingId: existingVersionId,
           importingId: importingVersionId,
           conflictField: 'content',
@@ -354,7 +341,7 @@ describe('Error Types', () => {
         });
 
         expect(error._tag).toBe('ConflictError');
-        expect(error.entityType).toBe('snippet-version');
+        expect(error.entityType).toBe('content node version');
         expect(error.existingId).toBe(existingVersionId);
         expect(error.importingId).toBe(importingVersionId);
       }),
@@ -372,17 +359,17 @@ describe('Error Types', () => {
           operation: 'read',
           originalMessage: 'test',
         }),
-        new NotFoundError({ entityType: 'snippet' }),
+        new NotFoundError({ entityType: 'content node' }),
         (() => {
           // Use a valid UUID for the test
-          const id1 = Schema.decodeSync(SnippetId)(
+          const id1 = Schema.decodeSync(ContentNodeId)(
             '550e8400-e29b-41d4-a716-446655440000',
           );
-          const id2 = Schema.decodeSync(SnippetId)(
+          const id2 = Schema.decodeSync(ContentNodeId)(
             '660e8400-e29b-41d4-a716-446655440001',
           );
           return new ConflictError({
-            entityType: 'snippet',
+            entityType: 'content node',
             existingId: id1,
             importingId: id2,
             conflictField: 'name',

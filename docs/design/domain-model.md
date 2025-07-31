@@ -14,109 +14,113 @@ This document specifies the core data model for the Janus Project. The model is 
 
 ### Entity Definitions
 
-#### 1. Snippets
+#### 1. Unified Content Types
 
-Snippets are the fundamental, reusable building blocks of prompts.
+The system uses a unified content model where all prompt-building entities (formerly snippets, parameters, and compositions) are represented as nodes in a content tree.
 
-**`Snippet`**
-The abstract container for a snippet and all its versions. It holds the consistent name.
+**`ContentNode`**
+The abstract container for any content element and all its versions. It serves as the universal building block.
 
 ```typescript
-type SnippetId = string & { readonly __brand: 'SnippetId' };
+type ContentNodeId = string & { readonly __brand: 'ContentNodeId' };
 type Slug = string & { readonly __brand: 'Slug' };
 
-type Snippet = {
-  id: SnippetId;
+type ContentNode = {
+  id: ContentNodeId;
   name: Slug;
   description: string;
 };
 ```
 
-**`SnippetVersion`**
-An immutable snapshot of a snippet's content at a specific point in time.
+**`ContentNodeVersion`**
+An immutable snapshot of a content node at a specific point in time. Content is optional to support both leaf nodes (with content) and branch nodes (organizing other nodes).
 
 ```typescript
-type SnippetVersionId = string & { readonly __brand: 'SnippetVersionId' };
+type ContentNodeVersionId = string & { readonly __brand: 'ContentNodeVersionId' };
 
-type SnippetVersion = {
-  id: SnippetVersionId;
-  content: string; // A template string, e.g., "You {{obligation_level}} to..."
+type ContentNodeVersion = {
+  id: ContentNodeVersionId;
+  content?: string; // Optional - branches may not have content
   createdAt: Date;
-  commit_message: string; // A mandatory message explaining the change.
+  commitMessage: string; // A mandatory message explaining the change
 };
 ```
 
-#### 2. Parameters
+#### 2. Test Cases
 
-Parameters are the named variables that can be injected into `SnippetVersion` content.
+Test cases define conversation structures and role assignments, enabling flexible prompt assembly and A/B testing.
 
-**`Parameter`**
-The abstract definition of a parameter.
+**`TestCase`**
+Defines a specific conversation structure with message slots that reference content nodes.
 
 ```typescript
-type ParameterId = string & { readonly __brand: 'ParameterId' };
+type TestCaseId = string & { readonly __brand: 'TestCaseId' };
+type LLMModel = string & { readonly __brand: 'LLMModel' }; // Validated pattern
 
-type Parameter = {
-  id: ParameterId;
-  name: Slug;
+type TestCase = {
+  id: TestCaseId;
+  name: string;
   description: string;
-};
-```
-
-**`ParameterOption`**
-A specific, versioned value for a `Parameter`.
-
-```typescript
-type ParameterOptionId = string & { readonly __brand: 'ParameterOptionId' };
-
-type ParameterOption = {
-  id: ParameterOptionId;
-  value: string; // The actual value, e.g., "have to"
   createdAt: Date;
-  commit_message: string;
+  llmModel: LLMModel;
+  messageSlots: MessageSlot[];
+  parameters?: ParameterContext; // Optional parameter values
 };
 ```
 
-#### 3. Compositions
-
-Compositions are recipes that define how to assemble multiple `SnippetVersion`s into a complete, runnable prompt.
-
-**`Composition`**
-The abstract container for a composition and all its versions.
+**`MessageSlot`**
+Specifies criteria for selecting content to fill a specific role in the conversation.
 
 ```typescript
-type CompositionId = string & { readonly __brand: 'CompositionId' };
+type ContentRole = 'system' | 'user' | 'assistant';
 
-type Composition = {
-  id: CompositionId;
+type MessageSlot = {
+  role: ContentRole;
+  tags?: Array<TagId | TagName>; // Filter by tags
+  excludeNodes?: Array<ContentNodeId | Slug>; // Exclude specific nodes
+  includeNodes?: Array<ContentNodeId | Slug>; // Include specific nodes
+  sequence: number; // Order in conversation
+};
+```
+
+#### 3. Supporting Types
+
+**Edge Properties**
+Relationships between content nodes carry operational semantics.
+
+```typescript
+type EdgeOperation = 'insert' | 'concatenate';
+
+type IncludesEdgeProperties = {
+  operation: EdgeOperation;
+  key?: string; // For insert operations - the placeholder to replace
+};
+```
+
+**Parameter Context**
+Type-safe parameter handling for content processing.
+
+```typescript
+type ParameterKey = string & { readonly __brand: 'ParameterKey' };
+type ParameterValue = string & { readonly __brand: 'ParameterValue' };
+type ParameterContext = HashMap<ParameterKey, ParameterValue>;
+```
+
+#### 4. Tags
+
+**`Tag`**
+A simple label for organizing and querying content nodes.
+
+```typescript
+type TagId = string & { readonly __brand: 'TagId' };
+
+type Tag = {
+  id: TagId;
   name: Slug;
-  description: string;
 };
 ```
 
-**`CompositionVersion`**
-An immutable snapshot of a composition, locking in specific `SnippetVersion`s in a defined order and role.
-
-```typescript
-type CompositionVersionId = string & {
-  readonly __brand: 'CompositionVersionId';
-};
-
-type CompositionSnippet = {
-  snippetVersionId: SnippetVersionId;
-  role: 'system' | 'user_prompt' | 'model_response';
-  sequence: number; // The order of the snippet within its role.
-};
-
-type CompositionVersion = {
-  id: CompositionVersionId;
-  snippets: CompositionSnippet[];
-  createdAt: Date;
-  commit_message: string;
-};
-```
-
-#### 4. Testing & Results
+#### 5. Testing & Results
 
 These entities store the configuration and output of an experiment.
 
@@ -150,19 +154,6 @@ type DataPoint = {
 };
 ```
 
-#### 5. Categorization
-
-**`Tag`**
-A simple label for organizing and querying entities.
-
-```typescript
-type TagId = string & { readonly __brand: 'TagId' };
-
-type Tag = {
-  id: TagId;
-  name: Slug;
-};
-```
 
 ---
 
@@ -170,30 +161,28 @@ type Tag = {
 
 These relationships define the connections between entities in the Neo4j graph.
 
-- `(SnippetVersion) -[:VERSION_OF]-> (Snippet)`
-  - Links a specific version to its abstract parent.
-- `(SnippetVersion) -[:PREVIOUS_VERSION]-> (SnippetVersion)`
-  - Creates a chronological linked-list of a snippet's history.
-- `(SnippetVersion) -[:DEFINES_PARAMETER]-> (Parameter)`
-  - Specifies that a snippet's content uses a given parameter.
-- `(Parameter) -[:HAS_OPTION]-> (ParameterOption)`
-  - Links a parameter definition to one of its possible values.
-- `(CompositionVersion) -[:VERSION_OF]-> (Composition)`
-  - Links a specific composition version to its abstract parent.
-- `(CompositionVersion) -[:PREVIOUS_VERSION]-> (CompositionVersion)`
-  - Creates a chronological linked-list of a composition's history.
-- `(CompositionVersion) -[:DERIVED_FROM]-> (CompositionVersion)`
-  - Tracks the lineage of how compositions were evolved from one another.
-- `(CompositionVersion) -[:INCLUDES { role: string, sequence: number }]-> (SnippetVersion)`
-  - The core composition relationship. Properties on the edge define the snippet's role and order.
+#### Content Structure Relationships
+
+- `(ContentNodeVersion) -[:VERSION_OF]-> (ContentNode)`
+  - Links a specific version to its abstract parent node.
+- `(ContentNodeVersion) -[:PREVIOUS_VERSION]-> (ContentNodeVersion)`
+  - Creates a chronological linked-list of a node's version history.
+- `(Parent:ContentNodeVersion) -[:INCLUDES {operation: string, key?: string}]-> (Child:ContentNodeVersion)`
+  - Forms the content tree structure. Edge properties define the operation:
+    - `operation: 'insert'` - Child provides a value for a placeholder in parent
+    - `operation: 'concatenate'` - Child's content is appended to parent
+    - `key` - For insert operations, specifies which placeholder to replace
+- `(ContentNode) -[:HAS_TAG]-> (Tag)`
+  - Applies categorical tags to content nodes for organization and filtering.
+
+#### Test and Result Relationships
+
 - `(TestRun) -[:GENERATED]-> (DataPoint)`
   - Links a test run to the individual data points it produced.
-- `(DataPoint) -[:USING_COMPOSITION]-> (CompositionVersion)`
-  - Links a result back to the exact, immutable composition that created it.
-- `(Snippet) -[:HAS_TAG]-> (Tag)`
-  - Applies a categorical tag to a snippet.
-- `(Composition) -[:HAS_TAG]-> (Tag)`
-  - Applies a categorical tag to a composition.
+- `(DataPoint) -[:USING_TEST_CASE]-> (TestCase)`
+  - Links a result to the test case that defined its conversation structure.
+- `(DataPoint) -[:USED_CONTENT]-> (ContentNodeVersion)`
+  - Tracks which specific content versions were used in generating the result.
 
 ---
 
@@ -201,29 +190,39 @@ These relationships define the connections between entities in the Neo4j graph.
 
 ```mermaid
 graph TD
-    subgraph "Prompt Building Blocks"
+    subgraph "Unified Content Tree"
         T(Tag)
-        S(Snippet) -- name, desc --> SV(SnippetVersion) -- content, commit_message
-        P(Parameter) -- name, desc --> PO(ParameterOption) -- value, commit_message
-
-        S -- HAS_TAG --> T
-        SV -- VERSION_OF --> S
-        SV -- PREVIOUS_VERSION --> SV
-        SV -- DEFINES_PARAMETER --> P
+        CN(ContentNode) -- name, desc --> CNV(ContentNodeVersion) -- content?, commitMessage
+        
+        CN -- HAS_TAG --> T
+        CNV -- VERSION_OF --> CN
+        CNV -- PREVIOUS_VERSION --> CNV
+        CNV -- "INCLUDES <br> {operation, key?}" --> CNV
     end
 
-    subgraph "Prompt Assembly"
-        C(Composition) -- name, desc --> CV(CompositionVersion) -- commit_message
-        C -- HAS_TAG --> T
-        CV -- VERSION_OF --> C
-        CV -- PREVIOUS_VERSION --> CV
-        CV -- DERIVED_FROM --> CV
-        CV -- "INCLUDES <br> {role, sequence}" --> SV
+    subgraph "Test Cases & Conversations"
+        TC(TestCase) -- name, llmModel --> MS(MessageSlot) -- role, tags, sequence
+        TC -- parameters --> PC(ParameterContext)
     end
 
     subgraph "Experimentation & Results"
         TR(TestRun) -- llm_model, metadata --> DP(DataPoint) -- response, metrics
         TR -- GENERATED --> DP
-        DP -- USING_COMPOSITION --> CV
+        DP -- USING_TEST_CASE --> TC
+        DP -- USED_CONTENT --> CNV
     end
 ```
+
+### Key Design Principles
+
+1. **Content is Role-Agnostic**: Content nodes don't specify roles. The same content can serve as system, user, or assistant messages in different test cases.
+
+2. **Tree Structure via Relationships**: The content hierarchy is expressed through Neo4j relationships, not type fields. This leverages the graph database's strengths.
+
+3. **Operations on Edges**: The `INCLUDES` relationship carries operation semantics (insert/concatenate), keeping nodes focused on content.
+
+4. **Lazy Processing**: Content trees are processed on-demand to avoid memory issues with large structures.
+
+5. **Type Safety**: Branded types and Effect schemas ensure compile-time safety and runtime validation.
+
+6. **Flexible Testing**: Test cases enable A/B testing and experimentation without duplicating content.
