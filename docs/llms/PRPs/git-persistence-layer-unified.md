@@ -3,7 +3,7 @@ description: |
 
 ## Purpose
 
-Create a unified StorageService interface that abstracts persistence operations, with swappable Git and Neo4j implementations using the simplified ContentNode model from the unified content types PRP.
+Create a unified StorageService interface that abstracts persistence operations, with swappable Git and Neo4j implementations using the unified ContentNode model from the official domain model specification.
 
 ## Core Principles
 
@@ -36,6 +36,9 @@ A storage abstraction layer that:
 - Uses unified ContentNode/ContentNodeVersion types
 - Allows runtime backend selection via configuration
 - Maintains identical behavior across implementations
+- **Git backend supports two modes**:
+  - **Lossless**: Full JSON with metadata, complete version history via git log parsing
+  - **Lossy**: Human-editable YAML/Markdown, current version only, fast performance
 
 ### Success Criteria
 
@@ -52,12 +55,13 @@ A storage abstraction layer that:
 ```yaml
 # MUST READ - Include these specific sections in your context window
 
-- file: /home/user/git/janus-project/docs/llms/features/unified-content-types.md
-  why: [Unified type model both backends must support]
+- file: /home/user/git/janus-project/docs/design/domain-model.md
+  why: [Official domain model specification with unified content types]
   critical: |
     ContentNode: abstract container (id, name, description)
-    ContentNodeVersion: content + operation (insert/concatenate)
+    ContentNodeVersion: content + operation (insert/concatenate on edges)
     Tree structure with VERSION_OF, INCLUDES relationships
+    TestCase defines conversation structure
 
 - file: /home/user/git/janus-project/src/services/neo4j/Neo4j.service.ts
   why: [Current interface to abstract into StorageService]
@@ -92,8 +96,9 @@ A storage abstraction layer that:
     Layer composition patterns
     Effect.gen usage
 
-- file: /home/user/git/janus-project/docs/llms/PRPs/05-unified-content-types.md
-  why: [Complete unified type model specification]
+- file: /home/user/git/janus-project/docs/design/domain-model.md
+  sections: ['Unified Content Types', 'Test Cases', 'Relationships']
+  why: [Complete domain model with relationships and processing rules]
   critical: |
     Operation goes on EDGES not nodes
     TestCase defines roles, not content
@@ -120,8 +125,8 @@ A storage abstraction layer that:
 // operation: 'insert' | 'concatenate'
 // key: only for insert operations (parameter name)
 
-// CRITICAL: File paths must handle special characters in slugs
-// Use proper encoding for filesystem safety
+// CRITICAL: Slugs are already validated to be filesystem-safe
+// Regex: /^[a-z0-9]+(?:-[a-z0-9]+)*$/ ensures no special characters
 ```
 
 ### Current Service Usage
@@ -271,15 +276,34 @@ type MessageSlot = {
 // Git: File references with edge data in _meta
 ```
 
+### Git Backend Modes
+
+The Git backend supports two modes for different use cases:
+
+#### Lossless Mode (Full Fidelity)
+- **Purpose**: Automated backups, migrations, data integrity
+- **Format**: JSON with complete metadata and IDs
+- **Versioning**: Parses git history for version traversal
+- **Performance**: Slower due to git operations
+- **Use cases**: CI/CD, backups, Neo4j migration
+
+#### Lossy Mode (Human Editable)
+- **Purpose**: Local development, manual editing
+- **Format**: YAML or Markdown for easy editing
+- **Versioning**: Current version only (git handles history)
+- **Performance**: Fast - simple file reads
+- **Use cases**: Development, prototyping, content authoring
+
 ### File Structure (Git Backend)
 
+#### Lossless Mode Structure
 ```bash
 data/
-├── nodes/                      # ContentNode entities
+├── nodes/                      # ContentNode entities (JSON)
 │   ├── greeting.json          
 │   ├── tone.json             
 │   └── welcome-prompt.json    
-├── versions/                  # ContentNodeVersion entities
+├── versions/                  # ContentNodeVersion entities (JSON)
 │   ├── greeting/
 │   │   └── v1.json           
 │   ├── tone/
@@ -295,9 +319,24 @@ data/
     └── concise-system-prompt.json
 ```
 
+#### Lossy Mode Structure
+```bash
+data/
+├── content/                   # All content in human-friendly format
+│   ├── greeting.yaml         # Or .md for Markdown format
+│   ├── tone.yaml            
+│   └── welcome-prompt.yaml   
+├── testcases/                # Test cases in YAML
+│   ├── support-conversation.yaml
+│   └── concise-system-prompt.yaml
+└── tags.yaml                 # All tags in one file
+```
+
 ### Storage Format Examples
 
-```typescript
+#### Lossless Mode (JSON)
+
+```json
 // File: data/nodes/greeting.json
 {
   "id": "cn_550e8400-e29b-41d4-a716-446655440000",
@@ -372,6 +411,60 @@ data/
 }
 ```
 
+#### Lossy Mode (YAML/Markdown)
+
+```yaml
+# File: data/content/greeting.yaml
+name: greeting
+description: A friendly greeting template
+tags: [greeting, cli]
+content: |
+  Hello! Reply in a {{tone}} manner.
+includes:
+  - name: tone        # Reference by name, not ID
+    operation: insert
+    key: tone
+```
+
+```yaml
+# File: data/content/tone.yaml
+name: tone
+description: Tone parameter for responses
+tags: [parameter]
+content: professional
+# No includes - leaf node
+```
+
+```markdown
+<!-- Alternative: data/content/greeting.md -->
+---
+name: greeting
+description: A friendly greeting template
+tags: [greeting, cli]
+includes:
+  tone: insert  # Simplified syntax for single parameter
+---
+
+Hello! Reply in a {{tone}} manner.
+```
+
+```yaml
+# File: data/testcases/support-conversation.yaml
+name: support-conversation
+description: Multi-turn support conversation
+model: gpt-4
+parameters:
+  tone: helpful
+  style: concise
+messages:
+  - role: system
+    tags: [instruction, behavior]
+  - role: user
+    tags: [greeting]
+  - role: assistant
+    tags: [greeting-response]
+```
+
 ### Query Pattern Mappings
 
 ```yaml
@@ -417,7 +510,10 @@ export const ConfigSchema = Schema.Struct({
   ),
   neo4j: Neo4jConfigSchema,
   git: Schema.Struct({
-    dataPath: Schema.String.pipe(Schema.withDefault(() => './data'))
+    dataPath: Schema.String.pipe(Schema.withDefault(() => './data')),
+    mode: Schema.Literal('lossless', 'lossy').pipe(
+      Schema.withDefault(() => 'lossy') // Default to human-friendly
+    )
   })
 });
 
@@ -483,18 +579,34 @@ CREATE src/layers/storage/Neo4jStorage.layer.ts:
 Task 5: Create Git Storage Implementation
 CREATE src/services/storage/git/GitStorage.ts:
   - Implement StorageService interface
-  - Translate queries to file operations
-  - Use Git for version history
-  - Process tree relationships
+  - Delegate to appropriate strategy based on mode
+  - Handle mode switching
+
+CREATE src/services/storage/git/strategies/LosslessStrategy.ts:
+  - Extends BaseGitStrategy
+  - Full JSON with metadata and complete IDs
+  - Parse git history for version traversal
+  - Preserve all timestamps and relationships
+  - Support migration to/from Neo4j
+  - Store edge properties in _meta.includes arrays
+
+CREATE src/services/storage/git/strategies/LossyStrategy.ts:
+  - Extends BaseGitStrategy
+  - YAML/Markdown format for human editing
+  - Name-based references (no IDs in files)
+  - Single current version per node
+  - Generate stable IDs from names when needed
+  - Simplified include syntax in frontmatter
 
 CREATE src/services/storage/git/query-translator.ts:
   - Parse Cypher-like queries
   - Map to file operations
-  - Support ContentNode queries
+  - Support both modes
 
 CREATE src/layers/storage/GitStorage.layer.ts:
   - Create GitStorageLive layer
   - Initialize Git repo if needed
+  - Select strategy based on config
 
 Task 6: Create Storage Layer Selector
 CREATE src/layers/storage/Storage.layer.ts:
@@ -623,53 +735,148 @@ export const createNeo4jStorage = (driver: Driver): StorageImpl => ({
   // ... other methods
 });
 
-// Task 5: Git Storage Implementation
+// Task 5: Git Storage Implementation with Strategy Pattern
 // src/services/storage/git/GitStorage.ts
+interface GitStorageStrategy {
+  runQuery: StorageImpl['runQuery'];
+  runInTransaction: StorageImpl['runInTransaction'];
+  runBatch: StorageImpl['runBatch'];
+  withSession: StorageImpl['withSession'];
+}
+
+// Base strategy with common git operations
+abstract class BaseGitStrategy implements GitStorageStrategy {
+  constructor(
+    protected git: GitService,
+    protected fs: FileSystem.FileSystem,
+    protected config: GitConfig
+  ) {}
+
+  abstract runQuery: StorageImpl['runQuery'];
+  
+  runInTransaction = (operations) =>
+    Effect.gen(function* () {
+      const filesWritten: string[] = [];
+      
+      const txContext: TransactionContext = {
+        run: (query, params) =>
+          Effect.gen(function* () {
+            const result = yield* this.runQuery(query, params);
+            
+            // Track files for batch commit
+            const { operation, entityType } = yield* parseQuery(query);
+            if (operation === 'CREATE' || operation === 'UPDATE') {
+              filesWritten.push(/* file path */);
+            }
+            
+            return result;
+          })
+      };
+      
+      const result = yield* operations(txContext);
+      
+      // Commit all changes at once
+      if (filesWritten.length > 0) {
+        yield* Effect.all(
+          filesWritten.map(f => this.git.add(f)),
+          { concurrency: "unbounded" }
+        );
+        yield* this.git.commit("Transaction commit");
+      }
+      
+      return result;
+    });
+
+  runBatch = (queries) =>
+    Effect.gen(function* () {
+      return yield* Effect.forEach(
+        queries,
+        (query) => this.runQuery(query.query, query.params),
+        { concurrency: "unbounded" }
+      );
+    });
+
+  withSession = <A>(work: (session: Session) => Effect.Effect<A, StorageError, never>) =>
+    Effect.gen(function* () {
+      // Git doesn't need sessions, but provide compatible interface
+      const mockSession = {} as Session;
+      return yield* work(mockSession);
+    });
+}
+
 export const createGitStorage = (
   git: GitService,
-  fs: FileSystem.FileSystem
-): StorageImpl => ({
-  runQuery: (query, params) =>
+  fs: FileSystem.FileSystem,
+  config: GitConfig
+): StorageImpl => {
+  // Select strategy based on mode
+  const strategy = config.mode === 'lossless' 
+    ? new LosslessStrategy(git, fs)
+    : new LossyStrategy(git, fs);
+    
+  return {
+    runQuery: strategy.runQuery,
+    runInTransaction: strategy.runInTransaction,
+    runBatch: strategy.runBatch,
+    withSession: strategy.withSession
+  };
+};
+
+// src/services/storage/git/strategies/LossyStrategy.ts
+export class LossyStrategy implements GitStorageStrategy {
+  constructor(
+    private git: GitService,
+    private fs: FileSystem.FileSystem
+  ) {}
+  
+  runQuery = (query, params) =>
     Effect.gen(function* () {
       const { operation, entityType, filters } = yield* parseQuery(query);
       
       switch (operation) {
         case 'MATCH':
           if (entityType === 'ContentNode' && filters.name) {
-            const path = `data/nodes/${filters.name}.json`;
-            const exists = yield* fs.exists(path);
+            // Lossy mode: single YAML file per node
+            const path = `data/content/${filters.name}.yaml`;
+            const exists = yield* this.fs.exists(path);
             if (!exists) return [];
             
-            const content = yield* fs.readFileString(path);
-            const node = JSON.parse(content);
-            const { _meta, ...data } = node;
-            return [{ n: data }];
+            const content = yield* this.fs.readFileString(path);
+            const data = yield* parseYaml(content);
+            
+            // Generate ID from name for compatibility
+            const node = {
+              ...data,
+              id: generateIdFromName('ContentNode', data.name)
+            };
+            
+            return [{ n: node }];
           }
           // Handle other patterns
           
         case 'CREATE':
           if (entityType === 'ContentNode') {
             const node = params?.props;
-            const path = `data/nodes/${node.name}.json`;
+            const path = `data/content/${node.name}.yaml`;
             
-            const fileContent = {
-              ...node,
-              _meta: {
-                type: 'ContentNode',
-                created: new Date().toISOString(),
-                tags: []
-              }
-            };
+            // Human-friendly YAML format
+            const yamlContent = stringifyYaml({
+              name: node.name,
+              description: node.description,
+              tags: node.tags || [],
+              content: node.content,
+              includes: [] // Will be populated by relationships
+            });
             
-            yield* fs.writeFileString(path, JSON.stringify(fileContent, null, 2));
-            yield* git.add(path);
-            yield* git.commit(`Create ContentNode: ${node.name}`);
+            yield* this.fs.writeFileString(path, yamlContent);
+            yield* this.git.add(path);
+            yield* this.git.commit(`Create ${node.name}`);
             
             return [{ n: node }];
           }
           // Handle other types
       }
-    }),
+    });
 
   runInTransaction: (operations) =>
     Effect.gen(function* () {
@@ -767,14 +974,18 @@ CONFIGURATION:
 ENVIRONMENT:
   - STORAGE_BACKEND=git for Git backend
   - STORAGE_BACKEND=neo4j for Neo4j backend (default)
+  - GIT_STORAGE_MODE=lossless for full fidelity
+  - GIT_STORAGE_MODE=lossy for human-editable (default)
 
 LAYERS:
   - All layers that depended on Neo4jLive now depend on StorageLive
   - No changes needed in business logic layers
 
 MIGRATION:
-  - npm run migrate:export -- --from neo4j --to git
+  - npm run migrate:export -- --from neo4j --to git --mode lossless
   - npm run migrate:import -- --from git --to neo4j
+  - npm run migrate:convert -- --from lossless --to lossy
+  - npm run migrate:convert -- --from lossy --to lossless
 ```
 
 ## Validation Loop
@@ -900,6 +1111,28 @@ npm run migrate:import -- --from git --to neo4j
 4. **Clean Architecture**: Proper dependency inversion
 5. **Development Flexibility**: Different backends for different environments
 
+## Benefits of Dual-Mode Git Backend
+
+### Lossy Mode Benefits
+- **Human Readable**: Edit content in VS Code, vim, or any text editor
+- **Fast Performance**: No git history parsing, simple file reads
+- **Easy Collaboration**: Review changes in standard diff tools
+- **Rapid Prototyping**: Create content without worrying about IDs
+- **Intuitive Format**: YAML/Markdown familiar to developers
+
+### Lossless Mode Benefits
+- **Complete Fidelity**: All metadata preserved
+- **Migration Ready**: Can move data to/from Neo4j
+- **Full History**: Access all versions via git log parsing
+- **Audit Trail**: Complete record of all changes
+- **CI/CD Compatible**: Automated backups and restores
+
+### Mode Switching
+- Start in lossy mode for development
+- Switch to lossless for production backups
+- Convert between modes as needed
+- Mix modes (read lossless, write lossy)
+
 ## Migration Strategy
 
 1. Create StorageService interface alongside Neo4jService
@@ -911,7 +1144,7 @@ npm run migrate:import -- --from git --to neo4j
 
 ---
 
-## Confidence Score: 9/10
+## Confidence Score: 8/10
 
 High confidence because:
 - Clear abstraction boundary
@@ -919,7 +1152,12 @@ High confidence because:
 - Simple interface to implement
 - Effect patterns well-established
 - Can migrate incrementally
+- Dual-mode design provides flexibility
 
-Minor uncertainty:
-- Query abstraction complexity (Cypher vs structured queries)
-- Performance overhead of abstraction layer
+Moderate complexity added by:
+- Two Git storage strategies to implement
+- ID generation/resolution in lossy mode
+- Format conversion between modes
+- YAML/Markdown parsing and generation
+
+The dual-mode approach adds implementation complexity but greatly improves usability for development scenarios.
