@@ -6,7 +6,7 @@
  */
 
 import { Schema, HashMap, Chunk } from 'effect';
-import { Slug, ContentNodeId, TagId } from './branded';
+import { Slug, ContentNodeId, TagId, TestCaseId } from './branded';
 import {
   ParameterKey,
   ParameterValue,
@@ -21,23 +21,14 @@ export const LLMModel = Schema.String.pipe(
 );
 export type LLMModel = typeof LLMModel.Type;
 
-// Test Case ID
-export const TestCaseId = Schema.String.pipe(
-  Schema.pattern(
-    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-  ),
-  Schema.brand('TestCaseId'),
-);
-export type TestCaseId = typeof TestCaseId.Type;
-
 // Tag name alias for test cases
-export const TagName = Slug; // Tags use slug format
-export type TagName = typeof TagName.Type;
+export const TestCaseTagName = Slug; // Tags use slug format
+export type TestCaseTagName = typeof TestCaseTagName.Type;
 
 // Message slot definition for test cases
 export const MessageSlot = Schema.Struct({
   role: ContentRole,
-  tags: Schema.optional(Schema.Array(Schema.Union(TagId, TagName))),
+  tags: Schema.optional(Schema.Array(Schema.Union(TagId, TestCaseTagName))),
   excludeNodes: Schema.optional(
     Schema.Array(Schema.Union(ContentNodeId, Slug)),
   ),
@@ -56,11 +47,14 @@ export const TestCase = Schema.Struct({
   createdAt: Schema.DateTimeUtc,
   llmModel: LLMModel,
   messageSlots: Schema.Array(MessageSlot),
-  parameters: Schema.optional(Schema.Unknown), // Will be validated as ParameterContext at runtime
+  parameters: Schema.optional(
+    Schema.HashMap({
+      key: ParameterKey,
+      value: ParameterValue,
+    }),
+  ),
 });
-export type TestCase = Omit<typeof TestCase.Type, 'parameters'> & {
-  parameters?: ParameterContext;
-};
+export type TestCase = typeof TestCase.Type;
 
 // Message type for conversations
 export const Message = Schema.Struct({

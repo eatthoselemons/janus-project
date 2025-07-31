@@ -87,6 +87,12 @@ export const ContentNodeVersionId = makeIdType('ContentNodeVersionId');
 export type ContentNodeVersionId = typeof ContentNodeVersionId.Type;
 
 /**
+ * Test Case ID - Identifies a test case
+ */
+export const TestCaseId = makeIdType('TestCaseId');
+export type TestCaseId = typeof TestCaseId.Type;
+
+/**
  * Slug - URL and command-line friendly string
  * Format: lowercase letters, numbers, and hyphens only
  * Must start and end with alphanumeric characters

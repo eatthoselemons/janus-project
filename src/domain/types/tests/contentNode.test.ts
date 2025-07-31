@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@effect/vitest';
-import { Effect, Schema, HashMap } from 'effect';
+import { Effect, Schema, HashMap, Option } from 'effect';
 import {
   ContentNode,
   ContentNodeVersion,
@@ -284,8 +284,8 @@ describe('TestCase', () => {
     Effect.gen(function* () {
       const key = yield* Schema.decode(ParameterKey)('topic');
       const value = yield* Schema.decode(ParameterValue)('TypeScript');
-      const params = HashMap.make<ParameterKey, ParameterValue>([[key, value]]);
 
+      // Use array form for Schema.HashMap encoding
       const testCase = {
         id: '123e4567-e89b-42d3-a456-426614174000',
         name: 'Parameterized test',
@@ -293,11 +293,13 @@ describe('TestCase', () => {
         createdAt: validDate,
         llmModel: 'gpt-4',
         messageSlots: [{ role: 'user', sequence: 0 }],
-        parameters: params,
+        parameters: [[key, value]], // Array of key-value pairs for Schema.HashMap
       };
 
       const result = yield* Schema.decode(TestCase)(testCase);
       expect(result.parameters).toBeDefined();
+      expect(HashMap.has(result.parameters!, key)).toBe(true);
+      expect(HashMap.get(result.parameters!, key)).toEqual(Option.some(value));
     }),
   );
 

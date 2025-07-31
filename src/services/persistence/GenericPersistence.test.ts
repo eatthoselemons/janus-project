@@ -110,7 +110,7 @@ describe('Generic Persistence Functions', () => {
   describe('findByName', () => {
     it.effect('should find existing entity by name', () =>
       Effect.gen(function* () {
-        const result = yield* GenericPersistence.findByName(
+        const result = yield* GenericPersistence.findEntityByName(
           'ContentNode',
           ContentNode,
           Schema.decodeSync(Slug)('existing-content-node'),
@@ -126,7 +126,7 @@ describe('Generic Persistence Functions', () => {
 
     it.effect('should return None when entity not found', () =>
       Effect.gen(function* () {
-        const result = yield* GenericPersistence.findByName(
+        const result = yield* GenericPersistence.findEntityByName(
           'ContentNode',
           ContentNode,
           Schema.decodeSync(Slug)('non-existent-content-node'),
@@ -156,7 +156,7 @@ describe('Generic Persistence Functions', () => {
         });
 
         const result = yield* Effect.either(
-          GenericPersistence.findByName(
+          GenericPersistence.findEntityByName(
             'Test',
             TestEntity,
             Schema.decodeSync(Slug)('test'),
@@ -307,7 +307,7 @@ describe('Generic Persistence Functions', () => {
       });
 
       // @ts-expect-error - Schema missing required 'name' field
-      const _invalidCall2 = GenericPersistence.findByName(
+      const _invalidCall2 = GenericPersistence.findEntityByName(
         'Bad',
         BadSchema2,
         Schema.decodeSync(Slug)('test'),
@@ -422,7 +422,7 @@ describe('Generic Persistence Functions', () => {
         });
 
         const result = yield* Effect.either(
-          GenericPersistence.findByName(
+          GenericPersistence.findEntityByName(
             'ContentNode',
             ContentNode,
             Schema.decodeSync(Slug)('test'),
