@@ -18,10 +18,15 @@ Replace the existing 6 content types with 2 unified types:
 - `ContentNode`: Abstract container with id, name, description
 - `ContentNodeVersion`: Versioned content with optional content field
 
+Add TestCase type for defining conversation structure:
+- `TestCase`: Defines message slots with roles and filtering
+- `MessageSlot`: Specifies role, tags, and content selection
+
 Structural relationships managed entirely by Neo4j:
-- Tree structure via INCLUDES relationships with operation and role on edges
+- Tree structure via INCLUDES relationships with operation on edges
 - Versioning via VERSION_OF and PREVIOUS_VERSION
-- Operations (insert/concatenate) and roles stored as edge properties
+- Tags via HAS_TAG relationships
+- Roles defined in TestCases, not in content
 
 ### Success Criteria
 
@@ -156,20 +161,17 @@ export const ContentNode = Schema.Struct({
 // ContentNodeVersion - unified version type  
 export const ContentNodeVersion = Schema.Struct({
   id: ContentNodeVersionId,  // New branded type
-  content: Schema.optional(Schema.String), // Optional - role containers have no content
+  content: Schema.optional(Schema.String), // Optional - branches may not have content
   createdAt: Schema.DateTimeUtc,
   commitMessage: Schema.String, // Align with existing convention
 });
 
-// Special marker for role containers
-export const ROLE_CONTAINER_PREFIX = 'role-container-' as const;
-
 // Neo4j Relationships:
 // (ContentNodeVersion) -[:VERSION_OF]-> (ContentNode)
-// (Parent:ContentNodeVersion) -[:INCLUDES {role?: ContentRole, operation: EdgeOperation, key?: string}]-> (Child:ContentNodeVersion)  
+// (Parent:ContentNodeVersion) -[:INCLUDES {operation: EdgeOperation, key?: string}]-> (Child:ContentNodeVersion)  
 // (ContentNodeVersion) -[:PREVIOUS_VERSION]-> (ContentNodeVersion)
-// Note: Every tree starts with a role container node that has no content but establishes the prompt type
-// Role containers are identified by names starting with 'role-container-'
+// (ContentNode) -[:HAS_TAG]-> (Tag)
+// Note: Content is role-agnostic - roles are defined in TestCases
 ```
 
 ### Type Safety and Data Models
@@ -189,7 +191,6 @@ export type EdgeOperation = typeof EdgeOperation.Type;
 
 // Edge properties schema for type safety
 export const IncludesEdgeProperties = Schema.Struct({
-  role: Schema.optional(ContentRole),
   operation: EdgeOperation,
   key: Schema.optional(Schema.String), // Only for insert operations
 });
@@ -230,6 +231,44 @@ export type ChildNode = {
   node: ContentNodeVersion;
   edge: IncludesEdgeProperties;
 };
+
+// Tag types
+export const TagId = makeIdType('TagId');
+export type TagId = typeof TagId.Type;
+
+export const TagName = Slug; // Tags use slug format
+export type TagName = typeof TagName.Type;
+
+// LLM Model validation
+export const LLMModel = Schema.String.pipe(
+  Schema.pattern(/^(gpt-4|gpt-3\.5-turbo|claude-3|claude-2|llama).*$/),
+  Schema.brand('LLMModel')
+);
+export type LLMModel = typeof LLMModel.Type;
+
+// Test Case types - define conversation structure
+export const MessageSlot = Schema.Struct({
+  role: ContentRole,
+  tags: Schema.optional(Schema.Array(Schema.Union(TagId, TagName))),
+  excludeNodes: Schema.optional(Schema.Array(Schema.Union(ContentNodeId, Slug))),
+  includeNodes: Schema.optional(Schema.Array(Schema.Union(ContentNodeId, Slug))),
+  sequence: Schema.Number.pipe(Schema.int(), Schema.nonNegative())
+});
+export type MessageSlot = typeof MessageSlot.Type;
+
+export const TestCaseId = makeIdType('TestCaseId');
+export type TestCaseId = typeof TestCaseId.Type;
+
+export const TestCase = Schema.Struct({
+  id: TestCaseId,
+  name: Schema.String,
+  description: Schema.String,
+  createdAt: Schema.DateTimeUtc,
+  llmModel: LLMModel,
+  messageSlots: Schema.Array(MessageSlot),
+  parameters: Schema.optional(ParameterContext)
+});
+export type TestCase = typeof TestCase.Type;
 ```
 
 ### List of tasks to be completed
@@ -305,24 +344,29 @@ export const createContentNode = (
   });
 });
 
-// Helper to create role containers
-export const createRoleContainer = (
-  role: ContentRole
-): Effect.Effect<{ node: ContentNode; version: ContentNodeVersion }, PersistenceError, Neo4jService> => 
+// Tag content for organization
+export const tagContent = (
+  nodeId: ContentNodeId,
+  tagNames: TagName[]
+): Effect.Effect<void, PersistenceError, Neo4jService> => 
   Effect.gen(function* () {
-  const node = yield* createContentNode(
-    `${ROLE_CONTAINER_PREFIX}${role}` as Slug,
-    `Role container for ${role} prompts`
-  );
-  
-  const version = yield* createContentNodeVersion(
-    node.id,
-    undefined, // No content
-    `Created ${role} role container`
-  );
-  
-  return { node, version };
-});
+    const neo4j = yield* Neo4jService;
+    
+    yield* Effect.forEach(tagNames, (tagName) => 
+      Effect.gen(function* () {
+        // Create tag if it doesn't exist
+        const query = cypher`
+          MERGE (t:Tag {name: $tagName})
+          WITH t
+          MATCH (n:ContentNode {id: $nodeId})
+          MERGE (n)-[:HAS_TAG]->(t)
+        `;
+        
+        const params = yield* queryParams({ tagName, nodeId });
+        yield* neo4j.runQuery(query, params);
+      })
+    );
+  });
 
 export const createContentNodeVersion = (
   nodeId: ContentNodeId,
@@ -330,8 +374,7 @@ export const createContentNodeVersion = (
   commitMessage: string,
   parents?: Array<{ 
     versionId: ContentNodeVersionId;
-    role?: ContentRole; // Role on the edge
-    operation: 'insert' | 'concatenate';
+    operation: EdgeOperation;
     key?: string; // For insert operations - which placeholder to fill
   }>
 ): Effect.Effect<ContentNodeVersion, NotFoundError | PersistenceError, Neo4jService> => 
@@ -355,14 +398,20 @@ export const createContentNodeVersion = (
           const query = cypher`
             MATCH (parent:ContentNodeVersion {id: $parentId})
             MATCH (child:ContentNodeVersion {id: $childId})
-            CREATE (parent)-[:INCLUDES {role: $role, operation: $operation, key: $key}]->(child)
+            CREATE (parent)-[:INCLUDES {operation: $operation, key: $key}]->(child)
           `;
+          
+          // Validate edge properties
+          const edgeProps = yield* Schema.decodeUnknown(IncludesEdgeProperties)({
+            operation: parent.operation,
+            key: parent.key
+          });
+          
           const params = yield* queryParams({
             parentId: parent.versionId,
             childId: version.id,  // The new version is the child
-            role: parent.role || null,
-            operation: parent.operation,
-            key: parent.key || null
+            operation: edgeProps.operation,
+            key: edgeProps.key || null
           });
           yield* tx.run(query, params);
         }
@@ -483,52 +532,87 @@ const processNode = (
     return processed + (concatenated ? '\n' + concatenated : '');
   });
 
-// Determine the role of a tree by finding its role container (lazy)
-export const getTreeRole = (
-  versionId: ContentNodeVersionId
-): Effect.Effect<ContentRole, Error | PersistenceError, Neo4jService> => 
+// Find content matching message slot criteria
+export const findContentForSlot = (
+  slot: MessageSlot,
+  parameters: ParameterContext
+): Effect.Effect<ContentNodeVersionId[], PersistenceError, Neo4jService> => 
   Effect.gen(function* () {
     const neo4j = yield* Neo4jService;
     
-    // Find role container by traversing down to leaves
-    const query = cypher`
-      MATCH (start:ContentNodeVersion {id: $versionId})
-      MATCH path = (start)-[:INCLUDES*0..]->(leaf:ContentNodeVersion)
-      WHERE NOT (leaf)-[:INCLUDES]->(:ContentNodeVersion)
-      AND leaf.name STARTS WITH $prefix
-      RETURN leaf.name as roleName
-      LIMIT 1
+    let query = cypher`
+      MATCH (n:ContentNode)-[:VERSION_OF]-(v:ContentNodeVersion)
     `;
     
-    const params = yield* queryParams({ 
-      versionId, 
-      prefix: ROLE_CONTAINER_PREFIX 
-    });
-    
-    const results = yield* neo4j.runQuery<{ roleName: string }>(query, params);
-    
-    if (results.length === 0) {
-      return yield* Effect.fail(new Error('No role container found in tree'));
+    // Add tag filtering if specified
+    if (slot.tags && slot.tags.length > 0) {
+      query += cypher`
+        WHERE ALL(tag IN $tags WHERE (n)-[:HAS_TAG]->(:Tag {name: tag}))
+      `;
     }
     
-    const role = results[0].roleName.replace(ROLE_CONTAINER_PREFIX, '') as ContentRole;
-    return role;
+    // Add exclusions
+    if (slot.excludeNodes && slot.excludeNodes.length > 0) {
+      query += cypher`
+        AND NOT n.id IN $excludeIds AND NOT n.name IN $excludeNames
+      `;
+    }
+    
+    // Add inclusions  
+    if (slot.includeNodes && slot.includeNodes.length > 0) {
+      query += cypher`
+        AND (n.id IN $includeIds OR n.name IN $includeNames)
+      `;
+    }
+    
+    query += cypher`
+      RETURN v.id as versionId
+      ORDER BY v.createdAt DESC
+    `;
+    
+    const params = yield* queryParams({
+      tags: slot.tags || [],
+      excludeIds: slot.excludeNodes?.filter(n => n.includes('-')) || [],
+      excludeNames: slot.excludeNodes?.filter(n => !n.includes('-')) || [],
+      includeIds: slot.includeNodes?.filter(n => n.includes('-')) || [],
+      includeNames: slot.includeNodes?.filter(n => !n.includes('-')) || []
+    });
+    
+    const results = yield* neo4j.runQuery<{ versionId: ContentNodeVersionId }>(query, params);
+    return results.map(r => r.versionId);
   });
 
-// Build conversation as array of messages for LLM APIs
-export const buildConversation = (
-  compositionVersionIds: ContentNodeVersionId[],
-  parameterContext: ParameterContext = HashMap.empty<ParameterKey, ParameterValue>(),
-  options: ProcessingOptions = {}
+// Build conversation from TestCase
+export const buildConversationFromTestCase = (
+  testCase: TestCase
 ): Effect.Effect<Conversation, Error | PersistenceError, Neo4jService> => 
   Effect.gen(function* () {
-    // Process each composition and collect messages
+    // Sort slots by sequence
+    const sortedSlots = [...testCase.messageSlots].sort((a, b) => a.sequence - b.sequence);
+    
+    // Process each slot
     const messages = yield* Effect.forEach(
-      compositionVersionIds,
-      (versionId) => Effect.gen(function* () {
-        const role = yield* getTreeRole(versionId);
-        const content = yield* processContentFromId(versionId, parameterContext, options);
-        return { role, content } satisfies Message;
+      sortedSlots,
+      (slot) => Effect.gen(function* () {
+        // Find content matching slot criteria
+        const versionIds = yield* findContentForSlot(slot, testCase.parameters || HashMap.empty());
+        
+        if (versionIds.length === 0) {
+          return yield* Effect.fail(new Error(`No content found for slot with role ${slot.role}`));
+        }
+        
+        // Process all matching content and concatenate
+        const contents = yield* Effect.forEach(
+          versionIds,
+          (versionId) => processContentFromId(
+            versionId, 
+            testCase.parameters || HashMap.empty(),
+            { includeTags: slot.tags }
+          )
+        );
+        
+        const combinedContent = contents.filter(Boolean).join('\n');
+        return { role: slot.role, content: combinedContent } satisfies Message;
       })
     );
     
@@ -551,13 +635,12 @@ export const linkNodes = (
     const query = cypher`
       MATCH (parent:ContentNodeVersion {id: $parentId})
       MATCH (child:ContentNodeVersion {id: $childId})
-      CREATE (parent)-[:INCLUDES {role: $role, operation: $operation, key: $key}]->(child)
+      CREATE (parent)-[:INCLUDES {operation: $operation, key: $key}]->(child)
     `;
     
     const params = yield* queryParams({
       parentId,
       childId,
-      role: validProps.role || null,
       operation: validProps.operation,
       key: validProps.key || null
     });
@@ -577,23 +660,22 @@ DATABASE:
 
 RELATIONSHIPS:
   - VERSION_OF: Links versions to their parent node
-  - INCLUDES: Forms the tree structure with properties - role (optional), operation, key (for inserts)
+  - INCLUDES: Forms the tree structure with properties - operation, key (for inserts)
   - PREVIOUS_VERSION: Links to previous version for history
+  - HAS_TAG: Links content nodes to tags for organization
 
 ROLE BEHAVIOR:
-  - Every prompt tree has a role container as a leaf node
-  - Role containers have no content, just establish the tree's role
-  - Role is stored on INCLUDES edges for flexible A/B testing
-  - Same content can have different roles in different contexts
-  - Role containers are named 'role-container-system', 'role-container-user', etc.
+  - Content is role-agnostic - no roles in the content tree
+  - Roles are defined in TestCase message slots
+  - Same content can have different roles in different test cases
+  - TestCases define the conversation structure and role assignments
 
 MIGRATION:
-  - Map Snippet -> ContentNode (operation will be on edges)
+  - Map Snippet -> ContentNode with appropriate tags
   - Map Parameter -> ContentNode (operation='insert' on parent edges)
-  - Map Composition -> ContentNode (operation='concatenate' on child edges)
-  - Create role containers for each existing composition based on its usage
-  - Attach role containers as leaf nodes to maintain tree structure
-  - Move role from CompositionSnippet to INCLUDES edge property
+  - Map Composition -> TestCase with message slots
+  - Extract tags from existing categorization
+  - Create TestCases for existing compositions
   - Preserve all version history and relationships
 ```
 
@@ -625,132 +707,148 @@ it('should create valid ContentNode', () => {
 // ContentService tests  
 it.effect('should create content tree', () =>
   Effect.gen(function* () {
-    // Create role container first
-    const roleContainer = yield* createRoleContainer('system');
-    
-    // Create parent node
-    const parent = yield* createContentNode('parent', 'Parent node');
+    // Create parent node with tags
+    const parent = yield* createContentNode('greeting-template', 'Greeting template');
+    yield* tagContent(parent.id, ['greeting', 'formal']);
     const parentVersion = yield* createContentNodeVersion(
       parent.id,
-      'Parent {{childValue}}',
-      'Initial parent'
+      'Hello {{name}}, welcome to our service!',
+      'Initial greeting template'
     );
     
-    // Link parent to role container
-    yield* linkNodes(parentVersion.id, roleContainer.version.id, {
-      role: 'system',
-      operation: 'concatenate'
-    });
-    
-    // Create child node
-    const child = yield* createContentNode('child', 'Child node');
-    const childVersion = yield* createContentNodeVersion(
-      child.id,
-      'content',
-      'Initial child',
+    // Create parameter node
+    const param = yield* createContentNode('user-name', 'User name parameter');
+    yield* tagContent(param.id, ['parameter', 'user-info']);
+    const paramVersion = yield* createContentNodeVersion(
+      param.id,
+      'Alice',
+      'Default user name',
       [{ 
         versionId: parentVersion.id,
         operation: 'insert',
-        key: 'childValue'
+        key: 'name'
       }]
     );
     
-    // Process content lazily
-    const context = HashMap.make<ParameterKey, ParameterValue>([
-      [Schema.decodeSync(ParameterKey)('childValue'), Schema.decodeSync(ParameterValue)('replaced')]
-    ]);
-    const result = yield* processContentFromId(parentVersion.id, context);
+    // Process content with parameter substitution
+    const result = yield* processContentFromId(parentVersion.id);
     
-    expect(result).toBe('Parent replaced\ncontent');
+    expect(result).toBe('Hello Alice, welcome to our service!');
   })
 );
 
 // A/B Testing example - same content, different roles
-it.effect('should support A/B testing with role containers', () =>
+it.effect('should support A/B testing with TestCases', () =>
   Effect.gen(function* () {
     // Create shared content
-    const sharedNode = yield* createContentNode('be-concise', 'Conciseness instruction');
-    const sharedVersion = yield* createContentNodeVersion(
-      sharedNode.id,
+    const conciseNode = yield* createContentNode('be-concise', 'Conciseness instruction');
+    yield* tagContent(conciseNode.id, ['instruction', 'tone']);
+    const conciseVersion = yield* createContentNodeVersion(
+      conciseNode.id,
       'Be concise and direct in your responses',
-      'Initial version'
+      'Conciseness instruction'
     );
     
-    // Test A: As system prompt
-    const systemRole = yield* createRoleContainer('system');
-    yield* linkNodes(sharedVersion.id, systemRole.version.id, {
+    // Create helper content  
+    const helperNode = yield* createContentNode('be-helpful', 'Helpfulness instruction');
+    yield* tagContent(helperNode.id, ['instruction', 'behavior']);
+    const helperVersion = yield* createContentNodeVersion(
+      helperNode.id,
+      'Be helpful and supportive',
+      'Helpfulness instruction'
+    );
+    
+    // Test A: Conciseness in system prompt
+    const testCaseA = Schema.decodeSync(TestCase)({
+      id: '123e4567-e89b-12d3-a456-426614174000',
+      name: 'Concise instruction as system',
+      description: 'Test with conciseness in system role',
+      createdAt: new Date().toISOString(),
+      llmModel: 'gpt-4',
+      messageSlots: [
+        { role: 'system', tags: ['instruction'], sequence: 0 },
+        { role: 'user', tags: ['greeting'], sequence: 1 }
+      ]
+    });
+    
+    // Test B: Conciseness in user prompt
+    const testCaseB = Schema.decodeSync(TestCase)({
+      id: '223e4567-e89b-12d3-a456-426614174001',
+      name: 'Concise instruction as user',
+      description: 'Test with conciseness in user role',
+      createdAt: new Date().toISOString(),
+      llmModel: 'gpt-4',
+      messageSlots: [
+        { role: 'system', tags: ['behavior'], sequence: 0 },
+        { role: 'user', tags: ['tone', 'greeting'], sequence: 1 }
+      ]
+    });
+    
+    // Build conversations for both test cases
+    const conversationA = yield* buildConversationFromTestCase(testCaseA);
+    const conversationB = yield* buildConversationFromTestCase(testCaseB);
+    
+    // Test A should have conciseness in system role
+    expect(Chunk.toReadonlyArray(conversationA)[0]).toMatchObject({
       role: 'system',
-      operation: 'concatenate'
+      content: expect.stringContaining('Be concise')
     });
     
-    // Test B: As user prompt
-    const userRole = yield* createRoleContainer('user');
-    yield* linkNodes(sharedVersion.id, userRole.version.id, {
+    // Test B should have conciseness in user role
+    expect(Chunk.toReadonlyArray(conversationB)[1]).toMatchObject({
       role: 'user',
-      operation: 'concatenate'
+      content: expect.stringContaining('Be concise')
     });
-    
-    // Build conversations for both tests
-    const conversationA = yield* buildConversation([sharedVersion.id]);
-    const conversationB = yield* buildConversation([sharedVersion.id]);
-    
-    // Both should find their respective role containers
-    expect(Chunk.toReadonlyArray(conversationA)).toEqual([
-      { role: 'system', content: 'Be concise and direct in your responses' }
-    ]);
-    
-    expect(Chunk.toReadonlyArray(conversationB)).toEqual([
-      { role: 'user', content: 'Be concise and direct in your responses' }
-    ]);
   })
 );
 
 // Multi-turn conversation example
 it.effect('should build multi-turn conversations', () =>
   Effect.gen(function* () {
-    // Create nodes for a conversation
+    // Create content nodes with tags
     const greeting = yield* createContentNode('user-greeting', 'User greeting');
+    yield* tagContent(greeting.id, ['greeting', 'user-message']);
     const greetingV = yield* createContentNodeVersion(
       greeting.id,
       'Hello, can you help me?',
       'Initial greeting'
     );
-    const greetingRole = yield* createRoleContainer('user');
-    yield* linkNodes(greetingV.id, greetingRole.version.id, {
-      operation: 'concatenate'
-    });
     
     const response = yield* createContentNode('assistant-response', 'Assistant response');
+    yield* tagContent(response.id, ['greeting-response', 'assistant-message']);
     const responseV = yield* createContentNodeVersion(
       response.id,
       'Hello! I\'d be happy to help.',
       'Initial response'
     );
-    const responseRole = yield* createRoleContainer('assistant');
-    yield* linkNodes(responseV.id, responseRole.version.id, {
-      operation: 'concatenate'
-    });
     
     const followup = yield* createContentNode('user-followup', 'User followup');
+    yield* tagContent(followup.id, ['followup', 'user-message']);
     const followupV = yield* createContentNodeVersion(
       followup.id,
       'I need help with {{topic}}',
       'Followup with parameter'
     );
-    const followupRole = yield* createRoleContainer('user');
-    yield* linkNodes(followupV.id, followupRole.version.id, {
-      operation: 'concatenate'
+    
+    // Create a test case for the conversation
+    const conversationTest = Schema.decodeSync(TestCase)({
+      id: '323e4567-e89b-12d3-a456-426614174002',
+      name: 'Support conversation',
+      description: 'Multi-turn support conversation',
+      createdAt: new Date().toISOString(),
+      llmModel: 'gpt-4',
+      messageSlots: [
+        { role: 'user', tags: ['greeting'], sequence: 0 },
+        { role: 'assistant', tags: ['greeting-response'], sequence: 1 },
+        { role: 'user', tags: ['followup'], sequence: 2 }
+      ],
+      parameters: HashMap.make<ParameterKey, ParameterValue>([
+        [Schema.decodeSync(ParameterKey)('topic'), Schema.decodeSync(ParameterValue)('TypeScript')]
+      ])
     });
     
-    // Build conversation with parameters
-    const context = HashMap.make<ParameterKey, ParameterValue>([
-      [Schema.decodeSync(ParameterKey)('topic'), Schema.decodeSync(ParameterValue)('TypeScript')]
-    ]);
-    
-    const conversation = yield* buildConversation(
-      [greetingV.id, responseV.id, followupV.id],
-      context
-    );
+    // Build conversation from test case
+    const conversation = yield* buildConversationFromTestCase(conversationTest);
     
     // Should create proper message array for LLM API
     expect(Chunk.toReadonlyArray(conversation)).toEqual([
@@ -797,19 +895,23 @@ pnpm tsx src/migration/unifyContentTypes.ts
 - ❌ Don't pass undefined to Neo4j - use null
 - ❌ Don't skip the queryParams helper
 - ❌ Don't put operation on nodes - it belongs on edges
-- ❌ Don't forget role containers - every tree needs one
+- ❌ Don't put roles in content - they belong in TestCases
 - ❌ Don't forget to handle recursive cycles in tree traversal
 - ❌ Don't mutate content - keep everything immutable
 
 ---
 
-**Confidence Score: 8/10**
+**Confidence Score: 9/10**
 
 The PRP provides comprehensive context including:
 - Complete understanding of current architecture
-- Clear migration path from 6 types to 2
+- Clear migration path from 6 types to 2 plus TestCase
 - Explicit Neo4j patterns to follow
 - Effect-TS best practices incorporated
+- Type-safe design with proper branded types
+- Lazy processing to avoid memory issues
+- LLM-ready conversation format
+- Flexible A/B testing through TestCases
 - Validation gates at every level
 - Known gotchas documented
 
