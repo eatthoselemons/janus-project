@@ -1,5 +1,5 @@
 import { Effect, Layer, Schema } from 'effect';
-import { Neo4jService, TransactionContext } from '../neo4j';
+import { StorageService, TransactionContext, StorageError } from '../storage';
 import { Tag } from '../../domain/types/tag';
 import {
   ContentNode,
@@ -11,7 +11,6 @@ import {
   ContentNodeVersionId,
   Slug,
 } from '../../domain/types/branded';
-import { Neo4jError } from '../../domain/types/errors';
 
 /**
  * Test data structure for generic persistence testing
@@ -199,8 +198,8 @@ export const Neo4jTestWithGenericData = (
 
   // Return Neo4j service with query handler
   return Layer.succeed(
-    Neo4jService,
-    Neo4jService.of({
+    StorageService,
+    StorageService.of({
       runQuery: <T = unknown>(query: any, params: any = {}) => {
         const data = handleQuery(query, params);
         return Effect.succeed(data as T[]);
@@ -222,8 +221,8 @@ export const Neo4jTestWithGenericData = (
       },
       withSession: () =>
         Effect.fail(
-          new Neo4jError({
-            query: '',
+          new StorageError({
+            operation: 'read' as const,
             originalMessage: 'withSession not implemented in test layer',
           }),
         ),

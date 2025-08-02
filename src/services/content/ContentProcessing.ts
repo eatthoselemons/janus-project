@@ -1,5 +1,5 @@
 import { Effect, Schema, HashMap } from 'effect';
-import { Neo4jService } from '../neo4j';
+import { StorageService } from '../storage';
 import { NotFoundError, PersistenceError } from '../../domain/types/errors';
 import { cypher, queryParams } from '../../domain/types/database';
 import {
@@ -21,10 +21,7 @@ const mapToPersistenceError = <A, E, R>(
 ): Effect.Effect<A, PersistenceError | NotFoundError, R> =>
   effect.pipe(
     Effect.mapError((error) => {
-      if (
-        error instanceof PersistenceError ||
-        error instanceof NotFoundError
-      ) {
+      if (error instanceof PersistenceError || error instanceof NotFoundError) {
         return error;
       }
       return new PersistenceError({
@@ -41,9 +38,9 @@ const processNode = (
   nodeVersion: ContentNodeVersion,
   parameterHashMap: InsertHashMap,
   options: ProcessingOptions,
-): Effect.Effect<string, PersistenceError | NotFoundError, Neo4jService> =>
+): Effect.Effect<string, PersistenceError | NotFoundError, StorageService> =>
   Effect.gen(function* () {
-    const neo4j = yield* Neo4jService;
+    const storage = yield* StorageService;
 
     // Fetch children for this node with their parent ContentNode for sorting
     const childrenQuery = cypher`
@@ -56,7 +53,7 @@ const processNode = (
       queryParams({ versionId: nodeVersion.id }),
     );
     const childrenResult = yield* mapToPersistenceError(
-      neo4j.runQuery<{
+      storage.runQuery<{
         child: unknown;
         edge: unknown;
         parentName: string;
@@ -152,9 +149,9 @@ export const processContentFromId = (
   versionId: ContentNodeVersionId,
   context: InsertHashMap = HashMap.empty<InsertKey, InsertValue>(),
   options: ProcessingOptions = {},
-): Effect.Effect<string, PersistenceError | NotFoundError, Neo4jService> =>
+): Effect.Effect<string, PersistenceError | NotFoundError, StorageService> =>
   Effect.gen(function* () {
-    const neo4j = yield* Neo4jService;
+    const storage = yield* StorageService;
 
     // Annotate span with processing context
     yield* Effect.annotateCurrentSpan({
@@ -176,7 +173,7 @@ export const processContentFromId = (
 
     const params = yield* mapToPersistenceError(queryParams({ versionId }));
     const result = yield* mapToPersistenceError(
-      neo4j.runQuery<{
+      storage.runQuery<{
         node: unknown;
       }>(query, params),
     );
@@ -209,10 +206,10 @@ export const getContentTree = (
 ): Effect.Effect<
   ContentTreeNode,
   PersistenceError | NotFoundError,
-  Neo4jService
+  StorageService
 > =>
   Effect.gen(function* () {
-    const neo4j = yield* Neo4jService;
+    const storage = yield* StorageService;
 
     // Recursive CTE to get full tree structure
     const query = cypher`
@@ -230,7 +227,7 @@ export const getContentTree = (
       queryParams({ versionId, maxDepth }),
     );
     const result = yield* mapToPersistenceError(
-      neo4j.runQuery<{
+      storage.runQuery<{
         root: unknown;
         descendants: Array<{ node: unknown; depth: number }>;
       }>(query, params),

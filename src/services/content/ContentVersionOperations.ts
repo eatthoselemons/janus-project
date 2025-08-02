@@ -1,10 +1,6 @@
 import { Effect, Option, Schema } from 'effect';
-import { Neo4jService, TransactionContext } from '../neo4j';
-import {
-  NotFoundError,
-  PersistenceError,
-  Neo4jError,
-} from '../../domain/types/errors';
+import { StorageService, TransactionContext, StorageError } from '../storage';
+import { NotFoundError, PersistenceError } from '../../domain/types/errors';
 import { cypher, queryParams } from '../../domain/types/database';
 import {
   ContentNodeVersion,
@@ -25,7 +21,7 @@ import {
  * Create parent relationships for a ContentNodeVersion
  */
 const createParentRelationships = (
-  neo4j: any,
+  storage: any,
   version: ContentNodeVersion,
   parents: Array<{
     versionId: ContentNodeVersionId;
@@ -33,7 +29,7 @@ const createParentRelationships = (
     key?: string;
   }>,
 ): Effect.Effect<void, PersistenceError, never> =>
-  neo4j
+  storage
     .runInTransaction((tx: TransactionContext) =>
       Effect.gen(function* () {
         for (const parent of parents) {
@@ -44,15 +40,16 @@ const createParentRelationships = (
           `;
 
           // Validate edge properties
-          const edgeProps = yield* Schema.decodeUnknown(
-            IncludesEdgeProperties,
-          )({
-            operation: parent.operation,
-            key: parent.key,
-          }).pipe(
+          const edgeProps = yield* Schema.decodeUnknown(IncludesEdgeProperties)(
+            {
+              operation: parent.operation,
+              key: parent.key,
+            },
+          ).pipe(
             Effect.mapError(
               () =>
-                new Neo4jError({
+                new StorageError({
+                  operation: 'create' as const,
                   originalMessage: 'Invalid edge properties',
                   query: '',
                 }),
@@ -67,7 +64,8 @@ const createParentRelationships = (
           }).pipe(
             Effect.mapError(
               (error) =>
-                new Neo4jError({
+                new StorageError({
+                  operation: 'create' as const,
                   originalMessage: error.message,
                   query: '',
                 }),
@@ -79,7 +77,7 @@ const createParentRelationships = (
     )
     .pipe(
       Effect.mapError((error) => {
-        if (error instanceof Neo4jError) {
+        if (error instanceof StorageError) {
           return new PersistenceError({
             originalMessage: error.originalMessage,
             operation: 'connect',
@@ -108,10 +106,10 @@ export const createContentNodeVersion = (
 ): Effect.Effect<
   ContentNodeVersion,
   NotFoundError | PersistenceError,
-  Neo4jService
+  StorageService
 > =>
   Effect.gen(function* () {
-    const neo4j = yield* Neo4jService;
+    const storage = yield* StorageService;
 
     // Annotate span with context
     yield* Effect.annotateCurrentSpan({
@@ -124,12 +122,15 @@ export const createContentNodeVersion = (
     const version = yield* generateContentNodeVersion(content, commitMessage);
 
     // Create version in Neo4j with proper relationships
-    yield* neo4j
+    yield* storage
       .runInTransaction((tx) =>
         Effect.gen(function* () {
           yield* verifyContentNodeExists(tx, nodeId);
 
-          const previousVersionId = yield* findPreviousContentNodeVersion(tx, nodeId);
+          const previousVersionId = yield* findPreviousContentNodeVersion(
+            tx,
+            nodeId,
+          );
 
           // Create version node with relationships
           yield* createVersionInNeo4j(tx, nodeId, version, previousVersionId);
@@ -141,7 +142,7 @@ export const createContentNodeVersion = (
             return error;
           }
           if (
-            error instanceof Neo4jError &&
+            error instanceof StorageError &&
             error.originalMessage.includes('not found')
           ) {
             return new NotFoundError({
@@ -158,7 +159,7 @@ export const createContentNodeVersion = (
 
     // Create parent relationships if provided
     if (parents && parents.length > 0) {
-      yield* createParentRelationships(neo4j, version, parents);
+      yield* createParentRelationships(storage, version, parents);
     }
 
     return version;
@@ -172,10 +173,10 @@ export const getLatestContentNodeVersion = (
 ): Effect.Effect<
   Option.Option<ContentNodeVersion>,
   PersistenceError,
-  Neo4jService
+  StorageService
 > =>
   Effect.gen(function* () {
-    const neo4j = yield* Neo4jService;
+    const storage = yield* StorageService;
     const query = cypher`
       MATCH (p:ContentNode {id: $parentId})<-[:VERSION_OF]-(v:ContentNodeVersion)
       RETURN v ORDER BY v.createdAt DESC LIMIT 1
@@ -190,7 +191,7 @@ export const getLatestContentNodeVersion = (
           }),
       ),
     );
-    const results = yield* neo4j.runQuery<{ v: unknown }>(query, params).pipe(
+    const results = yield* storage.runQuery<{ v: unknown }>(query, params).pipe(
       Effect.mapError(
         (error) =>
           new PersistenceError({
@@ -223,16 +224,16 @@ export const getLatestContentNodeVersion = (
  */
 export const getChildren = (
   nodeVersionId: ContentNodeVersionId,
-): Effect.Effect<readonly ChildNode[], PersistenceError, Neo4jService> =>
+): Effect.Effect<readonly ChildNode[], PersistenceError, StorageService> =>
   Effect.gen(function* () {
-    const neo4j = yield* Neo4jService;
+    const storage = yield* StorageService;
     const query = cypher`
       MATCH (parent:ContentNodeVersion {id: $parentId})-[r:INCLUDES]->(child:ContentNodeVersion)
       RETURN child, r
       ORDER BY child.createdAt
     `;
     const params = yield* queryParams({ parentId: nodeVersionId });
-    const results = yield* neo4j.runQuery<{ child: unknown; r: unknown }>(
+    const results = yield* storage.runQuery<{ child: unknown; r: unknown }>(
       query,
       params,
     );
@@ -270,9 +271,9 @@ export const linkNodes = (
   parentId: ContentNodeVersionId,
   childId: ContentNodeVersionId,
   props: IncludesEdgeProperties,
-): Effect.Effect<void, PersistenceError, Neo4jService> =>
+): Effect.Effect<void, PersistenceError, StorageService> =>
   Effect.gen(function* () {
-    const neo4j = yield* Neo4jService;
+    const storage = yield* StorageService;
 
     // Validate properties
     const validProps = yield* Schema.decodeUnknown(IncludesEdgeProperties)(
@@ -292,7 +293,7 @@ export const linkNodes = (
       key: validProps.key || null,
     });
 
-    yield* neo4j.runQuery(query, params);
+    yield* storage.runQuery(query, params);
   })
     .pipe(
       Effect.mapError((error) => {

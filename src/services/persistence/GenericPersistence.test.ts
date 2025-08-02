@@ -15,7 +15,7 @@ import {
   ContentNodeVersionId,
   Slug,
 } from '../../domain/types/branded';
-import { Neo4jService } from '../neo4j';
+import { StorageService } from '../storage';
 
 describe('Generic Persistence Functions', () => {
   // Test schema that matches requirements for named entities
@@ -139,7 +139,7 @@ describe('Generic Persistence Functions', () => {
     it.effect('should validate schema on returned data', () =>
       Effect.gen(function* () {
         // Mock Neo4j returning invalid data
-        const mockNeo4j = Neo4jService.of({
+        const mockStorage = StorageService.of({
           runQuery: () =>
             Effect.succeed([
               {
@@ -160,7 +160,7 @@ describe('Generic Persistence Functions', () => {
             'Test',
             TestEntity,
             Schema.decodeSync(Slug)('test'),
-          ).pipe(Effect.provide(Layer.succeed(Neo4jService, mockNeo4j))),
+          ).pipe(Effect.provide(Layer.succeed(StorageService, mockStorage))),
         );
 
         expect(result._tag).toBe('Left');
@@ -243,7 +243,7 @@ describe('Generic Persistence Functions', () => {
 
     it.effect('should validate all returned entities', () =>
       Effect.gen(function* () {
-        const mockNeo4j = Neo4jService.of({
+        const mockStorage = StorageService.of({
           runQuery: () =>
             Effect.succeed([
               {
@@ -268,7 +268,7 @@ describe('Generic Persistence Functions', () => {
 
         const result = yield* Effect.either(
           GenericPersistence.listAll('ContentNode', ContentNode).pipe(
-            Effect.provide(Layer.succeed(Neo4jService, mockNeo4j)),
+            Effect.provide(Layer.succeed(StorageService, mockStorage)),
           ),
         );
 
@@ -339,7 +339,7 @@ describe('Generic Persistence Functions', () => {
   describe('Schema Validation Edge Cases', () => {
     it.effect('should handle missing required fields', () =>
       Effect.gen(function* () {
-        const mockNeo4j = Neo4jService.of({
+        const mockStorage = StorageService.of({
           runQuery: () =>
             Effect.succeed([
               {
@@ -361,7 +361,7 @@ describe('Generic Persistence Functions', () => {
             'content node',
             ContentNode,
             Schema.decodeSync(Slug)('valid-name'),
-          ).pipe(Effect.provide(Layer.succeed(Neo4jService, mockNeo4j))),
+          ).pipe(Effect.provide(Layer.succeed(StorageService, mockStorage))),
         );
 
         expect(result._tag).toBe('Left');
@@ -373,7 +373,7 @@ describe('Generic Persistence Functions', () => {
 
     it.effect('should handle extra fields gracefully', () =>
       Effect.gen(function* () {
-        const mockNeo4j = Neo4jService.of({
+        const mockStorage = StorageService.of({
           runQuery: () =>
             Effect.succeed([
               {
@@ -395,7 +395,7 @@ describe('Generic Persistence Functions', () => {
           'content node',
           ContentNode,
           Schema.decodeSync(Slug)('valid-name'),
-        ).pipe(Effect.provide(Layer.succeed(Neo4jService, mockNeo4j)));
+        ).pipe(Effect.provide(Layer.succeed(StorageService, mockStorage)));
 
         // Should succeed and ignore extra field
         expect(contentNode.name).toBe('valid-name');
@@ -405,7 +405,7 @@ describe('Generic Persistence Functions', () => {
 
     it.effect('should handle invalid slug format', () =>
       Effect.gen(function* () {
-        const mockNeo4j = Neo4jService.of({
+        const mockStorage = StorageService.of({
           runQuery: () =>
             Effect.succeed([
               {
@@ -426,7 +426,7 @@ describe('Generic Persistence Functions', () => {
             'ContentNode',
             ContentNode,
             Schema.decodeSync(Slug)('test'),
-          ).pipe(Effect.provide(Layer.succeed(Neo4jService, mockNeo4j))),
+          ).pipe(Effect.provide(Layer.succeed(StorageService, mockStorage))),
         );
 
         expect(result._tag).toBe('Left');

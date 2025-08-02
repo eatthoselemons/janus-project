@@ -1,5 +1,5 @@
 import { Effect, Console, Schema, HashMap } from 'effect';
-import { Neo4jService } from '../services/neo4j';
+import { StorageService } from '../services/storage';
 import {
   createContentNode,
   createContentNodeVersion,
@@ -163,7 +163,7 @@ const createSampleContent = Effect.gen(function* () {
 const createSampleTestCases = Effect.gen(function* () {
   yield* Console.log('Creating sample test cases...');
 
-  const neo4j = yield* Neo4jService;
+  const storage = yield* StorageService;
 
   // Create a basic conversation test case
   const basicConversationTest: TestCase = {
@@ -214,7 +214,7 @@ const createSampleTestCases = Effect.gen(function* () {
     CREATE (t:TestCase $props)
   `;
   const testCaseParams = yield* queryParams({ props: basicConversationTest });
-  yield* neo4j.runQuery(createTestCaseQuery, testCaseParams);
+  yield* storage.runQuery(createTestCaseQuery, testCaseParams);
 
   // Create an A/B testing scenario
   const abTestCaseA: TestCase = {
@@ -267,10 +267,10 @@ const createSampleTestCases = Effect.gen(function* () {
 
   // Store A/B test cases
   const testCaseAParams = yield* queryParams({ props: abTestCaseA });
-  yield* neo4j.runQuery(createTestCaseQuery, testCaseAParams);
+  yield* storage.runQuery(createTestCaseQuery, testCaseAParams);
 
   const testCaseBParams = yield* queryParams({ props: abTestCaseB });
-  yield* neo4j.runQuery(createTestCaseQuery, testCaseBParams);
+  yield* storage.runQuery(createTestCaseQuery, testCaseBParams);
 
   yield* Console.log('Sample test cases created successfully!');
 });
@@ -278,7 +278,7 @@ const createSampleTestCases = Effect.gen(function* () {
 const createConstraints = Effect.gen(function* () {
   yield* Console.log('Creating database constraints...');
 
-  const neo4j = yield* Neo4jService;
+  const storage = yield* StorageService;
 
   // Create unique constraints
   const constraints = [
@@ -291,7 +291,7 @@ const createConstraints = Effect.gen(function* () {
 
   for (const constraint of constraints) {
     try {
-      yield* neo4j.runQuery(cypher`${constraint}`, {});
+      yield* storage.runQuery(cypher`${constraint}`, {});
       yield* Console.log(`✓ Created constraint: ${constraint.split(' ')[2]}`);
     } catch (error) {
       // Constraint might already exist, that's okay
@@ -307,7 +307,7 @@ const createConstraints = Effect.gen(function* () {
 const createIndexes = Effect.gen(function* () {
   yield* Console.log('Creating database indexes...');
 
-  const neo4j = yield* Neo4jService;
+  const storage = yield* StorageService;
 
   // Create indexes for better query performance
   const indexes = [
@@ -319,7 +319,7 @@ const createIndexes = Effect.gen(function* () {
 
   for (const index of indexes) {
     try {
-      yield* neo4j.runQuery(cypher`${index}`, {});
+      yield* storage.runQuery(cypher`${index}`, {});
       yield* Console.log(`✓ Created index: ${index.split(' ')[2]}`);
     } catch (error) {
       // Index might already exist, that's okay

@@ -1,11 +1,8 @@
 import { Effect, Option } from 'effect';
-import { Neo4jService } from '../neo4j';
+import { StorageService } from '../storage';
 import { NotFoundError, PersistenceError } from '../../domain/types/errors';
 import { cypher, queryParams } from '../../domain/types/database';
-import {
-  ContentNode,
-  ContentNodeId,
-} from '../../domain/types/contentNode';
+import { ContentNode, ContentNodeId } from '../../domain/types/contentNode';
 import { TestCaseTagName } from '../../domain/types/testCase';
 import { Slug } from '../../domain/types/branded';
 import {
@@ -21,7 +18,7 @@ import {
 export const createContentNode = (
   name: Slug,
   description: string,
-): Effect.Effect<ContentNode, PersistenceError, Neo4jService> =>
+): Effect.Effect<ContentNode, PersistenceError, StorageService> =>
   createNamedEntity('ContentNode', ContentNode, {
     name,
     description,
@@ -32,7 +29,11 @@ export const createContentNode = (
  */
 export const findContentNodeByName = (
   name: Slug,
-): Effect.Effect<Option.Option<ContentNode>, PersistenceError, Neo4jService> =>
+): Effect.Effect<
+  Option.Option<ContentNode>,
+  PersistenceError,
+  StorageService
+> =>
   findEntityByName('ContentNode', ContentNode, name).pipe(
     Effect.withSpan('ContentService.findContentNodeByName'),
   );
@@ -42,7 +43,11 @@ export const findContentNodeByName = (
  */
 export const mustFindContentNodeByName = (
   name: Slug,
-): Effect.Effect<ContentNode, NotFoundError | PersistenceError, Neo4jService> =>
+): Effect.Effect<
+  ContentNode,
+  NotFoundError | PersistenceError,
+  StorageService
+> =>
   mustFindByName('ContentNode', 'content node', ContentNode, name).pipe(
     Effect.withSpan('ContentService.mustFindContentNodeByName'),
   );
@@ -53,7 +58,7 @@ export const mustFindContentNodeByName = (
 export const listContentNodes = (): Effect.Effect<
   readonly ContentNode[],
   PersistenceError,
-  Neo4jService
+  StorageService
 > =>
   listAll('ContentNode', ContentNode).pipe(
     Effect.withSpan('ContentService.listContentNodes'),
@@ -65,9 +70,9 @@ export const listContentNodes = (): Effect.Effect<
 export const tagContent = (
   nodeId: ContentNodeId,
   tagNames: TestCaseTagName[],
-): Effect.Effect<void, PersistenceError, Neo4jService> =>
+): Effect.Effect<void, PersistenceError, StorageService> =>
   Effect.gen(function* () {
-    const neo4j = yield* Neo4jService;
+    const storage = yield* StorageService;
 
     yield* Effect.forEach(tagNames, (tagName) =>
       Effect.gen(function* () {
@@ -79,7 +84,7 @@ export const tagContent = (
         `;
 
         const params = yield* queryParams({ tagName, nodeId });
-        yield* neo4j.runQuery(query, params);
+        yield* storage.runQuery(query, params);
       }),
     );
   })
@@ -101,19 +106,19 @@ export const tagContent = (
  */
 export const getNodeTags = (
   nodeId: ContentNodeId,
-): Effect.Effect<string[], PersistenceError, Neo4jService> =>
+): Effect.Effect<string[], PersistenceError, StorageService> =>
   Effect.gen(function* () {
-    const neo4j = yield* Neo4jService;
-    
+    const storage = yield* StorageService;
+
     const query = cypher`
       MATCH (n:ContentNode {id: $nodeId})-[:HAS_TAG]->(t:Tag)
       RETURN t.name as tagName
       ORDER BY t.name
     `;
-    
+
     const params = yield* queryParams({ nodeId });
-    const result = yield* neo4j.runQuery<{ tagName: string }>(query, params);
-    
+    const result = yield* storage.runQuery<{ tagName: string }>(query, params);
+
     return result.map((r) => r.tagName);
   })
     .pipe(

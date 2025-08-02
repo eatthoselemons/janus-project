@@ -225,7 +225,10 @@ describe('ConfigSchema', () => {
       };
 
       const result = yield* Schema.decode(ConfigSchema)(validConfig);
-      expect(result).toEqual(validConfig);
+      expect(result).toEqual({
+        ...validConfig,
+        storageBackend: 'neo4j',
+      });
     }),
   );
 
@@ -354,7 +357,10 @@ describe('ConfigSchema', () => {
       };
 
       const result = yield* Schema.decode(ConfigSchema)(validConfig);
-      expect(result).toEqual(validConfig);
+      expect(result).toEqual({
+        ...validConfig,
+        storageBackend: 'neo4j',
+      });
       expect(Object.keys(result.llm.providers)).toHaveLength(4);
     }),
   );

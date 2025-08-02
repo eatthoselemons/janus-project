@@ -1,5 +1,5 @@
 import { Effect, HashMap, Chunk } from 'effect';
-import { Neo4jService } from '../neo4j';
+import { StorageService } from '../storage';
 import { PersistenceError } from '../../domain/types/errors';
 import { cypher, queryParams } from '../../domain/types/database';
 import {
@@ -22,9 +22,9 @@ import { processContentFromId } from './ContentProcessing';
 export const findContentForSlot = (
   slot: MessageSlot,
   _parameters: InsertHashMap,
-): Effect.Effect<ContentNodeVersionId[], PersistenceError, Neo4jService> =>
+): Effect.Effect<ContentNodeVersionId[], PersistenceError, StorageService> =>
   Effect.gen(function* () {
-    const neo4j = yield* Neo4jService;
+    const storage = yield* StorageService;
 
     // Build query based on slot configuration
     const queryParts: string[] = [
@@ -68,10 +68,9 @@ export const findContentForSlot = (
       includeNames: slot.includeNodes?.filter((n) => !n.includes('-')) || [],
     });
 
-    const results = yield* neo4j.runQuery<{ versionId: ContentNodeVersionId }>(
-      query,
-      params,
-    );
+    const results = yield* storage.runQuery<{
+      versionId: ContentNodeVersionId;
+    }>(query, params);
     return results.map((r) => r.versionId);
   })
     .pipe(
@@ -92,7 +91,7 @@ export const findContentForSlot = (
  */
 export const buildConversationFromTestCase = (
   testCase: TestCase,
-): Effect.Effect<Conversation, Error | PersistenceError, Neo4jService> =>
+): Effect.Effect<Conversation, Error | PersistenceError, StorageService> =>
   Effect.gen(function* () {
     // Annotate span with test case info
     yield* Effect.annotateCurrentSpan({

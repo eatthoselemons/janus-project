@@ -1,7 +1,7 @@
 import { Effect, Option, Schema } from 'effect';
 import * as crypto from 'crypto';
-import { TransactionContext } from '../neo4j';
-import { Neo4jError, PersistenceError } from '../../domain/types/errors';
+import { TransactionContext, StorageError } from '../storage';
+import { PersistenceError } from '../../domain/types/errors';
 import { cypher, queryParams } from '../../domain/types/database';
 import {
   ContentNodeVersion,
@@ -54,13 +54,14 @@ export const generateContentNodeVersion = (
 export const verifyContentNodeExists = (
   tx: TransactionContext,
   nodeId: ContentNodeId,
-): Effect.Effect<void, Neo4jError, never> =>
+): Effect.Effect<void, StorageError, never> =>
   Effect.gen(function* () {
     const parentQuery = cypher`MATCH (p:ContentNode {id: $id}) RETURN p`;
     const parentParams = yield* queryParams({ id: nodeId }).pipe(
       Effect.mapError(
         (error) =>
-          new Neo4jError({
+          new StorageError({
+            operation: 'read' as const,
             originalMessage: error.message,
             query: '',
           }),
@@ -69,7 +70,8 @@ export const verifyContentNodeExists = (
     const parentResults = yield* tx.run(parentQuery, parentParams);
     if (parentResults.length === 0) {
       return yield* Effect.fail(
-        new Neo4jError({
+        new StorageError({
+          operation: 'read' as const,
           originalMessage: `ContentNode with id ${nodeId} not found`,
           query: parentQuery,
         }),
@@ -83,7 +85,7 @@ export const verifyContentNodeExists = (
 export const findPreviousContentNodeVersion = (
   tx: TransactionContext,
   nodeId: ContentNodeId,
-): Effect.Effect<Option.Option<ContentNodeVersionId>, Neo4jError, never> =>
+): Effect.Effect<Option.Option<ContentNodeVersionId>, StorageError, never> =>
   Effect.gen(function* () {
     const previousQuery = cypher`
       MATCH (p:ContentNode {id: $parentId})<-[:VERSION_OF]-(v:ContentNodeVersion)
@@ -92,7 +94,8 @@ export const findPreviousContentNodeVersion = (
     const previousParams = yield* queryParams({ parentId: nodeId }).pipe(
       Effect.mapError(
         (error) =>
-          new Neo4jError({
+          new StorageError({
+            operation: 'read' as const,
             originalMessage: error.message,
             query: '',
           }),
@@ -119,7 +122,7 @@ export const createVersionInNeo4j = (
   nodeId: ContentNodeId,
   version: ContentNodeVersion,
   previousVersionId: Option.Option<ContentNodeVersionId>,
-): Effect.Effect<void, Neo4jError, never> =>
+): Effect.Effect<void, StorageError, never> =>
   Effect.gen(function* () {
     const createQuery = Option.isSome(previousVersionId)
       ? cypher`
@@ -139,7 +142,9 @@ export const createVersionInNeo4j = (
 
     const createParams = yield* queryParams({
       parentId: nodeId,
-      previousId: Option.isSome(previousVersionId) ? previousVersionId.value : null,
+      previousId: Option.isSome(previousVersionId)
+        ? previousVersionId.value
+        : null,
       props: {
         id: version.id,
         content: version.content,
@@ -149,7 +154,8 @@ export const createVersionInNeo4j = (
     }).pipe(
       Effect.mapError(
         (error) =>
-          new Neo4jError({
+          new StorageError({
+            operation: 'read' as const,
             originalMessage: error.message,
             query: '',
           }),

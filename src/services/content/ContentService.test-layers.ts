@@ -1,5 +1,5 @@
 import { Effect, Layer, Schema } from 'effect';
-import { Neo4jService } from '../neo4j';
+import { StorageService, StorageError } from '../storage';
 import {
   ContentNode,
   ContentNodeVersion,
@@ -10,7 +10,6 @@ import {
 } from '../../domain/types/contentNode';
 import { TestCase, TestCaseTagName } from '../../domain/types/testCase';
 import { Slug } from '../../domain/types/branded';
-import { Neo4jError } from '../../domain/types/errors';
 
 /**
  * Test data structure for content nodes and versions
@@ -355,7 +354,6 @@ export const ContentTestWithData = (
       ];
     }
 
-
     // Get node only (new query pattern)
     if (
       query.includes('MATCH (node:ContentNodeVersion {id: $versionId})') &&
@@ -521,7 +519,9 @@ export const ContentTestWithData = (
 
     // Get tags for a node
     if (
-      query.includes('MATCH (n:ContentNode {id: $nodeId})-[:HAS_TAG]->(t:Tag)') &&
+      query.includes(
+        'MATCH (n:ContentNode {id: $nodeId})-[:HAS_TAG]->(t:Tag)',
+      ) &&
       query.includes('RETURN t.name as tagName')
     ) {
       const nodeId = params.nodeId;
@@ -536,8 +536,8 @@ export const ContentTestWithData = (
 
   // Return Neo4j service with query handler
   return Layer.succeed(
-    Neo4jService,
-    Neo4jService.of({
+    StorageService,
+    StorageService.of({
       runQuery: <T = unknown>(query: any, params: any = {}) => {
         const data = handleQuery(query, params);
         return Effect.succeed(data as T[]);
@@ -559,8 +559,8 @@ export const ContentTestWithData = (
       },
       withSession: () =>
         Effect.fail(
-          new Neo4jError({
-            query: '',
+          new StorageError({
+            operation: 'read',
             originalMessage: 'withSession not implemented in test layer',
           }),
         ),

@@ -1,10 +1,6 @@
 import { Effect, Option, Schema } from 'effect';
-import { Neo4jService, TransactionContext } from '../neo4j';
-import {
-  NotFoundError,
-  PersistenceError,
-  Neo4jError,
-} from '../../domain/types/errors';
+import { StorageService, TransactionContext, StorageError } from '../storage';
+import { NotFoundError, PersistenceError } from '../../domain/types/errors';
 import {
   cypher,
   queryParams,
@@ -56,7 +52,7 @@ const mapToPersistenceError =
       Effect.mapError((error) => {
         if (error instanceof PersistenceError) {
           return error;
-        } else if (error instanceof Neo4jError) {
+        } else if (error instanceof StorageError) {
           return new PersistenceError({
             originalMessage: error.originalMessage,
             operation,
@@ -94,13 +90,13 @@ export const findEntityByName = <A, I, R>(
 ): Effect.Effect<
   Option.Option<Schema.Schema.Type<typeof schema>>,
   PersistenceError,
-  R | Neo4jService
+  R | StorageService
 > =>
   Effect.gen(function* () {
-    const neo4j = yield* Neo4jService;
+    const storage = yield* StorageService;
     const query = cypher`MATCH (n:${nodeLabel} {name: $name}) RETURN n`;
     const params = yield* queryParams({ name });
-    const results = yield* neo4j.runQuery<{ n: unknown }>(query, params);
+    const results = yield* storage.runQuery<{ n: unknown }>(query, params);
 
     if (results.length === 0) return Option.none();
 
@@ -140,7 +136,7 @@ export const mustFindByName = <A, I, R>(
 ): Effect.Effect<
   Schema.Schema.Type<typeof schema>,
   NotFoundError | PersistenceError,
-  R | Neo4jService
+  R | StorageService
 > =>
   findEntityByName(nodeLabel, schema, name).pipe(
     Effect.flatMap(
@@ -170,10 +166,10 @@ export const createNamedEntity = <
 ): Effect.Effect<
   Schema.Schema.Type<S>,
   PersistenceError,
-  Schema.Schema.Context<S> | Neo4jService
+  Schema.Schema.Context<S> | StorageService
 > =>
   Effect.gen(function* () {
-    const neo4j = yield* Neo4jService;
+    const storage = yield* StorageService;
 
     // Get the name property from entity - we know it has it due to type constraints
     const entityName = (entity as unknown as { name: Slug }).name;
@@ -210,7 +206,7 @@ export const createNamedEntity = <
 
     const query = cypher`CREATE (n:${nodeLabel} $props) RETURN n`;
     const params = yield* queryParams({ props: validatedEntity });
-    const results = yield* neo4j.runQuery<{ n: unknown }>(query, params);
+    const results = yield* storage.runQuery<{ n: unknown }>(query, params);
 
     // Schema.decode validates the data from the database
     return yield* Schema.decodeUnknown(schema)(results[0].n).pipe(
@@ -239,12 +235,12 @@ export const listAll = <A, I, R>(
 ): Effect.Effect<
   readonly Schema.Schema.Type<typeof schema>[],
   PersistenceError,
-  R | Neo4jService
+  R | StorageService
 > =>
   Effect.gen(function* () {
-    const neo4j = yield* Neo4jService;
+    const storage = yield* StorageService;
     const query = cypher`MATCH (n:${nodeLabel}) RETURN n ORDER BY n.name`;
-    const results = yield* neo4j.runQuery<{ n: unknown }>(query);
+    const results = yield* storage.runQuery<{ n: unknown }>(query);
 
     return yield* Effect.forEach(results, (result) =>
       Schema.decodeUnknown(schema)(result.n).pipe(
@@ -267,13 +263,14 @@ const verifyParentExists = (
   tx: TransactionContext,
   parentLabel: string,
   parentId: Brand<string>,
-): Effect.Effect<void, Neo4jError, never> =>
+): Effect.Effect<void, StorageError, never> =>
   Effect.gen(function* () {
     const parentQuery = cypher`MATCH (p:${parentLabel} {id: $id}) RETURN p`;
     const parentParams = yield* queryParams({ id: parentId }).pipe(
       Effect.mapError(
         (error) =>
-          new Neo4jError({
+          new StorageError({
+            operation: 'read' as const,
             originalMessage: error.message,
             query: parentQuery,
           }),
@@ -283,7 +280,8 @@ const verifyParentExists = (
 
     if (parentResults.length === 0) {
       return yield* Effect.fail(
-        new Neo4jError({
+        new StorageError({
+          operation: 'read' as const,
           originalMessage: `Parent ${parentLabel} with id ${parentId} not found`,
           query: parentQuery,
         }),
@@ -299,7 +297,7 @@ const findPreviousVersion = (
   parentLabel: string,
   versionLabel: string,
   parentId: Brand<string>,
-): Effect.Effect<Option.Option<string>, Neo4jError, never> =>
+): Effect.Effect<Option.Option<string>, StorageError, never> =>
   Effect.gen(function* () {
     const prevQuery = cypher`
       MATCH (p:${parentLabel} {id: $parentId})<-[:VERSION_OF]-(v:${versionLabel})
@@ -308,7 +306,8 @@ const findPreviousVersion = (
     const parentParams = yield* queryParams({ id: parentId }).pipe(
       Effect.mapError(
         (error) =>
-          new Neo4jError({
+          new StorageError({
+            operation: 'read' as const,
             originalMessage: error.message,
             query: prevQuery,
           }),
@@ -333,7 +332,11 @@ const createVersionWithPrevious = <S extends Schema.Schema<any, any, any>>(
   prevId: string,
   validatedVersion: Schema.Schema.Type<S>,
   schema: S,
-): Effect.Effect<Schema.Schema.Type<S>, Neo4jError, Schema.Schema.Context<S>> =>
+): Effect.Effect<
+  Schema.Schema.Type<S>,
+  StorageError,
+  Schema.Schema.Context<S>
+> =>
   Effect.gen(function* () {
     const createQuery = cypher`
       MATCH (p:${parentLabel} {id: $parentId})
@@ -350,7 +353,8 @@ const createVersionWithPrevious = <S extends Schema.Schema<any, any, any>>(
     }).pipe(
       Effect.mapError(
         (error) =>
-          new Neo4jError({
+          new StorageError({
+            operation: 'create' as const,
             originalMessage: error.message,
             query: createQuery,
           }),
@@ -361,7 +365,8 @@ const createVersionWithPrevious = <S extends Schema.Schema<any, any, any>>(
     return yield* Schema.decodeUnknown(schema)(result.v).pipe(
       Effect.mapError(
         (error) =>
-          new Neo4jError({
+          new StorageError({
+            operation: 'create' as const,
             originalMessage: `Schema validation failed: ${error.message}`,
             query: createQuery,
           }),
@@ -379,7 +384,11 @@ const createVersionWithoutPrevious = <S extends Schema.Schema<any, any, any>>(
   parentId: Brand<string>,
   validatedVersion: Schema.Schema.Type<S>,
   schema: S,
-): Effect.Effect<Schema.Schema.Type<S>, Neo4jError, Schema.Schema.Context<S>> =>
+): Effect.Effect<
+  Schema.Schema.Type<S>,
+  StorageError,
+  Schema.Schema.Context<S>
+> =>
   Effect.gen(function* () {
     const createQuery = cypher`
       MATCH (p:${parentLabel} {id: $parentId})
@@ -393,7 +402,8 @@ const createVersionWithoutPrevious = <S extends Schema.Schema<any, any, any>>(
     }).pipe(
       Effect.mapError(
         (error) =>
-          new Neo4jError({
+          new StorageError({
+            operation: 'create' as const,
             originalMessage: error.message,
             query: createQuery,
           }),
@@ -404,7 +414,8 @@ const createVersionWithoutPrevious = <S extends Schema.Schema<any, any, any>>(
     return yield* Schema.decodeUnknown(schema)(result.v).pipe(
       Effect.mapError(
         (error) =>
-          new Neo4jError({
+          new StorageError({
+            operation: 'create' as const,
             originalMessage: `Schema validation failed: ${error.message}`,
             query: createQuery,
           }),
@@ -434,14 +445,14 @@ export const createVersion = <
 ): Effect.Effect<
   Schema.Schema.Type<S>,
   NotFoundError | PersistenceError,
-  Schema.Schema.Context<S> | Neo4jService
+  Schema.Schema.Context<S> | StorageService
 > =>
   Effect.gen(function* () {
-    const neo4j = yield* Neo4jService;
+    const storage = yield* StorageService;
 
-    return yield* neo4j
+    return yield* storage
       .runInTransaction(
-        (tx): Effect.Effect<Schema.Schema.Type<S>, Neo4jError, never> =>
+        (tx): Effect.Effect<Schema.Schema.Type<S>, StorageError, never> =>
           Effect.gen(function* () {
             // Verify parent exists
             yield* verifyParentExists(tx, parentLabel, parentId);
@@ -468,7 +479,8 @@ export const createVersion = <
             ).pipe(
               Effect.mapError(
                 (error) =>
-                  new Neo4jError({
+                  new StorageError({
+                    operation: 'create' as const,
                     originalMessage: `Schema validation failed: ${error.message}`,
                     query: '',
                   }),
@@ -497,10 +509,10 @@ export const createVersion = <
                   schema,
                 ),
             });
-          }) as Effect.Effect<Schema.Schema.Type<S>, Neo4jError, never>,
+          }) as Effect.Effect<Schema.Schema.Type<S>, StorageError, never>,
       )
       .pipe(
-        Effect.mapError((error: Neo4jError) => {
+        Effect.mapError((error: StorageError) => {
           // Check if this is a parent not found error
           if (
             error.originalMessage.includes('Parent') &&
@@ -544,16 +556,16 @@ export const getLatestVersion = <A, I, R>(
 ): Effect.Effect<
   Option.Option<Schema.Schema.Type<typeof schema>>,
   PersistenceError,
-  R | Neo4jService
+  R | StorageService
 > =>
   Effect.gen(function* () {
-    const neo4j = yield* Neo4jService;
+    const storage = yield* StorageService;
     const query = cypher`
       MATCH (p:${parentLabel} {id: $parentId})<-[:VERSION_OF]-(v:${versionLabel})
       RETURN v ORDER BY v.createdAt DESC LIMIT 1
     `;
     const params = yield* queryParams({ parentId });
-    const results = yield* neo4j.runQuery<{ v: unknown }>(query, params);
+    const results = yield* storage.runQuery<{ v: unknown }>(query, params);
 
     if (results.length === 0) return Option.none();
 

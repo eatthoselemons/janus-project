@@ -20,7 +20,6 @@ const makeIdType = <B extends string>(brand: B) =>
     Schema.brand(brand),
   );
 
-
 /**
  * Test Run ID - Identifies a test execution
  */

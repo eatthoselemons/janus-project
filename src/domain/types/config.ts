@@ -27,9 +27,32 @@ export const LlmProviderConfigSchema = Schema.Struct({
   model: LlmModel,
 });
 
+// Git storage configuration schema
+export const GitConfigSchema = Schema.Struct({
+  dataPath: Schema.optional(Schema.String).pipe(
+    Schema.withDefaults({
+      constructor: () => './data',
+      decoding: () => './data',
+    }),
+  ),
+  mode: Schema.optional(Schema.Literal('lossless', 'lossy')).pipe(
+    Schema.withDefaults({
+      constructor: () => 'lossy' as const,
+      decoding: () => 'lossy' as const,
+    }),
+  ),
+});
+
 // Main configuration schema
 export const ConfigSchema = Schema.Struct({
+  storageBackend: Schema.optional(Schema.Literal('neo4j', 'git')).pipe(
+    Schema.withDefaults({
+      constructor: () => 'neo4j' as const,
+      decoding: () => 'neo4j' as const,
+    }),
+  ),
   neo4j: Neo4jConfigSchema,
+  git: Schema.optional(GitConfigSchema),
   llm: Schema.Struct({
     providers: Schema.Record({
       key: ProviderName,
@@ -40,5 +63,6 @@ export const ConfigSchema = Schema.Struct({
 
 // Extract types from schemas
 export type Neo4jConfig = typeof Neo4jConfigSchema.Type;
+export type GitConfig = typeof GitConfigSchema.Type;
 export type LlmProviderConfig = typeof LlmProviderConfigSchema.Type;
 export type ConfigSchema = typeof ConfigSchema.Type;
