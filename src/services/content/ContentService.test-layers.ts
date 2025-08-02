@@ -294,6 +294,23 @@ export const ContentTestWithData = (
 
     // Create version with previous
     if (query.includes('CREATE (v)-[:PREVIOUS_VERSION]->(prev)')) {
+      // Add the new version to test data with previous version
+      if (params.props) {
+        const nodeId = params.parentId;
+        const previousVersionId = params.previousId;
+        testData.versions.push({
+          version: {
+            id: params.props.id,
+            content: params.props.content,
+            createdAt: Schema.decodeSync(Schema.DateTimeUtc)(
+              params.props.createdAt,
+            ),
+            commitMessage: params.props.commitMessage,
+          },
+          nodeId,
+          previousVersionId,
+        });
+      }
       return [
         {
           v: {
