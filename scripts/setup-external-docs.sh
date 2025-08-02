@@ -20,6 +20,7 @@ has_content() {
 
 # Setup examples directory resources
 echo "1. Checking examples directory..."
+mkdir -p "$EXAMPLES_DIR"
 cd "$EXAMPLES_DIR"
 
 # Effect official examples
