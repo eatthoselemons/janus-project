@@ -95,3 +95,36 @@ export const tagContent = (
       }),
     )
     .pipe(Effect.withSpan('ContentService.tagContent'));
+
+/**
+ * Get all tags associated with a content node
+ */
+export const getNodeTags = (
+  nodeId: ContentNodeId,
+): Effect.Effect<string[], PersistenceError, Neo4jService> =>
+  Effect.gen(function* () {
+    const neo4j = yield* Neo4jService;
+    
+    const query = cypher`
+      MATCH (n:ContentNode {id: $nodeId})-[:HAS_TAG]->(t:Tag)
+      RETURN t.name as tagName
+      ORDER BY t.name
+    `;
+    
+    const params = yield* queryParams({ nodeId });
+    const result = yield* neo4j.runQuery<{ tagName: string }>(query, params);
+    
+    return result.map((r) => r.tagName);
+  })
+    .pipe(
+      Effect.mapError((error) => {
+        if (error instanceof PersistenceError) {
+          return error;
+        }
+        return new PersistenceError({
+          originalMessage: String(error),
+          operation: 'read',
+        });
+      }),
+    )
+    .pipe(Effect.withSpan('ContentService.getNodeTags'));
