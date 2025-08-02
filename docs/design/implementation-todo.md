@@ -91,7 +91,7 @@ Only create entity-specific services if you need domain-specific operations beyo
 
 - [ ] **6.1: LLM API Service**
   - [ ] **Implementation:** Create an `LlmApi` service (`Effect.Tag`) to abstract LLM provider interactions.
-  - [ ] **Implementation:** The service will expose `generate(prompt: string, model: string): Effect<string, LlmApiError>`.
+  - [ ] **Implementation:** The service will expose `generate(conversation: conversation, model: string): Effect<string>, LlmApiError>`.
   - [ ] **Implementation:** Create a `LlmApiLive` layer that reads the provider and API key from the `Config` service.
   - [ ] **Testing:** Write an integration test for the `LlmApiLive` layer that makes a real API call (can be mocked in CI environments).
 
