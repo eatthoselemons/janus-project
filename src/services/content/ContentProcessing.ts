@@ -8,7 +8,7 @@ import {
   IncludesEdgeProperties,
   ParameterKey,
   ParameterValue,
-  ParameterContext,
+  ParameterHashMap,
   ProcessingOptions,
   ChildNode,
 } from '../../domain/types/contentNode';
@@ -39,7 +39,7 @@ const mapToPersistenceError = <A, E, R>(
  */
 const processNode = (
   nodeVersion: ContentNodeVersion,
-  context: ParameterContext,
+  parameterHashMap: ParameterHashMap,
   options: ProcessingOptions,
 ): Effect.Effect<string, PersistenceError | NotFoundError, Neo4jService> =>
   Effect.gen(function* () {
@@ -81,7 +81,7 @@ const processNode = (
     );
     const updatedContext = yield* Effect.reduce(
       insertChildren,
-      context,
+      parameterHashMap,
       (ctx, child) =>
         Effect.gen(function* () {
           if (!child.edge.key) {
@@ -151,7 +151,7 @@ const processNode = (
  */
 export const processContentFromId = (
   versionId: ContentNodeVersionId,
-  context: ParameterContext = HashMap.empty<ParameterKey, ParameterValue>(),
+  context: ParameterHashMap = HashMap.empty<ParameterKey, ParameterValue>(),
   options: ProcessingOptions = {},
 ): Effect.Effect<string, PersistenceError | NotFoundError, Neo4jService> =>
   Effect.gen(function* () {

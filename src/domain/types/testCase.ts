@@ -10,7 +10,7 @@ import { Slug, ContentNodeId, TagId, TestCaseId } from './branded';
 import {
   ParameterKey,
   ParameterValue,
-  ParameterContext,
+  ParameterHashMap,
   ContentRole,
 } from './contentNode';
 

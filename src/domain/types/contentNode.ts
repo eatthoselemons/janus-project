@@ -68,7 +68,7 @@ export const ParameterValue = Schema.String.pipe(
 export type ParameterValue = typeof ParameterValue.Type;
 
 // Using type alias instead of Schema for HashMap since it's used with HashMap functions
-export type ParameterContext = HashMap.HashMap<ParameterKey, ParameterValue>;
+export type ParameterHashMap = HashMap.HashMap<ParameterKey, ParameterValue>;
 
 // Processing options for filtering
 export const ProcessingOptions = Schema.Struct({
