@@ -6,7 +6,7 @@ import {
   ContentNodeId,
   ContentNodeVersionId,
 } from '../../domain/types/branded';
-import { ParameterKey, ParameterValue } from '../../domain/types/contentNode';
+import { InsertKey, InsertValue, ParameterKey, ParameterValue } from '../../domain/types/contentNode';
 import { TestCase, LLMModel } from '../../domain/types/testCase';
 import { NotFoundError, PersistenceError } from '../../domain/types/errors';
 import {
@@ -61,6 +61,13 @@ describe('ContentService', () => {
         const nodeId = Schema.decodeSync(ContentNodeId)(
           '550e8400-e29b-41d4-a716-446655440001',
         );
+        
+        // Get the existing version that will become the previous version
+        const previousVersion = yield* ContentService.getLatestContentNodeVersion(nodeId);
+        expect(Option.isSome(previousVersion)).toBe(true);
+        const previousVersionId = Option.isSome(previousVersion) ? previousVersion.value.id : '';
+        
+        // Create new version
         const version = yield* ContentService.createContentNodeVersion(
           nodeId,
           'New version content',
@@ -73,6 +80,21 @@ describe('ContentService', () => {
           /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
         );
         expect(version.createdAt).toHaveProperty('epochMillis');
+        
+        // Verify it's not the same as the previous version
+        expect(version.id).not.toBe(previousVersionId);
+        
+        // Get the latest version again to verify it's our new version
+        const latestVersion = yield* ContentService.getLatestContentNodeVersion(nodeId);
+        expect(Option.isSome(latestVersion)).toBe(true);
+        if (Option.isSome(latestVersion)) {
+          expect(latestVersion.value.id).toBe(version.id);
+          expect(latestVersion.value.content).toBe('New version content');
+        }
+        
+        // NOTE: The test layer now tracks previousVersionId when creating versions.
+        // In a real implementation with Neo4j, we would query for the PREVIOUS_VERSION
+        // relationship to verify it was created correctly.
       }).pipe(Effect.provide(ContentTestWithData())),
     );
 
@@ -438,7 +460,7 @@ describe('ContentService', () => {
             { role: 'assistant', tags: ['greeting-response'], sequence: 1 },
             { role: 'user', tags: ['followup'], sequence: 2 },
           ],
-          parameters: HashMap.make<ParameterKey, ParameterValue>([
+          parameters: HashMap.make<InsertKey, InsertValue>([
             [
               Schema.decodeSync(ParameterKey)('topic'),
               Schema.decodeSync(ParameterValue)('TypeScript'),
