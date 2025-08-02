@@ -338,47 +338,6 @@ export const ContentTestWithData = (
       ];
     }
 
-    // Get node with children (old combined query)
-    if (
-      query.includes('MATCH (node:ContentNodeVersion {id: $versionId})') &&
-      query.includes(
-        'OPTIONAL MATCH (node)-[r:INCLUDES]->(child:ContentNodeVersion)',
-      )
-    ) {
-      const versionId = params.versionId;
-      const version = testData.versions.find((v) => v.version.id === versionId);
-      if (!version) return [];
-
-      const children = testData.edges
-        .filter((e) => e.parentId === versionId)
-        .map((e) => {
-          const childVersion = testData.versions.find(
-            (v) => v.version.id === e.childId,
-          );
-          return {
-            child: childVersion
-              ? {
-                  ...childVersion.version,
-                  createdAt: JSON.parse(
-                    JSON.stringify(childVersion.version.createdAt),
-                  ),
-                }
-              : undefined,
-            edge: e.properties,
-          };
-        })
-        .filter((c) => c.child !== undefined);
-
-      return [
-        {
-          node: {
-            ...version.version,
-            createdAt: JSON.parse(JSON.stringify(version.version.createdAt)),
-          },
-          children: children,
-        },
-      ];
-    }
 
     // Get node only (new query pattern)
     if (
