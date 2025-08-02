@@ -58,9 +58,7 @@ fi
 # Notion Discord Notifications example
 if ! has_content "notion-discord-notifications"; then
     echo "   Cloning Notion Discord Notifications example..."
-    # Assuming this is a public repo - update URL if needed
-    git clone https://github.com/YOUR_ORG/notion-discord-notifications.git notion-discord-notifications 2>/dev/null || {
-        echo "   Note: Could not clone notion-discord-notifications - it may be a private repo or already exist locally"
+    git clone https://github.com/bmdavis419/notion-discord-notifications notion-discord-notifications 2>/dev/null || {
     }
 else
     echo "   Notion Discord Notifications example already exists"
