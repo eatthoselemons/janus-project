@@ -264,7 +264,13 @@ const buildTreeFromResult = (result: {
   mapToPersistenceError(
     Effect.gen(function* () {
       const root = yield* Schema.decodeUnknown(ContentNodeVersion)(result.root);
-      // Simplified tree building - in real implementation would need proper parent-child mapping
+      // TODO: Implement actual tree building when needed
+      // Current implementation only returns root without children
+      // Full implementation would:
+      // 1. Parse all descendants from result
+      // 2. Build parent-child relationships based on paths
+      // 3. Recursively construct tree structure
+      // 4. Handle large trees efficiently (consider memory usage)
       return {
         version: root,
         children: [],

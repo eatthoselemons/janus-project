@@ -530,7 +530,7 @@ describe('ContentService', () => {
       }).pipe(Effect.provide(ContentTestWithData())),
     );
 
-    it.effect('should build multi-turn conversations', () =>
+    it.effect('should build multi-turn conversations with parameter substitution', () =>
       Effect.gen(function* () {
         // Create content nodes with tags
         const greeting = yield* ContentService.createContentNode(
@@ -561,6 +561,7 @@ describe('ContentService', () => {
           'Initial response',
         );
 
+        // Create template node with placeholder
         const followup = yield* ContentService.createContentNode(
           Schema.decodeSync(Slug)('user-followup'),
           'User followup',
@@ -569,10 +570,45 @@ describe('ContentService', () => {
           Schema.decodeSync(Slug)('followup'),
           Schema.decodeSync(Slug)('user-message'),
         ]);
-        yield* ContentService.createContentNodeVersion(
+        const followupVersion = yield* ContentService.createContentNodeVersion(
           followup.id,
-          'I need help with {{topic}}',
-          'Followup with parameter',
+          'I need help with {{topic}} and {{subtopic}}',
+          'Followup with parameters',
+        );
+
+        // Create nodes that provide parameter values
+        const topicNode = yield* ContentService.createContentNode(
+          Schema.decodeSync(Slug)('topic-provider'),
+          'Provides topic value',
+        );
+        yield* ContentService.createContentNodeVersion(
+          topicNode.id,
+          'TypeScript',
+          'Topic value',
+          [
+            {
+              versionId: followupVersion.id,
+              operation: 'insert',
+              key: 'topic',
+            },
+          ],
+        );
+
+        const subtopicNode = yield* ContentService.createContentNode(
+          Schema.decodeSync(Slug)('subtopic-provider'),
+          'Provides subtopic value',
+        );
+        yield* ContentService.createContentNodeVersion(
+          subtopicNode.id,
+          'generic types',
+          'Subtopic value',
+          [
+            {
+              versionId: followupVersion.id,
+              operation: 'insert',
+              key: 'subtopic',
+            },
+          ],
         );
 
         // Create a test case for the conversation
@@ -581,7 +617,7 @@ describe('ContentService', () => {
             '323e4567-e89b-12d3-a456-426614174002',
           ),
           name: 'Support conversation',
-          description: 'Multi-turn support conversation',
+          description: 'Multi-turn support conversation with parameter substitution',
           createdAt: Schema.decodeSync(Schema.DateTimeUtc)(
             '2024-01-01T00:00:00Z',
           ),
@@ -591,23 +627,19 @@ describe('ContentService', () => {
             { role: 'assistant', tags: ['greeting-response'], sequence: 1 },
             { role: 'user', tags: ['followup'], sequence: 2 },
           ],
-          parameters: HashMap.make<InsertKey, InsertValue>([
-            [
-              Schema.decodeSync(InsertKey)('topic'),
-              Schema.decodeSync(InsertValue)('TypeScript'),
-            ],
-          ]),
+          // Note: TestCase parameters don't affect substitution
+          parameters: HashMap.empty(),
         };
 
         // Build conversation from test case
         const conversation =
           yield* ContentService.buildConversationFromTestCase(conversationTest);
 
-        // Should create proper message array for LLM API
+        // Should create proper message array with substituted parameters
         expect(Chunk.toReadonlyArray(conversation)).toEqual([
           { role: 'user', content: 'Hello, can you help me?' },
           { role: 'assistant', content: "Hello! I'd be happy to help." },
-          { role: 'user', content: 'I need help with {{topic}}' }, // Parameters only apply with insert operations
+          { role: 'user', content: 'I need help with TypeScript and generic types' },
         ]);
       }).pipe(Effect.provide(ContentTestWithEmptyData())),
     );
