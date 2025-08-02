@@ -28,8 +28,12 @@ Test requirements:
 
 ### Task Management
 
-- Mark completed tasks in `TASK.md` immediately after finishing them
-- Add new sub-tasks or TODOs discovered during development to `TASK.md` under a "Discovered During Work" section
+- Create a task file in `docs/humans/tasks/` (e.g., `feature-name.md`)
+- Use the template at `docs/humans/tasks/TASK-TEMPLATE.md`
+- Update progress as you work (⏳ pending, 🔄 in progress, ✅ completed)
+- Keep task file updated with clear summary of changes for PR description
+- task file is for the pull request description
+- document issues and fixes made after the initial PRP in a document in `docs/humans/fixes/{feature-number}-{feature-name}.md` for review of how to improve prps
 
 ## 2. Core Technology Stack
 

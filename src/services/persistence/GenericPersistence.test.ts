@@ -3,25 +3,16 @@ import { Effect, Schema, Option, Layer } from 'effect';
 import * as GenericPersistence from './GenericPersistence';
 import {
   Neo4jTestWithGenericData,
-  generateTestSnippet,
-  generateTestSnippetVersionRaw,
-  generateTestComposition,
-  generateTestCompositionVersionRaw,
-  generateTestParameter,
   QueryTracker,
 } from './GenericPersistence.test-layers';
-import { Snippet, SnippetVersion } from '../../domain/types/snippet';
 import { Tag } from '../../domain/types/tag';
-import { Parameter, ParameterOption } from '../../domain/types/parameter';
 import {
-  Composition,
-  CompositionVersion,
-} from '../../domain/types/composition';
+  ContentNode,
+  ContentNodeVersion,
+} from '../../domain/types/contentNode';
 import {
-  SnippetId,
-  SnippetVersionId,
-  ParameterId,
-  CompositionId,
+  ContentNodeId,
+  ContentNodeVersionId,
   Slug,
 } from '../../domain/types/branded';
 import { Neo4jService } from '../neo4j';
@@ -41,7 +32,7 @@ describe('Generic Persistence Functions', () => {
     id: Schema.UUID.pipe(Schema.brand('TestVersionId')),
     content: Schema.String,
     createdAt: Schema.DateTimeUtc,
-    commit_message: Schema.String,
+    commitMessage: Schema.String,
   });
 
   describe('createNamedEntity', () => {
@@ -67,8 +58,8 @@ describe('Generic Persistence Functions', () => {
     it.effect('should fail when entity with same name already exists', () =>
       Effect.gen(function* () {
         const result = yield* Effect.either(
-          GenericPersistence.createNamedEntity('Snippet', Snippet, {
-            name: Schema.decodeSync(Slug)('existing-snippet'),
+          GenericPersistence.createNamedEntity('ContentNode', ContentNode, {
+            name: Schema.decodeSync(Slug)('existing-content-node'),
             description: 'Should fail',
           }),
         );
@@ -81,20 +72,20 @@ describe('Generic Persistence Functions', () => {
       }).pipe(Effect.provide(Neo4jTestWithGenericData())),
     );
 
-    it.effect('should work with Snippet schema', () =>
+    it.effect('should work with ContentNode schema', () =>
       Effect.gen(function* () {
         const created = yield* GenericPersistence.createNamedEntity(
-          'Snippet',
-          Snippet,
+          'ContentNode',
+          ContentNode,
           {
-            name: Schema.decodeSync(Slug)('new-snippet'),
-            description: 'Test snippet',
+            name: Schema.decodeSync(Slug)('new-content-node'),
+            description: 'Test content node',
           },
         );
 
-        const isValid = Schema.is(Snippet)(created);
+        const isValid = Schema.is(ContentNode)(created);
         expect(isValid).toBe(true);
-        expect(created.name).toBe('new-snippet');
+        expect(created.name).toBe('new-content-node');
       }).pipe(Effect.provide(Neo4jTestWithGenericData())),
     );
 
@@ -114,65 +105,31 @@ describe('Generic Persistence Functions', () => {
         expect(created.name).toBe('new-tag');
       }).pipe(Effect.provide(Neo4jTestWithGenericData())),
     );
-
-    it.effect('should work with Parameter schema', () =>
-      Effect.gen(function* () {
-        const created = yield* GenericPersistence.createNamedEntity(
-          'Parameter',
-          Parameter,
-          {
-            name: Schema.decodeSync(Slug)('new-parameter'),
-            description: 'Test parameter',
-          },
-        );
-
-        const isValid = Schema.is(Parameter)(created);
-        expect(isValid).toBe(true);
-        expect(created.name).toBe('new-parameter');
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
-    );
-
-    it.effect('should work with Composition schema', () =>
-      Effect.gen(function* () {
-        const created = yield* GenericPersistence.createNamedEntity(
-          'Composition',
-          Composition,
-          {
-            name: Schema.decodeSync(Slug)('new-composition'),
-            description: 'Test composition',
-          },
-        );
-
-        const isValid = Schema.is(Composition)(created);
-        expect(isValid).toBe(true);
-        expect(created.name).toBe('new-composition');
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
-    );
   });
 
   describe('findByName', () => {
     it.effect('should find existing entity by name', () =>
       Effect.gen(function* () {
-        const result = yield* GenericPersistence.findByName(
-          'Snippet',
-          Snippet,
-          Schema.decodeSync(Slug)('existing-snippet'),
+        const result = yield* GenericPersistence.findEntityByName(
+          'ContentNode',
+          ContentNode,
+          Schema.decodeSync(Slug)('existing-content-node'),
         );
 
         expect(Option.isSome(result)).toBe(true);
         if (Option.isSome(result)) {
-          expect(result.value.name).toBe('existing-snippet');
-          expect(result.value.description).toBe('An existing snippet');
+          expect(result.value.name).toBe('existing-content-node');
+          expect(result.value.description).toBe('An existing content node');
         }
       }).pipe(Effect.provide(Neo4jTestWithGenericData())),
     );
 
     it.effect('should return None when entity not found', () =>
       Effect.gen(function* () {
-        const result = yield* GenericPersistence.findByName(
-          'Snippet',
-          Snippet,
-          Schema.decodeSync(Slug)('non-existent-snippet'),
+        const result = yield* GenericPersistence.findEntityByName(
+          'ContentNode',
+          ContentNode,
+          Schema.decodeSync(Slug)('non-existent-content-node'),
         );
 
         expect(Option.isNone(result)).toBe(true);
@@ -199,7 +156,7 @@ describe('Generic Persistence Functions', () => {
         });
 
         const result = yield* Effect.either(
-          GenericPersistence.findByName(
+          GenericPersistence.findEntityByName(
             'Test',
             TestEntity,
             Schema.decodeSync(Slug)('test'),
@@ -220,15 +177,15 @@ describe('Generic Persistence Functions', () => {
   describe('mustFindByName', () => {
     it.effect('should return entity when found', () =>
       Effect.gen(function* () {
-        const snippet = yield* GenericPersistence.mustFindByName(
-          'Snippet',
-          'snippet',
-          Snippet,
-          Schema.decodeSync(Slug)('existing-snippet'),
+        const contentNode = yield* GenericPersistence.mustFindByName(
+          'ContentNode',
+          'content node',
+          ContentNode,
+          Schema.decodeSync(Slug)('existing-content-node'),
         );
 
-        expect(snippet.name).toBe('existing-snippet');
-        expect(snippet.description).toBe('An existing snippet');
+        expect(contentNode.name).toBe('existing-content-node');
+        expect(contentNode.description).toBe('An existing content node');
       }).pipe(Effect.provide(Neo4jTestWithGenericData())),
     );
 
@@ -236,18 +193,18 @@ describe('Generic Persistence Functions', () => {
       Effect.gen(function* () {
         const result = yield* Effect.either(
           GenericPersistence.mustFindByName(
-            'Snippet',
-            'snippet',
-            Snippet,
-            Schema.decodeSync(Slug)('non-existent-snippet'),
+            'ContentNode',
+            'content node',
+            ContentNode,
+            Schema.decodeSync(Slug)('non-existent-content-node'),
           ),
         );
 
         expect(result._tag).toBe('Left');
         if (result._tag === 'Left') {
           expect(result.left._tag).toBe('NotFoundError');
-          expect(result.left.entityType).toBe('snippet');
-          expect(result.left.slug).toBe('non-existent-snippet');
+          expect(result.left.entityType).toBe('content node');
+          expect(result.left.slug).toBe('non-existent-content-node');
         }
       }).pipe(Effect.provide(Neo4jTestWithGenericData())),
     );
@@ -256,29 +213,28 @@ describe('Generic Persistence Functions', () => {
   describe('listAll', () => {
     it.effect('should return all entities ordered by name', () =>
       Effect.gen(function* () {
-        const snippets = yield* GenericPersistence.listAll('Snippet', Snippet);
+        const contentNodes = yield* GenericPersistence.listAll(
+          'ContentNode',
+          ContentNode,
+        );
 
-        expect(snippets.length).toBe(2);
-        expect(snippets[0].name).toBe('existing-snippet');
-        expect(snippets[1].name).toBe('test-snippet');
+        expect(contentNodes.length).toBe(2);
+        expect(contentNodes[0].name).toBe('existing-content-node');
+        expect(contentNodes[1].name).toBe('test-content-node');
       }).pipe(Effect.provide(Neo4jTestWithGenericData())),
     );
 
     it.effect('should return empty array when no entities exist', () =>
       Effect.gen(function* () {
         const emptyData = {
-          snippets: [],
-          snippetVersions: [],
+          contentNodes: [],
+          contentNodeVersions: [],
           tags: [],
-          parameters: [],
-          parameterOptions: [],
-          compositions: [],
-          compositionVersions: [],
         };
 
         const results = yield* GenericPersistence.listAll(
-          'Snippet',
-          Snippet,
+          'ContentNode',
+          ContentNode,
         ).pipe(Effect.provide(Neo4jTestWithGenericData(emptyData)));
 
         expect(results).toEqual([]);
@@ -311,7 +267,7 @@ describe('Generic Persistence Functions', () => {
         });
 
         const result = yield* Effect.either(
-          GenericPersistence.listAll('Snippet', Snippet).pipe(
+          GenericPersistence.listAll('ContentNode', ContentNode).pipe(
             Effect.provide(Layer.succeed(Neo4jService, mockNeo4j)),
           ),
         );
@@ -331,7 +287,7 @@ describe('Generic Persistence Functions', () => {
 
       // Schema missing required 'description' field
       const BadSchema1 = Schema.Struct({
-        id: SnippetId,
+        id: ContentNodeId,
         name: Slug,
       });
 
@@ -346,12 +302,12 @@ describe('Generic Persistence Functions', () => {
 
       // Schema missing required 'name' field
       const BadSchema2 = Schema.Struct({
-        id: SnippetId,
+        id: ContentNodeId,
         description: Schema.String,
       });
 
       // @ts-expect-error - Schema missing required 'name' field
-      const _invalidCall2 = GenericPersistence.findByName(
+      const _invalidCall2 = GenericPersistence.findEntityByName(
         'Bad',
         BadSchema2,
         Schema.decodeSync(Slug)('test'),
@@ -359,7 +315,7 @@ describe('Generic Persistence Functions', () => {
 
       // This should pass TypeScript compilation
       const GoodSchema = Schema.Struct({
-        id: SnippetId,
+        id: ContentNodeId,
         name: Slug,
         description: Schema.String,
         extraField: Schema.String,
@@ -401,9 +357,9 @@ describe('Generic Persistence Functions', () => {
 
         const result = yield* Effect.either(
           GenericPersistence.mustFindByName(
-            'Snippet',
-            'snippet',
-            Snippet,
+            'ContentNode',
+            'content node',
+            ContentNode,
             Schema.decodeSync(Slug)('valid-name'),
           ).pipe(Effect.provide(Layer.succeed(Neo4jService, mockNeo4j))),
         );
@@ -434,16 +390,16 @@ describe('Generic Persistence Functions', () => {
           withSession: () => Effect.die('Not implemented'),
         });
 
-        const snippet = yield* GenericPersistence.mustFindByName(
-          'Snippet',
-          'snippet',
-          Snippet,
+        const contentNode = yield* GenericPersistence.mustFindByName(
+          'ContentNode',
+          'content node',
+          ContentNode,
           Schema.decodeSync(Slug)('valid-name'),
         ).pipe(Effect.provide(Layer.succeed(Neo4jService, mockNeo4j)));
 
         // Should succeed and ignore extra field
-        expect(snippet.name).toBe('valid-name');
-        expect('extraField' in snippet).toBe(false);
+        expect(contentNode.name).toBe('valid-name');
+        expect('extraField' in contentNode).toBe(false);
       }),
     );
 
@@ -466,9 +422,9 @@ describe('Generic Persistence Functions', () => {
         });
 
         const result = yield* Effect.either(
-          GenericPersistence.findByName(
-            'Snippet',
-            Snippet,
+          GenericPersistence.findEntityByName(
+            'ContentNode',
+            ContentNode,
             Schema.decodeSync(Slug)('test'),
           ).pipe(Effect.provide(Layer.succeed(Neo4jService, mockNeo4j))),
         );
@@ -481,438 +437,6 @@ describe('Generic Persistence Functions', () => {
           );
         }
       }),
-    );
-  });
-
-  describe('createVersion', () => {
-    it.effect('should create first version without previous link', () =>
-      Effect.gen(function* () {
-        const queryTracker: QueryTracker = { queries: [] };
-
-        // Set up test data with an existing snippet but no versions
-        const testData = {
-          snippets: [
-            generateTestSnippet(
-              '550e8400-e29b-41d4-a716-446655440001',
-              'test-snippet',
-            ),
-          ],
-          snippetVersions: [], // No existing versions
-          tags: [],
-          parameters: [],
-          parameterOptions: [],
-          compositions: [],
-          compositionVersions: [],
-        };
-
-        const snippetId = Schema.decodeSync(SnippetId)(
-          '550e8400-e29b-41d4-a716-446655440001',
-        );
-
-        const version = yield* GenericPersistence.createVersion(
-          'SnippetVersion',
-          'Snippet',
-          snippetId,
-          SnippetVersion,
-          {
-            content: 'New snippet content',
-            commit_message: 'Initial version',
-          },
-        ).pipe(
-          Effect.provide(Neo4jTestWithGenericData(testData, queryTracker)),
-        );
-
-        expect(version.content).toBe('New snippet content');
-        expect(version.commit_message).toBe('Initial version');
-
-        // Verify the queries executed by the actual implementation
-        expect(queryTracker.queries.length).toBeGreaterThan(0);
-
-        // Find the CREATE query
-        const createQuery = queryTracker.queries.find((q) =>
-          q.query.includes('CREATE (v:SnippetVersion'),
-        );
-        expect(createQuery).toBeDefined();
-
-        // Most importantly: verify NO PREVIOUS_VERSION relationship was created
-        expect(createQuery?.query).not.toContain('PREVIOUS_VERSION');
-        expect(createQuery?.query).toContain('VERSION_OF');
-
-        // Verify it's the simpler create query without previous version matching
-        expect(createQuery?.query).not.toContain('MATCH (prev:SnippetVersion');
-      }),
-    );
-
-    it.effect(
-      'should create version with previous link when versions exist',
-      () =>
-        Effect.gen(function* () {
-          const queryTracker: QueryTracker = { queries: [] };
-
-          // Set up test data with existing version
-          const testData = {
-            snippets: [
-              generateTestSnippet(
-                '550e8400-e29b-41d4-a716-446655440001',
-                'test-snippet',
-              ),
-            ],
-            snippetVersions: [
-              {
-                version: {
-                  ...generateTestSnippetVersionRaw(
-                    '650e8400-e29b-41d4-a716-446655440001',
-                    'Old content',
-                    'Previous version',
-                    '2024-01-01T00:00:00.000Z',
-                  ),
-                } as any,
-                snippetId: Schema.decodeSync(SnippetId)(
-                  '550e8400-e29b-41d4-a716-446655440001',
-                ),
-              },
-            ],
-            tags: [],
-            parameters: [],
-            parameterOptions: [],
-            compositions: [],
-            compositionVersions: [],
-          };
-
-          const snippetId = Schema.decodeSync(SnippetId)(
-            '550e8400-e29b-41d4-a716-446655440001',
-          );
-
-          const version = yield* GenericPersistence.createVersion(
-            'SnippetVersion',
-            'Snippet',
-            snippetId,
-            SnippetVersion,
-            {
-              content: 'Updated content',
-              commit_message: 'Update content',
-            },
-          ).pipe(
-            Effect.provide(Neo4jTestWithGenericData(testData, queryTracker)),
-          );
-
-          expect(version.content).toBe('Updated content');
-          expect(version.commit_message).toBe('Update content');
-
-          // Verify the queries executed by the actual implementation
-          const queries = queryTracker.queries.map((q) => q.query);
-
-          // Should have multiple queries in a transaction
-          expect(queries.length).toBeGreaterThanOrEqual(3);
-
-          // 1. Check parent exists
-          const parentCheckQuery = queries.find(
-            (q) =>
-              q.includes('MATCH (p:Snippet {id: $') &&
-              q.includes('}) RETURN p'),
-          );
-          expect(parentCheckQuery).toBeDefined();
-
-          // 2. Find previous version
-          const findPrevQuery = queries.find(
-            (q) =>
-              q.includes('VERSION_OF') &&
-              q.includes('ORDER BY v.createdAt DESC'),
-          );
-          expect(findPrevQuery).toBeDefined();
-
-          // 3. Create with previous link
-          const createQuery = queries.find((q) =>
-            q.includes('CREATE (v:SnippetVersion'),
-          );
-          expect(createQuery).toBeDefined();
-
-          // Verify it uses the more complex query with previous version
-          expect(createQuery).toContain('MATCH (prev:SnippetVersion');
-          expect(createQuery).toContain('PREVIOUS_VERSION');
-          expect(createQuery).toContain('VERSION_OF');
-
-          // Check that prevId was passed correctly
-          const createQueryData = queryTracker.queries.find((q) =>
-            q.query.includes('CREATE (v:SnippetVersion'),
-          );
-          expect(createQueryData?.params.prevId).toBe(
-            '650e8400-e29b-41d4-a716-446655440001',
-          );
-        }),
-    );
-
-    it.effect('should fail with NotFoundError when parent does not exist', () =>
-      Effect.gen(function* () {
-        const nonExistentId = Schema.decodeSync(SnippetId)(
-          '999e8400-e29b-41d4-a716-446655440999',
-        );
-
-        const result = yield* Effect.either(
-          GenericPersistence.createVersion(
-            'SnippetVersion',
-            'Snippet',
-            nonExistentId,
-            SnippetVersion,
-            {
-              content: 'Content',
-              commit_message: 'Message',
-            },
-          ),
-        );
-
-        expect(result._tag).toBe('Left');
-        if (result._tag === 'Left') {
-          expect(result.left._tag).toBe('NotFoundError');
-          expect(result.left.entityType).toBe('snippet');
-        }
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
-    );
-
-    it.effect('should work with Parameter and ParameterOption', () =>
-      Effect.gen(function* () {
-        const parameterId = Schema.decodeSync(ParameterId)(
-          '850e8400-e29b-41d4-a716-446655440001',
-        );
-
-        const option = yield* GenericPersistence.createVersion(
-          'ParameterOption',
-          'Parameter',
-          parameterId,
-          ParameterOption,
-          {
-            value: 'should',
-            commit_message: 'Add should option',
-          },
-        );
-
-        expect(option.value).toBe('should');
-        expect(option.commit_message).toBe('Add should option');
-        const isValid = Schema.is(ParameterOption)(option);
-        expect(isValid).toBe(true);
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
-    );
-
-    it.effect('should work with Composition and CompositionVersion', () =>
-      Effect.gen(function* () {
-        const compositionId = Schema.decodeSync(CompositionId)(
-          'a50e8400-e29b-41d4-a716-446655440001',
-        );
-
-        const version = yield* GenericPersistence.createVersion(
-          'CompositionVersion',
-          'Composition',
-          compositionId,
-          CompositionVersion,
-          {
-            snippets: [
-              {
-                snippetVersionId: Schema.decodeSync(SnippetVersionId)(
-                  '650e8400-e29b-41d4-a716-446655440001',
-                ),
-                role: 'system' as const,
-                sequence: 0,
-              },
-              {
-                snippetVersionId: Schema.decodeSync(SnippetVersionId)(
-                  '650e8400-e29b-41d4-a716-446655440002',
-                ),
-                role: 'user_prompt' as const,
-                sequence: 0,
-              },
-            ],
-            commit_message: 'Add composition with two snippets',
-          },
-        );
-
-        expect(version.snippets).toHaveLength(2);
-        expect(version.snippets[0].sequence).toBe(0);
-        expect(version.snippets[0].role).toBe('system');
-        expect(version.snippets[1].sequence).toBe(0);
-        expect(version.snippets[1].role).toBe('user_prompt');
-        expect(version.commit_message).toBe(
-          'Add composition with two snippets',
-        );
-        const isValid = Schema.is(CompositionVersion)(version);
-        expect(isValid).toBe(true);
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
-    );
-  });
-
-  describe('getLatestVersion', () => {
-    it.effect('should return latest version when versions exist', () =>
-      Effect.gen(function* () {
-        const snippetId = Schema.decodeSync(SnippetId)(
-          '550e8400-e29b-41d4-a716-446655440001',
-        );
-
-        const result = yield* GenericPersistence.getLatestVersion(
-          'SnippetVersion',
-          'Snippet',
-          snippetId,
-          SnippetVersion,
-        );
-
-        expect(Option.isSome(result)).toBe(true);
-        if (Option.isSome(result)) {
-          // Should get the latest version (2024-01-02)
-          expect(result.value.content).toBe(
-            'You {{obligation_level}} provide a helpful response',
-          );
-          expect(result.value.commit_message).toBe('Updated wording');
-        }
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
-    );
-
-    it.effect('should return None when no versions exist', () =>
-      Effect.gen(function* () {
-        const snippetId = Schema.decodeSync(SnippetId)(
-          '550e8400-e29b-41d4-a716-446655440002', // Snippet with no versions
-        );
-
-        const result = yield* GenericPersistence.getLatestVersion(
-          'SnippetVersion',
-          'Snippet',
-          snippetId,
-          SnippetVersion,
-        );
-
-        expect(Option.isNone(result)).toBe(true);
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
-    );
-
-    it.effect('should return None when parent does not exist', () =>
-      Effect.gen(function* () {
-        const nonExistentId = Schema.decodeSync(SnippetId)(
-          '999e8400-e29b-41d4-a716-446655440999',
-        );
-
-        const result = yield* GenericPersistence.getLatestVersion(
-          'SnippetVersion',
-          'Snippet',
-          nonExistentId,
-          SnippetVersion,
-        );
-
-        expect(Option.isNone(result)).toBe(true);
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
-    );
-
-    it.effect('should correctly order versions by createdAt', () =>
-      Effect.gen(function* () {
-        const testData = {
-          snippets: [
-            generateTestSnippet(
-              '550e8400-e29b-41d4-a716-446655440003',
-              'test-snippet',
-            ),
-          ],
-          snippetVersions: [
-            {
-              version: {
-                ...generateTestSnippetVersionRaw(
-                  '650e8400-e29b-41d4-a716-446655440003',
-                  'First version',
-                  'First',
-                  '2024-01-01T00:00:00.000Z',
-                ),
-              } as any,
-              snippetId: Schema.decodeSync(SnippetId)(
-                '550e8400-e29b-41d4-a716-446655440003',
-              ),
-            },
-            {
-              version: {
-                ...generateTestSnippetVersionRaw(
-                  '650e8400-e29b-41d4-a716-446655440005',
-                  'Latest version',
-                  'Latest',
-                  '2024-01-03T00:00:00.000Z',
-                ),
-              } as any,
-              snippetId: Schema.decodeSync(SnippetId)(
-                '550e8400-e29b-41d4-a716-446655440003',
-              ),
-            },
-            {
-              version: {
-                ...generateTestSnippetVersionRaw(
-                  '650e8400-e29b-41d4-a716-446655440004',
-                  'Middle version',
-                  'Middle',
-                  '2024-01-02T00:00:00.000Z',
-                ),
-              } as any,
-              snippetId: Schema.decodeSync(SnippetId)(
-                '550e8400-e29b-41d4-a716-446655440003',
-              ),
-            },
-          ],
-          tags: [],
-          parameters: [],
-          parameterOptions: [],
-          compositions: [],
-          compositionVersions: [],
-        };
-
-        const snippetId = Schema.decodeSync(SnippetId)(
-          '550e8400-e29b-41d4-a716-446655440003',
-        );
-        const result = yield* GenericPersistence.getLatestVersion(
-          'SnippetVersion',
-          'Snippet',
-          snippetId,
-          SnippetVersion,
-        ).pipe(Effect.provide(Neo4jTestWithGenericData(testData)));
-
-        expect(Option.isSome(result)).toBe(true);
-        if (Option.isSome(result)) {
-          expect(result.value.content).toBe('Latest version');
-          expect(result.value.commit_message).toBe('Latest');
-        }
-      }),
-    );
-
-    it.effect('should work with ParameterOption', () =>
-      Effect.gen(function* () {
-        const parameterId = Schema.decodeSync(ParameterId)(
-          '850e8400-e29b-41d4-a716-446655440001',
-        );
-
-        const result = yield* GenericPersistence.getLatestVersion(
-          'ParameterOption',
-          'Parameter',
-          parameterId,
-          ParameterOption,
-        );
-
-        expect(Option.isSome(result)).toBe(true);
-        if (Option.isSome(result)) {
-          expect(result.value.value).toBe('must');
-          expect(result.value.commit_message).toBe('Initial option');
-        }
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
-    );
-
-    it.effect('should work with CompositionVersion', () =>
-      Effect.gen(function* () {
-        const compositionId = Schema.decodeSync(CompositionId)(
-          'a50e8400-e29b-41d4-a716-446655440001',
-        );
-
-        const result = yield* GenericPersistence.getLatestVersion(
-          'CompositionVersion',
-          'Composition',
-          compositionId,
-          CompositionVersion,
-        );
-
-        expect(Option.isSome(result)).toBe(true);
-        if (Option.isSome(result)) {
-          expect(result.value.snippets).toHaveLength(2);
-          expect(result.value.commit_message).toBe('Added second snippet');
-        }
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
     );
   });
 });

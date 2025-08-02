@@ -20,41 +20,6 @@ const makeIdType = <B extends string>(brand: B) =>
     Schema.brand(brand),
   );
 
-/**
- * Snippet ID - Identifies a snippet container
- */
-export const SnippetId = makeIdType('SnippetId');
-export type SnippetId = typeof SnippetId.Type;
-
-/**
- * Snippet Version ID - Identifies a specific version of a snippet
- */
-export const SnippetVersionId = makeIdType('SnippetVersionId');
-export type SnippetVersionId = typeof SnippetVersionId.Type;
-
-/**
- * Parameter ID - Identifies a parameter definition
- */
-export const ParameterId = makeIdType('ParameterId');
-export type ParameterId = typeof ParameterId.Type;
-
-/**
- * Parameter Option ID - Identifies a specific value for a parameter
- */
-export const ParameterOptionId = makeIdType('ParameterOptionId');
-export type ParameterOptionId = typeof ParameterOptionId.Type;
-
-/**
- * Composition ID - Identifies a composition container
- */
-export const CompositionId = makeIdType('CompositionId');
-export type CompositionId = typeof CompositionId.Type;
-
-/**
- * Composition Version ID - Identifies a specific version of a composition
- */
-export const CompositionVersionId = makeIdType('CompositionVersionId');
-export type CompositionVersionId = typeof CompositionVersionId.Type;
 
 /**
  * Test Run ID - Identifies a test execution
@@ -73,6 +38,24 @@ export type DataPointId = typeof DataPointId.Type;
  */
 export const TagId = makeIdType('TagId');
 export type TagId = typeof TagId.Type;
+
+/**
+ * Content Node ID - Identifies a unified content container
+ */
+export const ContentNodeId = makeIdType('ContentNodeId');
+export type ContentNodeId = typeof ContentNodeId.Type;
+
+/**
+ * Content Node Version ID - Identifies a specific version of a content node
+ */
+export const ContentNodeVersionId = makeIdType('ContentNodeVersionId');
+export type ContentNodeVersionId = typeof ContentNodeVersionId.Type;
+
+/**
+ * Test Case ID - Identifies a test case
+ */
+export const TestCaseId = makeIdType('TestCaseId');
+export type TestCaseId = typeof TestCaseId.Type;
 
 /**
  * Slug - URL and command-line friendly string
@@ -107,14 +90,11 @@ export type RelationshipStrength = typeof RelationshipStrength.Type;
  * Useful for error types and generic ID handling
  */
 export const AnyId = Schema.Union(
-  SnippetId,
-  SnippetVersionId,
-  ParameterId,
-  ParameterOptionId,
-  CompositionId,
-  CompositionVersionId,
   TestRunId,
   DataPointId,
   TagId,
+  ContentNodeId,
+  ContentNodeVersionId,
+  TestCaseId,
 );
 export type AnyId = typeof AnyId.Type;
