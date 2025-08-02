@@ -8,9 +8,9 @@
 import { Schema, HashMap, Chunk } from 'effect';
 import { Slug, ContentNodeId, TagId, TestCaseId } from './branded';
 import {
-  ParameterKey,
-  ParameterValue,
-  ParameterHashMap,
+  InsertKey,
+  InsertValue,
+  InsertHashMap,
   ContentRole,
 } from './contentNode';
 
@@ -49,8 +49,8 @@ export const TestCase = Schema.Struct({
   messageSlots: Schema.Array(MessageSlot),
   parameters: Schema.optional(
     Schema.HashMap({
-      key: ParameterKey,
-      value: ParameterValue,
+      key: InsertKey,
+      value: InsertValue,
     }),
   ),
 });

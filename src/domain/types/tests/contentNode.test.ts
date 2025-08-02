@@ -5,8 +5,8 @@ import {
   ContentNodeVersion,
   EdgeOperation,
   IncludesEdgeProperties,
-  ParameterKey,
-  ParameterValue,
+  InsertKey,
+  InsertValue,
 } from '../contentNode';
 import { Message, TestCase, MessageSlot, LLMModel } from '../testCase';
 
@@ -173,32 +173,32 @@ describe('IncludesEdgeProperties', () => {
   );
 });
 
-describe('ParameterKey', () => {
-  it.effect('should decode valid parameter key', () =>
+describe('InsertKey', () => {
+  it.effect('should decode valid insert key', () =>
     Effect.gen(function* () {
-      const result = yield* Schema.decode(ParameterKey)('validKey');
+      const result = yield* Schema.decode(InsertKey)('validKey');
       expect(result).toBe('validKey');
     }),
   );
 
-  it.effect('should decode parameter key with underscores', () =>
+  it.effect('should decode insert key with underscores', () =>
     Effect.gen(function* () {
-      const result = yield* Schema.decode(ParameterKey)('valid_key_name');
+      const result = yield* Schema.decode(InsertKey)('valid_key_name');
       expect(result).toBe('valid_key_name');
     }),
   );
 
-  it.effect('should reject parameter key starting with number', () =>
+  it.effect('should reject insert key starting with number', () =>
     Effect.gen(function* () {
-      const result = yield* Effect.either(Schema.decode(ParameterKey)('1key'));
+      const result = yield* Effect.either(Schema.decode(InsertKey)('1key'));
       expect(result._tag).toBe('Left');
     }),
   );
 
-  it.effect('should reject parameter key with spaces', () =>
+  it.effect('should reject insert key with spaces', () =>
     Effect.gen(function* () {
       const result = yield* Effect.either(
-        Schema.decode(ParameterKey)('invalid key'),
+        Schema.decode(InsertKey)('invalid key'),
       );
       expect(result._tag).toBe('Left');
     }),
@@ -282,8 +282,8 @@ describe('TestCase', () => {
 
   it.effect('should decode TestCase with parameters', () =>
     Effect.gen(function* () {
-      const key = yield* Schema.decode(ParameterKey)('topic');
-      const value = yield* Schema.decode(ParameterValue)('TypeScript');
+      const key = yield* Schema.decode(InsertKey)('topic');
+      const value = yield* Schema.decode(InsertValue)('TypeScript');
 
       // Use array form for Schema.HashMap encoding
       const testCase = {

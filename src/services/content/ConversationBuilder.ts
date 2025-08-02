@@ -4,9 +4,9 @@ import { PersistenceError } from '../../domain/types/errors';
 import { cypher, queryParams } from '../../domain/types/database';
 import {
   ContentNodeVersionId,
-  ParameterHashMap,
-  ParameterKey,
-  ParameterValue,
+  InsertHashMap,
+  InsertKey,
+  InsertValue,
 } from '../../domain/types/contentNode';
 import {
   TestCase,
@@ -21,7 +21,7 @@ import { processContentFromId } from './ContentProcessing';
  */
 export const findContentForSlot = (
   slot: MessageSlot,
-  _parameters: ParameterHashMap,
+  _parameters: InsertHashMap,
 ): Effect.Effect<ContentNodeVersionId[], PersistenceError, Neo4jService> =>
   Effect.gen(function* () {
     const neo4j = yield* Neo4jService;

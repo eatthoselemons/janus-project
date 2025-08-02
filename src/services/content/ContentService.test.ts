@@ -6,7 +6,7 @@ import {
   ContentNodeId,
   ContentNodeVersionId,
 } from '../../domain/types/branded';
-import { InsertKey, InsertValue, ParameterKey, ParameterValue } from '../../domain/types/contentNode';
+import { InsertKey, InsertValue } from '../../domain/types/contentNode';
 import { TestCase, LLMModel } from '../../domain/types/testCase';
 import { NotFoundError, PersistenceError } from '../../domain/types/errors';
 import {
@@ -462,8 +462,8 @@ describe('ContentService', () => {
           ],
           parameters: HashMap.make<InsertKey, InsertValue>([
             [
-              Schema.decodeSync(ParameterKey)('topic'),
-              Schema.decodeSync(ParameterValue)('TypeScript'),
+              Schema.decodeSync(InsertKey)('topic'),
+              Schema.decodeSync(InsertValue)('TypeScript'),
             ],
           ]),
         };

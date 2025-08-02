@@ -11,7 +11,7 @@ import {
   ContentNodeVersionId,
 } from '../domain/types/branded';
 import { TestCase, LLMModel } from '../domain/types/testCase';
-import { ParameterKey, ParameterValue } from '../domain/types/contentNode';
+import { InsertKey, InsertValue } from '../domain/types/contentNode';
 import { cypher, queryParams } from '../domain/types/database';
 
 /**
@@ -203,9 +203,9 @@ const createSampleTestCases = Effect.gen(function* () {
       },
     ],
     parameters: HashMap.set(
-      HashMap.empty<ParameterKey, ParameterValue>(),
-      Schema.decodeSync(ParameterKey)('topic'),
-      Schema.decodeSync(ParameterValue)('TypeScript programming'),
+      HashMap.empty<InsertKey, InsertValue>(),
+      Schema.decodeSync(InsertKey)('topic'),
+      Schema.decodeSync(InsertValue)('TypeScript programming'),
     ),
   };
 

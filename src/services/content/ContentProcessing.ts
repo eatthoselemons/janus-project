@@ -6,9 +6,9 @@ import {
   ContentNodeVersion,
   ContentNodeVersionId,
   IncludesEdgeProperties,
-  ParameterKey,
-  ParameterValue,
-  ParameterHashMap,
+  InsertKey,
+  InsertValue,
+  InsertHashMap,
   ProcessingOptions,
   ChildNode,
 } from '../../domain/types/contentNode';
@@ -39,7 +39,7 @@ const mapToPersistenceError = <A, E, R>(
  */
 const processNode = (
   nodeVersion: ContentNodeVersion,
-  parameterHashMap: ParameterHashMap,
+  parameterHashMap: InsertHashMap,
   options: ProcessingOptions,
 ): Effect.Effect<string, PersistenceError | NotFoundError, Neo4jService> =>
   Effect.gen(function* () {
@@ -87,7 +87,7 @@ const processNode = (
           if (!child.edge.key) {
             return ctx; // Skip if no key specified
           }
-          const key = yield* Schema.decodeUnknown(ParameterKey)(
+          const key = yield* Schema.decodeUnknown(InsertKey)(
             child.edge.key,
           ).pipe(
             Effect.mapError(
@@ -103,7 +103,7 @@ const processNode = (
             ctx,
             options,
           );
-          const paramValue = yield* Schema.decodeUnknown(ParameterValue)(
+          const paramValue = yield* Schema.decodeUnknown(InsertValue)(
             value,
           ).pipe(
             Effect.mapError(
@@ -151,7 +151,7 @@ const processNode = (
  */
 export const processContentFromId = (
   versionId: ContentNodeVersionId,
-  context: ParameterHashMap = HashMap.empty<ParameterKey, ParameterValue>(),
+  context: InsertHashMap = HashMap.empty<InsertKey, InsertValue>(),
   options: ProcessingOptions = {},
 ): Effect.Effect<string, PersistenceError | NotFoundError, Neo4jService> =>
   Effect.gen(function* () {

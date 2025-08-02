@@ -55,20 +55,20 @@ export const IncludesEdgeProperties = Schema.Struct({
 });
 export type IncludesEdgeProperties = typeof IncludesEdgeProperties.Type;
 
-// Parameter types to avoid primitive obsession
-export const ParameterKey = Schema.String.pipe(
+// Insert parameter types to avoid primitive obsession
+export const InsertKey = Schema.String.pipe(
   Schema.pattern(/^[a-zA-Z][a-zA-Z0-9_]*$/),
-  Schema.brand('ParameterKey'),
+  Schema.brand('InsertKey'),
 );
-export type ParameterKey = typeof ParameterKey.Type;
+export type InsertKey = typeof InsertKey.Type;
 
-export const ParameterValue = Schema.String.pipe(
-  Schema.brand('ParameterValue'),
+export const InsertValue = Schema.String.pipe(
+  Schema.brand('InsertValue'),
 );
-export type ParameterValue = typeof ParameterValue.Type;
+export type InsertValue = typeof InsertValue.Type;
 
 // Using type alias instead of Schema for HashMap since it's used with HashMap functions
-export type ParameterHashMap = HashMap.HashMap<ParameterKey, ParameterValue>;
+export type InsertHashMap = HashMap.HashMap<InsertKey, InsertValue>;
 
 // Processing options for filtering
 export const ProcessingOptions = Schema.Struct({
