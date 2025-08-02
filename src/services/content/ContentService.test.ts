@@ -295,6 +295,76 @@ describe('ContentService', () => {
       }).pipe(Effect.provide(ContentTestWithEmptyData())),
     );
 
+    it.effect('should concatenate children in alphabetical order by node name', () =>
+      Effect.gen(function* () {
+        // Create parent branch node
+        const parent = yield* ContentService.createContentNode(
+          Schema.decodeSync(Slug)('parent-alphabetical'),
+          'Parent for alphabetical test',
+        );
+        const parentVersion = yield* ContentService.createContentNodeVersion(
+          parent.id,
+          '',
+          'Branch node for alphabetical ordering',
+        );
+
+        // Create child nodes in non-alphabetical order
+        const zebra = yield* ContentService.createContentNode(
+          Schema.decodeSync(Slug)('zebra-content'),
+          'Zebra node',
+        );
+        yield* ContentService.createContentNodeVersion(
+          zebra.id,
+          'Zebra line',
+          'Zebra content',
+          [
+            {
+              versionId: parentVersion.id,
+              operation: 'concatenate',
+            },
+          ],
+        );
+
+        const apple = yield* ContentService.createContentNode(
+          Schema.decodeSync(Slug)('apple-content'),
+          'Apple node',
+        );
+        yield* ContentService.createContentNodeVersion(
+          apple.id,
+          'Apple line',
+          'Apple content',
+          [
+            {
+              versionId: parentVersion.id,
+              operation: 'concatenate',
+            },
+          ],
+        );
+
+        const middle = yield* ContentService.createContentNode(
+          Schema.decodeSync(Slug)('middle-content'),
+          'Middle node',
+        );
+        yield* ContentService.createContentNodeVersion(
+          middle.id,
+          'Middle line',
+          'Middle content',
+          [
+            {
+              versionId: parentVersion.id,
+              operation: 'concatenate',
+            },
+          ],
+        );
+
+        // Process should concatenate children alphabetically by node name
+        const result = yield* ContentService.processContentFromId(
+          parentVersion.id,
+        );
+        expect(result).toBe('Apple line\nMiddle line\nZebra line');
+      }).pipe(Effect.provide(ContentTestWithEmptyData())),
+    );
+
     it.effect('should exclude versions based on options', () =>
       Effect.gen(function* () {
         const versionId = Schema.decodeSync(ContentNodeVersionId)(

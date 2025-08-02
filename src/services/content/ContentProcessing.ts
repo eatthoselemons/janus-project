@@ -45,10 +45,11 @@ const processNode = (
   Effect.gen(function* () {
     const neo4j = yield* Neo4jService;
 
-    // Fetch children for this node
+    // Fetch children for this node with their parent ContentNode for sorting
     const childrenQuery = cypher`
       MATCH (node:ContentNodeVersion {id: $versionId})-[r:INCLUDES]->(child:ContentNodeVersion)
-      RETURN child, r as edge
+      MATCH (child)-[:VERSION_OF]->(parentNode:ContentNode)
+      RETURN child, r as edge, parentNode.name as parentName
     `;
 
     const childrenParams = yield* mapToPersistenceError(
@@ -58,6 +59,7 @@ const processNode = (
       neo4j.runQuery<{
         child: unknown;
         edge: unknown;
+        parentName: string;
       }>(childrenQuery, childrenParams),
     );
 
@@ -70,7 +72,7 @@ const processNode = (
           const edge = yield* Schema.decodeUnknown(IncludesEdgeProperties)(
             item.edge,
           );
-          return { node: child, edge };
+          return { node: child, edge, parentName: item.parentName };
         }),
       ),
     );
@@ -128,11 +130,8 @@ const processNode = (
     const concatChildren = children
       .filter((c) => c.edge.operation === 'concatenate')
       .sort((a, b) => {
-        // Sort by createdAt to maintain insertion order
-        // createdAt is already a timestamp value
-        const timeA = a.node.createdAt.epochMillis;
-        const timeB = b.node.createdAt.epochMillis;
-        return timeA - timeB;
+        // Sort alphabetically by parent node name
+        return a.parentName.localeCompare(b.parentName);
       });
 
     const concatenated = yield* Effect.forEach(concatChildren, (child) =>

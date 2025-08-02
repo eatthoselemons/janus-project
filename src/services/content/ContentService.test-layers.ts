@@ -376,12 +376,13 @@ export const ContentTestWithData = (
       ];
     }
 
-    // Get children of a node (new query pattern)
+    // Get children of a node with parent name (new query pattern)
     if (
       query.includes(
         'MATCH (node:ContentNodeVersion {id: $versionId})-[r:INCLUDES]->(child:ContentNodeVersion)',
       ) &&
-      query.includes('RETURN child, r as edge')
+      query.includes('MATCH (child)-[:VERSION_OF]->(parentNode:ContentNode)') &&
+      query.includes('RETURN child, r as edge, parentNode.name as parentName')
     ) {
       const versionId = params.versionId;
       return testData.edges
@@ -391,6 +392,10 @@ export const ContentTestWithData = (
             (v) => v.version.id === e.childId,
           );
           if (!childVersion) return null;
+          // Find the parent node for this version
+          const parentNode = testData.nodes.find(
+            (n) => n.id === childVersion.nodeId,
+          );
           return {
             child: {
               ...childVersion.version,
@@ -399,6 +404,7 @@ export const ContentTestWithData = (
               ),
             },
             edge: e.properties,
+            parentName: parentNode?.name || '',
           };
         })
         .filter((c) => c !== null);
