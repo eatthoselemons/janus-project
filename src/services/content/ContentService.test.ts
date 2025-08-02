@@ -612,6 +612,71 @@ describe('ContentService', () => {
       }).pipe(Effect.provide(ContentTestWithEmptyData())),
     );
 
+    it.effect('should handle parameter substitution in conversations', () =>
+      Effect.gen(function* () {
+        // Create a parent node with placeholder
+        const templateNode = yield* ContentService.createContentNode(
+          Schema.decodeSync(Slug)('help-template'),
+          'Help message template',
+        );
+        yield* ContentService.tagContent(templateNode.id, [
+          Schema.decodeSync(Slug)('help-message'),
+          Schema.decodeSync(Slug)('user-message'),
+        ]);
+        const templateVersion = yield* ContentService.createContentNodeVersion(
+          templateNode.id,
+          'I need help with {{topic}}',
+          'Template with topic placeholder',
+        );
+
+        // Create a child node that provides the topic value
+        const topicNode = yield* ContentService.createContentNode(
+          Schema.decodeSync(Slug)('topic-value'),
+          'Topic value provider',
+        );
+        const topicVersion = yield* ContentService.createContentNodeVersion(
+          topicNode.id,
+          'TypeScript generics',
+          'Specific topic value',
+          [
+            {
+              versionId: templateVersion.id,
+              operation: 'insert',
+              key: 'topic',
+            },
+          ],
+        );
+
+        // Create test case that uses the template
+        const testCase: TestCase = {
+          id: Schema.decodeSync(Schema.String.pipe(Schema.brand('TestCaseId')))(
+            '523e4567-e89b-12d3-a456-426614174004',
+          ),
+          name: 'Help with substitution',
+          description: 'Test parameter substitution in conversation',
+          createdAt: Schema.decodeSync(Schema.DateTimeUtc)(
+            '2024-01-01T00:00:00Z',
+          ),
+          llmModel: Schema.decodeSync(LLMModel)('gpt-4'),
+          messageSlots: [
+            { role: 'user', tags: ['help-message'], sequence: 0 },
+          ],
+          // Note: TestCase parameters don't affect substitution - 
+          // only insert relationships do
+          parameters: HashMap.empty(),
+        };
+
+        // Build conversation
+        const conversation =
+          yield* ContentService.buildConversationFromTestCase(testCase);
+
+        // Should have substituted the parameter
+        expect(Chunk.toReadonlyArray(conversation)).toEqual([
+          { role: 'user', content: 'I need help with TypeScript generics' },
+        ]);
+      }).pipe(Effect.provide(ContentTestWithEmptyData())),
+    );
+
     it.effect('should fail when no content found for slot', () =>
       Effect.gen(function* () {
         const testCase: TestCase = {
