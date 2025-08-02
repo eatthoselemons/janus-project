@@ -26,15 +26,7 @@ cd "$EXAMPLES_DIR"
 # Effect official examples
 if ! has_content "effect-official-examples"; then
     echo "   Cloning Effect official examples..."
-    TEMP_EFFECT=$(mktemp -d)
-    git clone --depth 1 https://github.com/Effect-TS/effect.git "$TEMP_EFFECT/effect"
-    if [ -d "$TEMP_EFFECT/effect/examples" ]; then
-        cp -r "$TEMP_EFFECT/effect/examples" effect-official-examples
-        echo "   Effect official examples copied successfully"
-    else
-        echo "   Warning: examples directory not found in Effect repository"
-    fi
-    rm -rf "$TEMP_EFFECT"
+    git clone https://github.com/Effect-TS/examples.git effect-official-examples
 else
     echo "   Effect official examples already exist"
 fi
@@ -74,15 +66,14 @@ if ! has_content "$EFFECT_DOCS_DIR" || ! has_content "$EFFECT_PACKAGES_DIR"; the
     TEMP_DIR=$(mktemp -d)
     cd "$TEMP_DIR"
     
-    # Clone Effect repository (shallow clone for speed)
-    git clone --depth 1 https://github.com/Effect-TS/effect.git effect-temp
-    
     # Copy docs if needed
     if ! has_content "$EFFECT_DOCS_DIR"; then
+        echo "   Cloning docs..."
+        git clone https://github.com/Effect-TS/website.git effect-docs-temp
         echo "   Copying Effect documentation..."
         mkdir -p "$EFFECT_DOCS_DIR"
-        if [ -d "effect-temp/docs" ]; then
-            cp -r effect-temp/docs/* "$EFFECT_DOCS_DIR/"
+        if [ -d "effect-docs-temp/content/src/content/docs/docs" ]; then
+            cp -r effect-docs-temp/content/src/content/docs/docs/* "$EFFECT_DOCS_DIR/"
             echo "   Effect documentation copied successfully"
         else
             echo "   Warning: docs directory not found in Effect repository"
@@ -93,6 +84,8 @@ if ! has_content "$EFFECT_DOCS_DIR" || ! has_content "$EFFECT_PACKAGES_DIR"; the
     
     # Copy packages source code if needed
     if ! has_content "$EFFECT_PACKAGES_DIR"; then
+        echo "   Cloning docs..."
+        git clone https://github.com/Effect-TS/effect.git effect-temp
         echo "   Copying Effect packages source code..."
         mkdir -p "$EFFECT_PACKAGES_DIR"
         if [ -d "effect-temp/packages" ]; then
