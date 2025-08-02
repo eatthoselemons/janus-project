@@ -5,6 +5,7 @@ export {
   mustFindContentNodeByName,
   listContentNodes,
   tagContent,
+  getNodeTags,
 } from './ContentNodeOperations';
 
 export {

@@ -189,22 +189,83 @@ describe('ContentService', () => {
     );
   });
 
-  describe('tagContent', () => {
-    it.effect('should tag content node', () =>
+  describe('getNodeTags', () => {
+    it.effect('should return empty array for node with no tags', () =>
       Effect.gen(function* () {
-        const nodeId = Schema.decodeSync(ContentNodeId)(
-          '550e8400-e29b-41d4-a716-446655440001',
+        const node = yield* ContentService.createContentNode(
+          Schema.decodeSync(Slug)('untagged-node'),
+          'Node without tags',
         );
+
+        const tags = yield* ContentService.getNodeTags(node.id);
+        expect(tags).toEqual([]);
+      }).pipe(Effect.provide(ContentTestWithEmptyData())),
+    );
+
+    it.effect('should return tags in alphabetical order', () =>
+      Effect.gen(function* () {
+        const node = yield* ContentService.createContentNode(
+          Schema.decodeSync(Slug)('ordered-tags-node'),
+          'Node with ordered tags',
+        );
+
+        // Tag in non-alphabetical order
+        yield* ContentService.tagContent(node.id, [
+          Schema.decodeSync(Slug)('zebra'),
+          Schema.decodeSync(Slug)('alpha'),
+          Schema.decodeSync(Slug)('beta'),
+        ]);
+
+        const tags = yield* ContentService.getNodeTags(node.id);
+        expect(tags).toEqual(['alpha', 'beta', 'zebra']);
+      }).pipe(Effect.provide(ContentTestWithEmptyData())),
+    );
+  });
+
+  describe('tagContent', () => {
+    it.effect('should tag content node and verify relationships', () =>
+      Effect.gen(function* () {
+        // Create a content node first
+        const node = yield* ContentService.createContentNode(
+          Schema.decodeSync(Slug)('test-node-for-tags'),
+          'Test node for tagging',
+        );
+
         const tagNames = [
           Schema.decodeSync(Slug)('new-tag'),
           Schema.decodeSync(Slug)('another-tag'),
         ];
 
-        yield* ContentService.tagContent(nodeId, tagNames);
+        // Tag the content
+        yield* ContentService.tagContent(node.id, tagNames);
 
-        // The mock doesn't persist state, so we just verify no errors
-        expect(true).toBe(true);
-      }).pipe(Effect.provide(ContentTestWithData())),
+        // Verify the tags were applied
+        const appliedTags = yield* ContentService.getNodeTags(node.id);
+        expect(appliedTags).toHaveLength(2);
+        expect(appliedTags).toContain('new-tag');
+        expect(appliedTags).toContain('another-tag');
+      }).pipe(Effect.provide(ContentTestWithEmptyData())),
+    );
+
+    it.effect('should handle duplicate tags gracefully', () =>
+      Effect.gen(function* () {
+        // Create a content node
+        const node = yield* ContentService.createContentNode(
+          Schema.decodeSync(Slug)('test-node-duplicate-tags'),
+          'Test node for duplicate tags',
+        );
+
+        const tagName = Schema.decodeSync(Slug)('duplicate-tag');
+
+        // Tag the content twice with the same tag
+        yield* ContentService.tagContent(node.id, [tagName]);
+        yield* ContentService.tagContent(node.id, [tagName]);
+
+        // Verify only one relationship exists (MERGE prevents duplicates)
+        const appliedTags = yield* ContentService.getNodeTags(node.id);
+        expect(appliedTags).toHaveLength(1);
+        expect(appliedTags).toContain('duplicate-tag');
+      }).pipe(Effect.provide(ContentTestWithEmptyData())),
     );
   });
 

@@ -519,6 +519,18 @@ export const ContentTestWithData = (
         .map((n) => ({ n }));
     }
 
+    // Get tags for a node
+    if (
+      query.includes('MATCH (n:ContentNode {id: $nodeId})-[:HAS_TAG]->(t:Tag)') &&
+      query.includes('RETURN t.name as tagName')
+    ) {
+      const nodeId = params.nodeId;
+      return testData.tags
+        .filter((t) => t.nodeId === nodeId)
+        .map((t) => ({ tagName: t.tagName }))
+        .sort((a, b) => a.tagName.localeCompare(b.tagName)); // Sort alphabetically like the query
+    }
+
     return [];
   };
 
