@@ -58,8 +58,7 @@ fi
 # Notion Discord Notifications example
 if ! has_content "notion-discord-notifications"; then
     echo "   Cloning Notion Discord Notifications example..."
-    git clone https://github.com/bmdavis419/notion-discord-notifications notion-discord-notifications 2>/dev/null || {
-    }
+    git clone https://github.com/bmdavis419/notion-discord-notifications notion-discord-notifications
 else
     echo "   Notion Discord Notifications example already exists"
 fi
