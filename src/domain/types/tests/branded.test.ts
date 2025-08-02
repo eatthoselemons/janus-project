@@ -1,15 +1,12 @@
 import { describe, expect, it } from '@effect/vitest';
 import { Effect, Schema } from 'effect';
 import {
-  SnippetId,
-  SnippetVersionId,
-  ParameterId,
-  ParameterOptionId,
-  CompositionId,
-  CompositionVersionId,
   TestRunId,
   DataPointId,
   TagId,
+  ContentNodeId,
+  ContentNodeVersionId,
+  TestCaseId,
   Slug,
   RelationshipStrength,
 } from '../branded';
@@ -51,15 +48,12 @@ describe('Branded UUID Types', () => {
   };
 
   // Test all ID types
-  testIdType('SnippetId', SnippetId);
-  testIdType('SnippetVersionId', SnippetVersionId);
-  testIdType('ParameterId', ParameterId);
-  testIdType('ParameterOptionId', ParameterOptionId);
-  testIdType('CompositionId', CompositionId);
-  testIdType('CompositionVersionId', CompositionVersionId);
   testIdType('TestRunId', TestRunId);
   testIdType('DataPointId', DataPointId);
   testIdType('TagId', TagId);
+  testIdType('ContentNodeId', ContentNodeId);
+  testIdType('ContentNodeVersionId', ContentNodeVersionId);
+  testIdType('TestCaseId', TestCaseId);
 });
 
 describe('Slug', () => {
