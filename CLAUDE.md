@@ -102,6 +102,12 @@ The project adheres strictly to **Functional Programming** and **Type-Driven Dev
 - **Never hallucinate libraries or functions** - Only use verified packages
 - **Always confirm file paths and module names exist** before referencing them
 
+### Notes When Making Tests
+
+- Use the language server mcp often to check types when you get errors in tests
+- Build errors usually are not descriptive enough
+- Poke around with the language server
+
 ## 5. Core Principles Checklist
 
 Ensure code always follows these ideals:
