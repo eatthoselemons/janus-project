@@ -4,12 +4,12 @@
   "description": "A framework for the rigorous, empathetic, and reproducible testing of Large Language Models.",
   "main": "dist/index.js",
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run src",
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write .",
-    "preflight": "pnpm run format && pnpm run lint && pnpm run build && pnpm run test"
+    "preflight": "pnpm run format && pnpm run lint && pnpm run build && pnpm run test src"
   },
   "keywords": [
     "llm",
@@ -20,6 +20,10 @@
   "author": "Elizabeth Wynn",
   "license": "Apache-2.0",
   "dependencies": {
+    "@effect/ai": "^0.25.0",
+    "@effect/ai-anthropic": "^0.15.0",
+    "@effect/ai-google": "^0.4.0",
+    "@effect/ai-openai": "^0.28.0",
     "@effect/cli": "^0.66.7",
     "@effect/platform-node": "^0.88.11",
     "effect": "^3.16.12",
