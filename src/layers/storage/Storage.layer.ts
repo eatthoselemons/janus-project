@@ -1,9 +1,9 @@
 import { Layer, Effect } from 'effect';
-import { StorageService } from '../../services/storage';
+import { StorageService, type StorageError } from '../../services/storage';
 import { ConfigService } from '../../services/config';
+import { Neo4jService } from '../../services/neo4j';
 import { Neo4jStorageLive } from './Neo4jStorage.layer';
-// TODO: Import GitStorageLive when implemented
-// import { GitStorageLive } from './GitStorage.layer';
+import { GitStorageLive } from './GitStorage.layer';
 
 /**
  * Storage layer that selects the appropriate backend based on configuration
@@ -14,15 +14,10 @@ export const StorageLive = Layer.unwrapEffect(
     const config = yield* ConfigService;
 
     if (config.storageBackend === 'git') {
-      // TODO: Return GitStorageLive when implemented
-      // For now, throw an error to indicate Git backend is not yet implemented
-      return yield* Effect.fail(
-        new Error('Git storage backend is not yet implemented'),
-      );
-      // return GitStorageLive;
+      return GitStorageLive as Layer.Layer<StorageService, StorageError, ConfigService>;
     } else {
       // Default to Neo4j backend
-      return Neo4jStorageLive;
+      return Neo4jStorageLive as Layer.Layer<StorageService, StorageError, ConfigService | Neo4jService>;
     }
   }),
 );

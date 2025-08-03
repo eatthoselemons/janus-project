@@ -2,7 +2,7 @@ import { describe, it, expect } from '@effect/vitest';
 import { Effect, Schema, Option, Layer } from 'effect';
 import * as GenericPersistence from './GenericPersistence';
 import {
-  Neo4jTestWithGenericData,
+  StorageTestWithGenericData,
   QueryTracker,
 } from './GenericPersistence.test-layers';
 import { Tag } from '../../domain/types/tag';
@@ -52,7 +52,7 @@ describe('Generic Persistence Functions', () => {
         expect(created.name).toBe('test-entity');
         expect(created.description).toBe('Test description');
         expect(created.customField).toBe('custom value');
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
+      }).pipe(Effect.provide(StorageTestWithGenericData())),
     );
 
     it.effect('should fail when entity with same name already exists', () =>
@@ -69,7 +69,7 @@ describe('Generic Persistence Functions', () => {
           expect(result.left._tag).toBe('PersistenceError');
           expect(result.left.originalMessage).toContain('already exists');
         }
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
+      }).pipe(Effect.provide(StorageTestWithGenericData())),
     );
 
     it.effect('should work with ContentNode schema', () =>
@@ -86,7 +86,7 @@ describe('Generic Persistence Functions', () => {
         const isValid = Schema.is(ContentNode)(created);
         expect(isValid).toBe(true);
         expect(created.name).toBe('new-content-node');
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
+      }).pipe(Effect.provide(StorageTestWithGenericData())),
     );
 
     it.effect('should work with Tag schema', () =>
@@ -103,7 +103,7 @@ describe('Generic Persistence Functions', () => {
         const isValid = Schema.is(Tag)(created);
         expect(isValid).toBe(true);
         expect(created.name).toBe('new-tag');
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
+      }).pipe(Effect.provide(StorageTestWithGenericData())),
     );
   });
 
@@ -121,7 +121,7 @@ describe('Generic Persistence Functions', () => {
           expect(result.value.name).toBe('existing-content-node');
           expect(result.value.description).toBe('An existing content node');
         }
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
+      }).pipe(Effect.provide(StorageTestWithGenericData())),
     );
 
     it.effect('should return None when entity not found', () =>
@@ -133,7 +133,7 @@ describe('Generic Persistence Functions', () => {
         );
 
         expect(Option.isNone(result)).toBe(true);
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
+      }).pipe(Effect.provide(StorageTestWithGenericData())),
     );
 
     it.effect('should validate schema on returned data', () =>
@@ -186,7 +186,7 @@ describe('Generic Persistence Functions', () => {
 
         expect(contentNode.name).toBe('existing-content-node');
         expect(contentNode.description).toBe('An existing content node');
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
+      }).pipe(Effect.provide(StorageTestWithGenericData())),
     );
 
     it.effect('should fail with NotFoundError when entity not found', () =>
@@ -206,7 +206,7 @@ describe('Generic Persistence Functions', () => {
           expect(result.left.entityType).toBe('content node');
           expect(result.left.slug).toBe('non-existent-content-node');
         }
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
+      }).pipe(Effect.provide(StorageTestWithGenericData())),
     );
   });
 
@@ -221,7 +221,7 @@ describe('Generic Persistence Functions', () => {
         expect(contentNodes.length).toBe(2);
         expect(contentNodes[0].name).toBe('existing-content-node');
         expect(contentNodes[1].name).toBe('test-content-node');
-      }).pipe(Effect.provide(Neo4jTestWithGenericData())),
+      }).pipe(Effect.provide(StorageTestWithGenericData())),
     );
 
     it.effect('should return empty array when no entities exist', () =>
@@ -235,7 +235,7 @@ describe('Generic Persistence Functions', () => {
         const results = yield* GenericPersistence.listAll(
           'ContentNode',
           ContentNode,
-        ).pipe(Effect.provide(Neo4jTestWithGenericData(emptyData)));
+        ).pipe(Effect.provide(StorageTestWithGenericData(emptyData)));
 
         expect(results).toEqual([]);
       }),
