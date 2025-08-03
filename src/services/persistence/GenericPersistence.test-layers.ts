@@ -1,5 +1,7 @@
 import { Effect, Layer, Schema } from 'effect';
-import { StorageService, TransactionContext, StorageError } from '../storage';
+import { StorageService, TransactionContext, type StorageError } from '../storage';
+import { Neo4jError, GitPersistenceError } from '../../domain/types/errors';
+import { StorageBackend } from '../../domain/types/config';
 import { Tag } from '../../domain/types/tag';
 import {
   ContentNode,
@@ -125,11 +127,15 @@ export interface QueryTracker {
 }
 
 /**
- * Create Neo4j test layer with generic data
+ * Create storage test layer with generic data
+ * @param testData - The test data to use
+ * @param queryTracker - Optional query tracker for testing
+ * @param backend - The storage backend to simulate ('neo4j' or 'git')
  */
-export const Neo4jTestWithGenericData = (
+export const StorageTestWithGenericData = (
   testData: GenericPersistenceTestData = defaultTestData,
   queryTracker?: QueryTracker,
+  backend: StorageBackend = 'neo4j',
 ) => {
   // Mock function to handle parameter-based queries
   const handleQuery = (query: string, params: any = {}): unknown[] => {
@@ -219,13 +225,20 @@ export const Neo4jTestWithGenericData = (
         );
         return Effect.succeed(results as T[][]);
       },
-      withSession: () =>
-        Effect.fail(
-          new StorageError({
-            operation: 'read' as const,
-            originalMessage: 'withSession not implemented in test layer',
-          }),
-        ),
+      withSession: () => {
+        const error: StorageError =
+          backend === 'git'
+            ? new GitPersistenceError({
+                path: '/test/git/repo',
+                operation: 'read',
+                originalMessage: 'withSession not implemented in test layer',
+              })
+            : new Neo4jError({
+                query: '',
+                originalMessage: 'withSession not implemented in test layer',
+              });
+        return Effect.fail(error);
+      },
     }),
   );
 };

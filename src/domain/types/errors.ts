@@ -122,6 +122,23 @@ export class Neo4jError extends Schema.TaggedError<Neo4jError>()('Neo4jError', {
 }
 
 /**
+ * Git persistence error for file-based operations
+ * Includes the file path, operation type, and error details
+ */
+export class GitPersistenceError extends Schema.TaggedError<GitPersistenceError>()(
+  'GitPersistenceError',
+  {
+    path: Schema.String,
+    operation: Schema.Literal('read', 'write', 'delete', 'sync', 'parse'),
+    originalMessage: Schema.String,
+  },
+) {
+  get message() {
+    return `Git persistence ${this.operation} error at ${this.path}: ${this.originalMessage}`;
+  }
+}
+
+/**
  * Union type for all Janus errors
  */
 export type JanusErrors =
@@ -131,4 +148,5 @@ export type JanusErrors =
   | FileSystemError
   | NotFoundError
   | ConflictError
-  | Neo4jError;
+  | Neo4jError
+  | GitPersistenceError;

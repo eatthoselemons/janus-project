@@ -1,5 +1,5 @@
-import { Effect, Option, Schema } from 'effect';
-import { StorageService, TransactionContext, StorageError } from '../storage';
+import { Effect, Option, Schema, Match } from 'effect';
+import { StorageService, TransactionContext, type StorageError } from '../storage';
 import { NotFoundError, PersistenceError } from '../../domain/types/errors';
 import { cypher, queryParams } from '../../domain/types/database';
 import {
@@ -48,7 +48,7 @@ const createParentRelationships = (
           ).pipe(
             Effect.mapError(
               () =>
-                new StorageError({
+                new PersistenceError({
                   operation: 'create' as const,
                   originalMessage: 'Invalid edge properties',
                   query: '',
@@ -64,7 +64,7 @@ const createParentRelationships = (
           }).pipe(
             Effect.mapError(
               (error) =>
-                new StorageError({
+                new PersistenceError({
                   operation: 'create' as const,
                   originalMessage: error.message,
                   query: '',
@@ -76,19 +76,16 @@ const createParentRelationships = (
       }),
     )
     .pipe(
-      Effect.mapError((error) => {
-        if (error instanceof StorageError) {
-          return new PersistenceError({
-            originalMessage: error.originalMessage,
-            operation: 'connect',
-            query: error.query,
-          });
-        }
-        return new PersistenceError({
-          originalMessage: String(error),
-          operation: 'connect',
-        });
-      }),
+      Effect.mapError((error) =>
+        Match.value(error).pipe(
+          Match.when(
+            (e): e is PersistenceError => e instanceof PersistenceError,
+            (e) => e
+          ),
+          // Let backend-specific errors bubble up
+          Match.orElse(() => error)
+        )
+      ),
     );
 
 /**
@@ -137,24 +134,20 @@ export const createContentNodeVersion = (
         }),
       )
       .pipe(
-        Effect.mapError((error) => {
-          if (error instanceof PersistenceError) {
-            return error;
-          }
-          if (
-            error instanceof StorageError &&
-            error.originalMessage.includes('not found')
-          ) {
-            return new NotFoundError({
-              entityType: 'content node',
-              id: nodeId,
-            });
-          }
-          return new PersistenceError({
-            originalMessage: String(error),
-            operation: 'create',
-          });
-        }),
+        Effect.mapError((error) =>
+          Match.value(error).pipe(
+            Match.when(
+              (e): e is PersistenceError => 
+                e instanceof PersistenceError && e.originalMessage.includes('not found'),
+              () => new NotFoundError({
+                entityType: 'content node',
+                id: nodeId,
+              })
+            ),
+            // Let all other errors bubble up (PersistenceError or backend-specific)
+            Match.orElse(() => error)
+          )
+        ),
       );
 
     // Create parent relationships if provided

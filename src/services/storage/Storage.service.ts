@@ -1,15 +1,13 @@
-import { Effect, Context, Data } from 'effect';
+import { Effect, Context } from 'effect';
 import type { Session } from 'neo4j-driver';
 import { CypherQuery, QueryParameters } from '../../domain/types/database';
+import { Neo4jError, GitPersistenceError } from '../../domain/types/errors';
 
 /**
- * Storage error type for unified storage layer
+ * Storage error type - union of all storage backend errors
+ * This allows users to identify which backend caused the error
  */
-export class StorageError extends Data.TaggedError('StorageError')<{
-  readonly query?: string;
-  readonly operation: 'create' | 'read' | 'update' | 'delete' | 'transaction';
-  readonly originalMessage: string;
-}> {}
+export type StorageError = Neo4jError | GitPersistenceError;
 
 /**
  * Query type that can be either Cypher for Neo4j or structured query for other backends
@@ -48,7 +46,7 @@ export interface TransactionContext {
   readonly run: <T = unknown>(
     query: Query,
     params?: QueryParameters,
-  ) => Effect.Effect<T[], any, never>;
+  ) => Effect.Effect<T[], StorageError, never>;
 }
 
 /**
@@ -85,7 +83,7 @@ export interface StorageImpl {
   readonly runQuery: <T = unknown>(
     query: Query,
     params?: QueryParameters,
-  ) => Effect.Effect<T[], any, never>;
+  ) => Effect.Effect<T[], StorageError, never>;
 
   /**
    * Execute multiple operations in a transaction
@@ -109,7 +107,7 @@ export interface StorageImpl {
       query: Query;
       params?: QueryParameters;
     }>,
-  ) => Effect.Effect<T[][], any, never>;
+  ) => Effect.Effect<T[][], StorageError, never>;
 
   /**
    * For complex operations that need full session control

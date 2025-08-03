@@ -5,6 +5,7 @@ import {
   ProviderName,
   ApiBaseUrl,
   LlmModel,
+  StorageBackend,
 } from '../../domain/types';
 
 /**
@@ -14,7 +15,7 @@ import {
 export class ConfigService extends Context.Tag('ConfigService')<
   ConfigService,
   {
-    readonly storageBackend?: 'neo4j' | 'git';
+    readonly storageBackend?: StorageBackend;
     readonly neo4j: {
       readonly uri: Neo4jUri;
       readonly user: Neo4jUser;

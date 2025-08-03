@@ -3,7 +3,6 @@ import type { Driver, Session } from 'neo4j-driver';
 import { Neo4jService, type Neo4jImpl } from '../../neo4j';
 import {
   StorageService,
-  StorageError,
   type StorageImpl,
   type TransactionContext,
   type Query,

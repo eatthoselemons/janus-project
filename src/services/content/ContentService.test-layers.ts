@@ -1,5 +1,7 @@
 import { Effect, Layer, Schema } from 'effect';
-import { StorageService, StorageError } from '../storage';
+import { StorageService, type StorageError } from '../storage';
+import { Neo4jError, GitPersistenceError } from '../../domain/types/errors';
+import { StorageBackend } from '../../domain/types/config';
 import {
   ContentNode,
   ContentNodeVersion,
@@ -232,10 +234,13 @@ const copyTestData = (data: ContentTestData): ContentTestData => ({
 });
 
 /**
- * Create Neo4j test layer with content data
+ * Create test layer with content data
+ * @param initialData - The test data to use
+ * @param backend - The storage backend to simulate ('neo4j' or 'git')
  */
 export const ContentTestWithData = (
   initialData: ContentTestData = defaultTestData,
+  backend: StorageBackend = 'neo4j',
 ) => {
   // Create a deep copy to avoid cross-test pollution
   const testData = copyTestData(initialData);
@@ -557,13 +562,20 @@ export const ContentTestWithData = (
         );
         return Effect.succeed(results as T[][]);
       },
-      withSession: () =>
-        Effect.fail(
-          new StorageError({
-            operation: 'read',
-            originalMessage: 'withSession not implemented in test layer',
-          }),
-        ),
+      withSession: () => {
+        const error: StorageError =
+          backend === 'git'
+            ? new GitPersistenceError({
+                path: '/test/git/repo',
+                operation: 'read',
+                originalMessage: 'withSession not implemented in test layer',
+              })
+            : new Neo4jError({
+                query: '',
+                originalMessage: 'withSession not implemented in test layer',
+              });
+        return Effect.fail(error);
+      },
     }),
   );
 };

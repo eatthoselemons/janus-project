@@ -17,3 +17,6 @@ export * from './testCase';
 
 // Error types
 export * from './errors';
+
+// Configuration types
+export * from './config';

@@ -13,6 +13,16 @@ import {
  * in the service implementation
  */
 
+/**
+ * Available storage backend types
+ */
+export type StorageBackend = 'neo4j' | 'git';
+
+/**
+ * Schema for storage backend selection
+ */
+export const StorageBackendSchema = Schema.Literal('neo4j', 'git');
+
 // Neo4j configuration schema
 export const Neo4jConfigSchema = Schema.Struct({
   uri: Neo4jUri,
@@ -45,7 +55,7 @@ export const GitConfigSchema = Schema.Struct({
 
 // Main configuration schema
 export const ConfigSchema = Schema.Struct({
-  storageBackend: Schema.optional(Schema.Literal('neo4j', 'git')).pipe(
+  storageBackend: Schema.optional(StorageBackendSchema).pipe(
     Schema.withDefaults({
       constructor: () => 'neo4j' as const,
       decoding: () => 'neo4j' as const,

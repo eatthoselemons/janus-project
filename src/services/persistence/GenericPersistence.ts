@@ -1,6 +1,6 @@
-import { Effect, Option, Schema } from 'effect';
-import { StorageService, TransactionContext, StorageError } from '../storage';
-import { NotFoundError, PersistenceError } from '../../domain/types/errors';
+import { Effect, Option, Schema, Match } from 'effect';
+import { StorageService, TransactionContext, type StorageError } from '../storage';
+import { NotFoundError, PersistenceError, Neo4jError, GitPersistenceError } from '../../domain/types/errors';
 import {
   cypher,
   queryParams,
@@ -49,29 +49,41 @@ const mapToPersistenceError =
   ) =>
   <E, A>(effect: Effect.Effect<A, E, any>) =>
     effect.pipe(
-      Effect.mapError((error) => {
-        if (error instanceof PersistenceError) {
-          return error;
-        } else if (error instanceof StorageError) {
-          return new PersistenceError({
-            originalMessage: error.originalMessage,
-            operation,
-            query: query || error.query,
-          });
-        } else if (error instanceof UndefinedQueryParameterError) {
-          return new PersistenceError({
-            originalMessage: error.message,
-            operation,
-            query,
-          });
-        } else {
-          return new PersistenceError({
+      Effect.mapError((error) =>
+        Match.value(error).pipe(
+            //todo could this be simplified since we do the same thing
+            // for multiple types?
+          // Already a PersistenceError, return as-is
+          Match.when(
+            (e): e is PersistenceError => e instanceof PersistenceError,
+            (e) => e
+          ),
+          // Let backend-specific errors bubble up for transparency
+          Match.when(
+            (e): e is Neo4jError => e instanceof Neo4jError,
+            (e) => e
+          ),
+          Match.when(
+            (e): e is GitPersistenceError => e instanceof GitPersistenceError,
+            (e) => e
+          ),
+          // Convert query parameter errors to PersistenceError
+          Match.when(
+            (e): e is UndefinedQueryParameterError => e instanceof UndefinedQueryParameterError,
+            (e) => new PersistenceError({
+              originalMessage: e.message,
+              operation,
+              query,
+            })
+          ),
+          // Default: wrap unknown errors in PersistenceError
+          Match.orElse(() => new PersistenceError({
             originalMessage: String(error),
             operation,
             query,
-          });
-        }
-      }),
+          }))
+        )
+      ),
     );
 
 /**
@@ -263,24 +275,15 @@ const verifyParentExists = (
   tx: TransactionContext,
   parentLabel: string,
   parentId: Brand<string>,
-): Effect.Effect<void, StorageError, never> =>
+): Effect.Effect<void, PersistenceError, never> =>
   Effect.gen(function* () {
     const parentQuery = cypher`MATCH (p:${parentLabel} {id: $id}) RETURN p`;
-    const parentParams = yield* queryParams({ id: parentId }).pipe(
-      Effect.mapError(
-        (error) =>
-          new StorageError({
-            operation: 'read' as const,
-            originalMessage: error.message,
-            query: parentQuery,
-          }),
-      ),
-    );
+    const parentParams = yield* queryParams({ id: parentId });
     const parentResults = yield* tx.run(parentQuery, parentParams);
 
     if (parentResults.length === 0) {
       return yield* Effect.fail(
-        new StorageError({
+        new PersistenceError({
           operation: 'read' as const,
           originalMessage: `Parent ${parentLabel} with id ${parentId} not found`,
           query: parentQuery,
@@ -297,22 +300,13 @@ const findPreviousVersion = (
   parentLabel: string,
   versionLabel: string,
   parentId: Brand<string>,
-): Effect.Effect<Option.Option<string>, StorageError, never> =>
+): Effect.Effect<Option.Option<string>, PersistenceError | StorageError, never> =>
   Effect.gen(function* () {
     const prevQuery = cypher`
       MATCH (p:${parentLabel} {id: $parentId})<-[:VERSION_OF]-(v:${versionLabel})
       RETURN v ORDER BY v.createdAt DESC LIMIT 1
     `;
-    const parentParams = yield* queryParams({ id: parentId }).pipe(
-      Effect.mapError(
-        (error) =>
-          new StorageError({
-            operation: 'read' as const,
-            originalMessage: error.message,
-            query: prevQuery,
-          }),
-      ),
-    );
+    const parentParams = yield* queryParams({ id: parentId });
     const prevResults = yield* tx.run(prevQuery, parentParams);
 
     if (prevResults.length === 0) return Option.none();
@@ -334,7 +328,7 @@ const createVersionWithPrevious = <S extends Schema.Schema<any, any, any>>(
   schema: S,
 ): Effect.Effect<
   Schema.Schema.Type<S>,
-  StorageError,
+  PersistenceError | StorageError,
   Schema.Schema.Context<S>
 > =>
   Effect.gen(function* () {
@@ -353,7 +347,7 @@ const createVersionWithPrevious = <S extends Schema.Schema<any, any, any>>(
     }).pipe(
       Effect.mapError(
         (error) =>
-          new StorageError({
+          new PersistenceError({
             operation: 'create' as const,
             originalMessage: error.message,
             query: createQuery,
@@ -365,7 +359,7 @@ const createVersionWithPrevious = <S extends Schema.Schema<any, any, any>>(
     return yield* Schema.decodeUnknown(schema)(result.v).pipe(
       Effect.mapError(
         (error) =>
-          new StorageError({
+          new PersistenceError({
             operation: 'create' as const,
             originalMessage: `Schema validation failed: ${error.message}`,
             query: createQuery,
@@ -386,7 +380,7 @@ const createVersionWithoutPrevious = <S extends Schema.Schema<any, any, any>>(
   schema: S,
 ): Effect.Effect<
   Schema.Schema.Type<S>,
-  StorageError,
+  PersistenceError | StorageError,
   Schema.Schema.Context<S>
 > =>
   Effect.gen(function* () {
@@ -402,7 +396,7 @@ const createVersionWithoutPrevious = <S extends Schema.Schema<any, any, any>>(
     }).pipe(
       Effect.mapError(
         (error) =>
-          new StorageError({
+          new PersistenceError({
             operation: 'create' as const,
             originalMessage: error.message,
             query: createQuery,
@@ -414,7 +408,7 @@ const createVersionWithoutPrevious = <S extends Schema.Schema<any, any, any>>(
     return yield* Schema.decodeUnknown(schema)(result.v).pipe(
       Effect.mapError(
         (error) =>
-          new StorageError({
+          new PersistenceError({
             operation: 'create' as const,
             originalMessage: `Schema validation failed: ${error.message}`,
             query: createQuery,
@@ -452,7 +446,7 @@ export const createVersion = <
 
     return yield* storage
       .runInTransaction(
-        (tx): Effect.Effect<Schema.Schema.Type<S>, StorageError, never> =>
+        (tx): Effect.Effect<Schema.Schema.Type<S>, PersistenceError | StorageError, never> =>
           Effect.gen(function* () {
             // Verify parent exists
             yield* verifyParentExists(tx, parentLabel, parentId);
@@ -479,7 +473,7 @@ export const createVersion = <
             ).pipe(
               Effect.mapError(
                 (error) =>
-                  new StorageError({
+                  new PersistenceError({
                     operation: 'create' as const,
                     originalMessage: `Schema validation failed: ${error.message}`,
                     query: '',
@@ -509,31 +503,30 @@ export const createVersion = <
                   schema,
                 ),
             });
-          }) as Effect.Effect<Schema.Schema.Type<S>, StorageError, never>,
+          }) as Effect.Effect<Schema.Schema.Type<S>, PersistenceError | StorageError, never>,
       )
       .pipe(
-        Effect.mapError((error: StorageError) => {
-          // Check if this is a parent not found error
-          if (
-            error.originalMessage.includes('Parent') &&
-            error.originalMessage.includes('not found')
-          ) {
-            const entityTypeMap: Record<string, 'content node' | 'tag'> = {
-              ContentNode: 'content node',
-              Tag: 'tag',
-            };
-            const entityType = entityTypeMap[parentLabel] || 'content node';
-            return new NotFoundError({
-              entityType,
-              id: parentId as any,
-            });
+        Effect.mapError((error) => {
+          // Check if this is a parent not found error from our PersistenceError
+          if (error instanceof PersistenceError) {
+            if (
+              error.originalMessage.includes('Parent') &&
+              error.originalMessage.includes('not found')
+            ) {
+              const entityTypeMap: Record<string, 'content node' | 'tag'> = {
+                ContentNode: 'content node',
+                Tag: 'tag',
+              };
+              const entityType = entityTypeMap[parentLabel] || 'content node';
+              return new NotFoundError({
+                entityType,
+                id: parentId as any,
+              });
+            }
+            return error;
           }
-
-          return new PersistenceError({
-            originalMessage: error.originalMessage,
-            operation: 'create' as const,
-            query: error.query,
-          });
+          // Let backend-specific errors bubble up
+          return error;
         }),
       );
   });
