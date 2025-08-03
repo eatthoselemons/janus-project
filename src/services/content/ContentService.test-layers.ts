@@ -287,7 +287,9 @@ export const ContentTestWithData = (
         version: {
           id: params.props.id,
           content: params.props.content,
-          createdAt: Schema.decodeSync(Schema.DateTimeUtc)(params.props.createdAt),
+          createdAt: Schema.decodeSync(Schema.DateTimeUtc)(
+            params.props.createdAt,
+          ),
           commitMessage: params.props.commitMessage,
         },
         nodeId,
@@ -313,7 +315,9 @@ export const ContentTestWithData = (
         version: {
           id: params.props.id,
           content: params.props.content,
-          createdAt: Schema.decodeSync(Schema.DateTimeUtc)(params.props.createdAt),
+          createdAt: Schema.decodeSync(Schema.DateTimeUtc)(
+            params.props.createdAt,
+          ),
           commitMessage: params.props.commitMessage,
         },
         nodeId,
@@ -417,7 +421,7 @@ export const ContentTestWithData = (
 
   const createEdgeRelationships = (params: any): unknown[] => {
     const { parentVersion, relationships } = params;
-    
+
     relationships.forEach((rel: any) => {
       testData.edges.push({
         parentId: rel.versionId,
@@ -428,7 +432,7 @@ export const ContentTestWithData = (
         },
       });
     });
-    
+
     return [];
   };
 
@@ -449,7 +453,7 @@ export const ContentTestWithData = (
                 ),
               }
             : null,
-          r: e.properties,  // Changed from 'edge' to 'r' to match query
+          r: e.properties,
         };
       })
       .filter((item) => item.child !== null);
@@ -461,7 +465,7 @@ export const ContentTestWithData = (
     const excludeVersionIds = params.excludeVersionIds || [];
 
     return slots
-      .map((slot: string) => {
+      .map((slot: string): { versionId: ContentNodeVersionId } | null => {
         // Find nodes with matching tags
         const nodesWithTags = testData.tags
           .filter((t) => tags.includes(t.tagName))
@@ -487,22 +491,35 @@ export const ContentTestWithData = (
               });
             return nodeVersions[0];
           })
-          .filter((v) => v);
+          .filter(
+            (v): v is { version: ContentNodeVersion; nodeId: ContentNodeId } =>
+              !!v,
+          );
 
         return versions[0] ? { versionId: versions[0].version.id } : null;
       })
-      .filter((v) => v !== null);
+      .filter(
+        (
+          v: { versionId: ContentNodeVersionId } | null,
+        ): v is { versionId: ContentNodeVersionId } => v !== null,
+      );
   };
 
   // Helper to create query pattern matchers
-  const queryContains = (...patterns: string[]) => (query: string) =>
-    patterns.every(pattern => query.includes(pattern));
+  const queryContains =
+    (...patterns: string[]) =>
+    (query: string) =>
+      patterns.every((pattern) => query.includes(pattern));
 
-  const queryContainsAny = (...patterns: string[]) => (query: string) =>
-    patterns.some(pattern => query.includes(pattern));
+  const queryContainsAny =
+    (...patterns: string[]) =>
+    (query: string) =>
+      patterns.some((pattern) => query.includes(pattern));
 
-  const queryExcludes = (...patterns: string[]) => (query: string) =>
-    patterns.every(pattern => !query.includes(pattern));
+  const queryExcludes =
+    (...patterns: string[]) =>
+    (query: string) =>
+      patterns.every((pattern) => !query.includes(pattern));
 
   // Mock function to handle parameter-based queries
   const handleQuery = (query: string, params: any = {}): unknown[] => {
@@ -510,64 +527,79 @@ export const ContentTestWithData = (
       // Find node by name
       Match.when(
         queryContains('MATCH (n:ContentNode {name: $name}) RETURN n'),
-        () => findNodeByName(params)
+        () => findNodeByName(params),
       ),
       // Create content node
-      Match.when(
-        queryContains('CREATE (n:ContentNode $props) RETURN n'),
-        () => createNode(params)
+      Match.when(queryContains('CREATE (n:ContentNode $props) RETURN n'), () =>
+        createNode(params),
       ),
       // Find node by ID
       Match.when(
         queryContains('MATCH (p:ContentNode {id: $id}) RETURN p'),
-        () => findNodeById(params)
+        () => findNodeById(params),
       ),
       // Find latest version
       Match.when(
-        queryContains('MATCH (p:ContentNode {id: $parentId})<-[:VERSION_OF]-(v:ContentNodeVersion)'),
-        () => findLatestVersion(params)
+        queryContains(
+          'MATCH (p:ContentNode {id: $parentId})<-[:VERSION_OF]-(v:ContentNodeVersion)',
+        ),
+        () => findLatestVersion(params),
       ),
       // Create version with previous
-      Match.when(
-        queryContains('CREATE (v)-[:PREVIOUS_VERSION]->(prev)'),
-        () => createVersionWithPrevious(params)
+      Match.when(queryContains('CREATE (v)-[:PREVIOUS_VERSION]->(prev)'), () =>
+        createVersionWithPrevious(params),
       ),
       // Create version without previous
       Match.when(
-        (q) => queryContains('CREATE (v)-[:VERSION_OF]->(p)', 'CREATE (v:ContentNodeVersion $props)')(q),
-        () => createVersionWithoutPrevious(params)
+        (q) =>
+          queryContains(
+            'CREATE (v)-[:VERSION_OF]->(p)',
+            'CREATE (v:ContentNodeVersion $props)',
+          )(q),
+        () => createVersionWithoutPrevious(params),
       ),
       // Get version by ID
       Match.when(
-        (q) => queryContains('MATCH (node:ContentNodeVersion {id: $versionId})', 'RETURN node')(q) &&
-               queryExcludes('OPTIONAL MATCH')(q),
-        () => getVersionById(params)
+        (q) =>
+          queryContains(
+            'MATCH (node:ContentNodeVersion {id: $versionId})',
+            'RETURN node',
+          )(q) && queryExcludes('OPTIONAL MATCH')(q),
+        () => getVersionById(params),
       ),
       // Get children with parent name
       Match.when(
-        (q) => queryContains(
-          'MATCH (node:ContentNodeVersion {id: $versionId})-[r:INCLUDES]->(child:ContentNodeVersion)',
-          'MATCH (child)-[:VERSION_OF]->(parentNode:ContentNode)',
-          'RETURN child, r as edge, parentNode.name as parentName'
-        )(q),
-        () => getChildrenWithParentName(params)
+        (q) =>
+          queryContains(
+            'MATCH (node:ContentNodeVersion {id: $versionId})-[r:INCLUDES]->(child:ContentNodeVersion)',
+            'MATCH (child)-[:VERSION_OF]->(parentNode:ContentNode)',
+            'RETURN child, r as edge, parentNode.name as parentName',
+          )(q),
+        () => getChildrenWithParentName(params),
       ),
       // Get children (old pattern)
       Match.when(
-        (q) => queryContains('MATCH (parent:ContentNodeVersion {id: $parentId})-[r:INCLUDES]->(child:ContentNodeVersion)')(q) &&
-               queryExcludes('parentNode.name')(q),
-        () => getChildrenWithSlotsAndRoles(params)
+        (q) =>
+          queryContains(
+            'MATCH (parent:ContentNodeVersion {id: $parentId})-[r:INCLUDES]->(child:ContentNodeVersion)',
+          )(q) && queryExcludes('parentNode.name')(q),
+        () => getChildrenWithSlotsAndRoles(params),
       ),
       // Create tag with relationship
       Match.when(
-        (q) => queryContains('MERGE (t:Tag {name: $tagName})', 'MERGE (n)-[:HAS_TAG]->(t)')(q),
-        () => createTag(params)
+        (q) =>
+          queryContains(
+            'MERGE (t:Tag {name: $tagName})',
+            'MERGE (n)-[:HAS_TAG]->(t)',
+          )(q),
+        () => createTag(params),
       ),
       // Create tag without relationship
       Match.when(
-        (q) => queryContains('MERGE (t:Tag {name: $tagName})')(q) &&
-               queryExcludes('MERGE (n)-[:HAS_TAG]->(t)')(q),
-        () => []
+        (q) =>
+          queryContains('MERGE (t:Tag {name: $tagName})')(q) &&
+          queryExcludes('MERGE (n)-[:HAS_TAG]->(t)')(q),
+        () => [],
       ),
       // Create INCLUDES relationship
       Match.when(
@@ -584,11 +616,15 @@ export const ContentTestWithData = (
             });
           }
           return [];
-        }
+        },
       ),
       // Find content for slot with tags
       Match.when(
-        (q) => queryContains('MATCH (n:ContentNode)-[:VERSION_OF]-(v:ContentNodeVersion)', 'WHERE ALL(tag IN $tags')(q),
+        (q) =>
+          queryContains(
+            'MATCH (n:ContentNode)-[:VERSION_OF]-(v:ContentNodeVersion)',
+            'WHERE ALL(tag IN $tags',
+          )(q),
         () => {
           const tags = params.tags || [];
           // Find nodes that have all required tags
@@ -615,41 +651,50 @@ export const ContentTestWithData = (
                 });
               return versions[0] ? { versionId: versions[0].version.id } : null;
             })
-            .filter((v) => v !== null);
-        }
+            .filter(
+              (v): v is { versionId: ContentNodeVersionId } => v !== null,
+            );
+        },
       ),
       // List all nodes
       Match.when(
-        (q) => queryContains('MATCH (n:ContentNode)', 'RETURN n', 'ORDER BY n.name')(q),
-        () => listAllNodes()
+        (q) =>
+          queryContains(
+            'MATCH (n:ContentNode)',
+            'RETURN n',
+            'ORDER BY n.name',
+          )(q),
+        () => listAllNodes(),
       ),
       // Get tags for a node
       Match.when(
-        (q) => queryContains('MATCH (n:ContentNode {id: $nodeId})-[:HAS_TAG]->(t:Tag)', 'RETURN t.name as tagName')(q),
-        () => getNodeTags(params)
+        (q) =>
+          queryContains(
+            'MATCH (n:ContentNode {id: $nodeId})-[:HAS_TAG]->(t:Tag)',
+            'RETURN t.name as tagName',
+          )(q),
+        () => getNodeTags(params),
       ),
       // Create test case
-      Match.when(
-        queryContains('CREATE (t:TestCase $props) RETURN t'),
-        () => createTestCase(params)
+      Match.when(queryContains('CREATE (t:TestCase $props) RETURN t'), () =>
+        createTestCase(params),
       ),
       // Find test case by ID
-      Match.when(
-        queryContains('MATCH (t:TestCase {id: $id}) RETURN t'),
-        () => findTestCaseById(params)
+      Match.when(queryContains('MATCH (t:TestCase {id: $id}) RETURN t'), () =>
+        findTestCaseById(params),
       ),
       // Create edge relationships
-      Match.when(
-        queryContains('UNWIND $relationships AS rel'),
-        () => createEdgeRelationships(params)
+      Match.when(queryContains('UNWIND $relationships AS rel'), () =>
+        createEdgeRelationships(params),
       ),
       // Find content for slots
       Match.when(
-        (q) => queryContains('UNWIND $slots AS slot', 'WHERE ALL(tag IN $tags')(q),
-        () => findContentForSlots(params)
+        (q) =>
+          queryContains('UNWIND $slots AS slot', 'WHERE ALL(tag IN $tags')(q),
+        () => findContentForSlots(params),
       ),
       // Default case
-      Match.orElse(() => [])
+      Match.orElse(() => []),
     );
   };
 
