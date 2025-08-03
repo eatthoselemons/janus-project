@@ -133,9 +133,9 @@ import { Effect } from 'effect';
 const createContentProgram = Effect.gen(function* () {
   const node = yield* ContentService.createContentNode(slug, description);
   const version = yield* ContentService.createContentNodeVersion(
-    node.id, 
+    node.id,
     'Content text',
-    'Initial version'
+    'Initial version',
   );
 });
 ```
