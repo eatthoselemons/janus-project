@@ -139,7 +139,9 @@ export const createVersionInNeo4j = (
 
     const createParams = yield* queryParams({
       parentId: nodeId,
-      previousId: Option.isSome(previousVersionId) ? previousVersionId.value : null,
+      previousId: Option.isSome(previousVersionId)
+        ? previousVersionId.value
+        : null,
       props: {
         id: version.id,
         content: version.content,

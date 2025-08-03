@@ -61,12 +61,15 @@ describe('ContentService', () => {
         const nodeId = Schema.decodeSync(ContentNodeId)(
           '550e8400-e29b-41d4-a716-446655440001',
         );
-        
+
         // Get the existing version that will become the previous version
-        const previousVersion = yield* ContentService.getLatestContentNodeVersion(nodeId);
+        const previousVersion =
+          yield* ContentService.getLatestContentNodeVersion(nodeId);
         expect(Option.isSome(previousVersion)).toBe(true);
-        const previousVersionId = Option.isSome(previousVersion) ? previousVersion.value.id : '';
-        
+        const previousVersionId = Option.isSome(previousVersion)
+          ? previousVersion.value.id
+          : '';
+
         // Create new version
         const version = yield* ContentService.createContentNodeVersion(
           nodeId,
@@ -80,18 +83,19 @@ describe('ContentService', () => {
           /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
         );
         expect(version.createdAt).toHaveProperty('epochMillis');
-        
+
         // Verify it's not the same as the previous version
         expect(version.id).not.toBe(previousVersionId);
-        
+
         // Get the latest version again to verify it's our new version
-        const latestVersion = yield* ContentService.getLatestContentNodeVersion(nodeId);
+        const latestVersion =
+          yield* ContentService.getLatestContentNodeVersion(nodeId);
         expect(Option.isSome(latestVersion)).toBe(true);
         if (Option.isSome(latestVersion)) {
           expect(latestVersion.value.id).toBe(version.id);
           expect(latestVersion.value.content).toBe('New version content');
         }
-        
+
         // NOTE: The test layer now tracks previousVersionId when creating versions.
         // In a real implementation with Neo4j, we would query for the PREVIOUS_VERSION
         // relationship to verify it was created correctly.
@@ -356,74 +360,76 @@ describe('ContentService', () => {
       }).pipe(Effect.provide(ContentTestWithEmptyData())),
     );
 
-    it.effect('should concatenate children in alphabetical order by node name', () =>
-      Effect.gen(function* () {
-        // Create parent branch node
-        const parent = yield* ContentService.createContentNode(
-          Schema.decodeSync(Slug)('parent-alphabetical'),
-          'Parent for alphabetical test',
-        );
-        const parentVersion = yield* ContentService.createContentNodeVersion(
-          parent.id,
-          '',
-          'Branch node for alphabetical ordering',
-        );
+    it.effect(
+      'should concatenate children in alphabetical order by node name',
+      () =>
+        Effect.gen(function* () {
+          // Create parent branch node
+          const parent = yield* ContentService.createContentNode(
+            Schema.decodeSync(Slug)('parent-alphabetical'),
+            'Parent for alphabetical test',
+          );
+          const parentVersion = yield* ContentService.createContentNodeVersion(
+            parent.id,
+            '',
+            'Branch node for alphabetical ordering',
+          );
 
-        // Create child nodes in non-alphabetical order
-        const zebra = yield* ContentService.createContentNode(
-          Schema.decodeSync(Slug)('zebra-content'),
-          'Zebra node',
-        );
-        yield* ContentService.createContentNodeVersion(
-          zebra.id,
-          'Zebra line',
-          'Zebra content',
-          [
-            {
-              versionId: parentVersion.id,
-              operation: 'concatenate',
-            },
-          ],
-        );
+          // Create child nodes in non-alphabetical order
+          const zebra = yield* ContentService.createContentNode(
+            Schema.decodeSync(Slug)('zebra-content'),
+            'Zebra node',
+          );
+          yield* ContentService.createContentNodeVersion(
+            zebra.id,
+            'Zebra line',
+            'Zebra content',
+            [
+              {
+                versionId: parentVersion.id,
+                operation: 'concatenate',
+              },
+            ],
+          );
 
-        const apple = yield* ContentService.createContentNode(
-          Schema.decodeSync(Slug)('apple-content'),
-          'Apple node',
-        );
-        yield* ContentService.createContentNodeVersion(
-          apple.id,
-          'Apple line',
-          'Apple content',
-          [
-            {
-              versionId: parentVersion.id,
-              operation: 'concatenate',
-            },
-          ],
-        );
+          const apple = yield* ContentService.createContentNode(
+            Schema.decodeSync(Slug)('apple-content'),
+            'Apple node',
+          );
+          yield* ContentService.createContentNodeVersion(
+            apple.id,
+            'Apple line',
+            'Apple content',
+            [
+              {
+                versionId: parentVersion.id,
+                operation: 'concatenate',
+              },
+            ],
+          );
 
-        const middle = yield* ContentService.createContentNode(
-          Schema.decodeSync(Slug)('middle-content'),
-          'Middle node',
-        );
-        yield* ContentService.createContentNodeVersion(
-          middle.id,
-          'Middle line',
-          'Middle content',
-          [
-            {
-              versionId: parentVersion.id,
-              operation: 'concatenate',
-            },
-          ],
-        );
+          const middle = yield* ContentService.createContentNode(
+            Schema.decodeSync(Slug)('middle-content'),
+            'Middle node',
+          );
+          yield* ContentService.createContentNodeVersion(
+            middle.id,
+            'Middle line',
+            'Middle content',
+            [
+              {
+                versionId: parentVersion.id,
+                operation: 'concatenate',
+              },
+            ],
+          );
 
-        // Process should concatenate children alphabetically by node name
-        const result = yield* ContentService.processContentFromId(
-          parentVersion.id,
-        );
-        expect(result).toBe('Apple line\nMiddle line\nZebra line');
-      }).pipe(Effect.provide(ContentTestWithEmptyData())),
+          // Process should concatenate children alphabetically by node name
+          const result = yield* ContentService.processContentFromId(
+            parentVersion.id,
+          );
+          expect(result).toBe('Apple line\nMiddle line\nZebra line');
+        }).pipe(Effect.provide(ContentTestWithEmptyData())),
     );
 
     it.effect('should exclude versions based on options', () =>
@@ -442,7 +448,6 @@ describe('ContentService', () => {
       }).pipe(Effect.provide(ContentTestWithData())),
     );
   });
-
 
   describe('listContentNodes', () => {
     it.effect('should list all content nodes ordered by name', () =>

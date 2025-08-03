@@ -2,10 +2,7 @@ import { Effect, Option } from 'effect';
 import { Neo4jService } from '../neo4j';
 import { NotFoundError, PersistenceError } from '../../domain/types/errors';
 import { cypher, queryParams } from '../../domain/types/database';
-import {
-  ContentNode,
-  ContentNodeId,
-} from '../../domain/types/contentNode';
+import { ContentNode, ContentNodeId } from '../../domain/types/contentNode';
 import { TestCaseTagName } from '../../domain/types/testCase';
 import { Slug } from '../../domain/types/branded';
 import {
@@ -104,16 +101,16 @@ export const getNodeTags = (
 ): Effect.Effect<string[], PersistenceError, Neo4jService> =>
   Effect.gen(function* () {
     const neo4j = yield* Neo4jService;
-    
+
     const query = cypher`
       MATCH (n:ContentNode {id: $nodeId})-[:HAS_TAG]->(t:Tag)
       RETURN t.name as tagName
       ORDER BY t.name
     `;
-    
+
     const params = yield* queryParams({ nodeId });
     const result = yield* neo4j.runQuery<{ tagName: string }>(query, params);
-    
+
     return result.map((r) => r.tagName);
   })
     .pipe(
