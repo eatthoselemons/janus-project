@@ -355,7 +355,6 @@ export const ContentTestWithData = (
       ];
     }
 
-
     // Get node only (new query pattern)
     if (
       query.includes('MATCH (node:ContentNodeVersion {id: $versionId})') &&
@@ -521,7 +520,9 @@ export const ContentTestWithData = (
 
     // Get tags for a node
     if (
-      query.includes('MATCH (n:ContentNode {id: $nodeId})-[:HAS_TAG]->(t:Tag)') &&
+      query.includes(
+        'MATCH (n:ContentNode {id: $nodeId})-[:HAS_TAG]->(t:Tag)',
+      ) &&
       query.includes('RETURN t.name as tagName')
     ) {
       const nodeId = params.nodeId;

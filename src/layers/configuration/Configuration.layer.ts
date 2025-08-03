@@ -7,7 +7,6 @@ import {
   Neo4jUser,
   ProviderName,
   ApiBaseUrl,
-  LlmModel,
 } from '../../domain/types';
 
 // Helper function to load a provider configuration
@@ -28,16 +27,13 @@ const loadProviderConfig = (providerName: string) =>
     // If API key exists, the other fields are required
     // These will fail with ConfigError if missing, which is what we want
     const baseUrlStr = yield* Config.string(`${prefix}_BASE_URL`);
-    const modelStr = yield* Config.string(`${prefix}_MODEL`);
 
     // Validate and convert to branded types
     const baseUrl = yield* Schema.decode(ApiBaseUrl)(baseUrlStr);
-    const model = yield* Schema.decode(LlmModel)(modelStr);
 
     return {
       apiKey: maybeApiKey.value,
       baseUrl,
-      model,
     };
   });
 
@@ -107,7 +103,6 @@ const configProgram = Effect.gen(function* () {
   type ProviderConfig = {
     apiKey: Redacted.Redacted<string>;
     baseUrl: ApiBaseUrl;
-    model: LlmModel;
   };
   const providers: Record<ProviderName, ProviderConfig> = {};
 

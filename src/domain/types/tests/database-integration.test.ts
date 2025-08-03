@@ -8,7 +8,6 @@ import {
   CypherQuery,
   ProviderName,
   ApiBaseUrl,
-  LlmModel,
   queryParams,
 } from '../database';
 import {
@@ -45,10 +44,8 @@ describe('Database Types Integration', () => {
         expect(provider).toBeDefined();
         if (provider) {
           const baseUrl: ApiBaseUrl = provider.baseUrl;
-          const model: LlmModel = provider.model;
 
           expect(baseUrl).toBe('https://api.openai.com/v1');
-          expect(model).toBe('gpt-4');
         }
       });
 

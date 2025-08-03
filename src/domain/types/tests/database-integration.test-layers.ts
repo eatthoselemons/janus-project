@@ -1,14 +1,6 @@
 import { Layer, ConfigProvider, Redacted, Schema } from 'effect';
-import { ConfigService } from '../../../services/config';
 import { Neo4jTest } from '../../../layers/neo4j/Neo4j.layer';
 import { ConfigServiceLive } from '../../../layers/configuration/Configuration.layer';
-import {
-  Neo4jUri,
-  Neo4jUser,
-  ProviderName,
-  ApiBaseUrl,
-  LlmModel,
-} from '../database';
 
 // ===========================
 // NEO4J TEST LAYERS
@@ -81,7 +73,6 @@ const validOpenAIConfig = {
   LLM_PROVIDERS: 'openai',
   LLM_OPENAI_API_KEY: 'sk-test',
   LLM_OPENAI_BASE_URL: 'https://api.openai.com/v1',
-  LLM_OPENAI_MODEL: 'gpt-4',
 };
 
 /**
@@ -136,7 +127,6 @@ export const ConfigTestInvalidUrl = Layer.provide(
           LLM_PROVIDERS: 'custom',
           LLM_CUSTOM_API_KEY: 'key',
           LLM_CUSTOM_BASE_URL: 'not-a-url',
-          LLM_CUSTOM_MODEL: 'model',
         }),
       ),
     ),
@@ -156,7 +146,6 @@ export const ConfigTestMixedCaseProvider = Layer.provide(
           LLM_PROVIDERS: 'OpenAI', // Mixed case
           LLM_OPENAI_API_KEY: 'sk-test',
           LLM_OPENAI_BASE_URL: 'https://api.openai.com/v1',
-          LLM_OPENAI_MODEL: 'gpt-4',
         }),
       ),
     ),
@@ -176,10 +165,8 @@ export const ConfigTestInvalidProviderNames = Layer.provide(
           LLM_PROVIDERS: 'open@ai,validprovider',
           LLM_OPEN_AI_API_KEY: 'sk-test',
           LLM_OPEN_AI_BASE_URL: 'https://api.openai.com/v1',
-          LLM_OPEN_AI_MODEL: 'gpt-4',
           LLM_VALIDPROVIDER_API_KEY: 'key',
           LLM_VALIDPROVIDER_BASE_URL: 'https://api.example.com',
-          LLM_VALIDPROVIDER_MODEL: 'model',
         }),
       ),
     ),

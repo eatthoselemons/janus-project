@@ -21,10 +21,7 @@ const mapToPersistenceError = <A, E, R>(
 ): Effect.Effect<A, PersistenceError | NotFoundError, R> =>
   effect.pipe(
     Effect.mapError((error) => {
-      if (
-        error instanceof PersistenceError ||
-        error instanceof NotFoundError
-      ) {
+      if (error instanceof PersistenceError || error instanceof NotFoundError) {
         return error;
       }
       return new PersistenceError({

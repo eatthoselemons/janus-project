@@ -62,9 +62,7 @@ export const InsertKey = Schema.String.pipe(
 );
 export type InsertKey = typeof InsertKey.Type;
 
-export const InsertValue = Schema.String.pipe(
-  Schema.brand('InsertValue'),
-);
+export const InsertValue = Schema.String.pipe(Schema.brand('InsertValue'));
 export type InsertValue = typeof InsertValue.Type;
 
 // Using type alias instead of Schema for HashMap since it's used with HashMap functions

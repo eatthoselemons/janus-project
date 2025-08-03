@@ -44,12 +44,12 @@ const createParentRelationships = (
           `;
 
           // Validate edge properties
-          const edgeProps = yield* Schema.decodeUnknown(
-            IncludesEdgeProperties,
-          )({
-            operation: parent.operation,
-            key: parent.key,
-          }).pipe(
+          const edgeProps = yield* Schema.decodeUnknown(IncludesEdgeProperties)(
+            {
+              operation: parent.operation,
+              key: parent.key,
+            },
+          ).pipe(
             Effect.mapError(
               () =>
                 new Neo4jError({
@@ -129,7 +129,10 @@ export const createContentNodeVersion = (
         Effect.gen(function* () {
           yield* verifyContentNodeExists(tx, nodeId);
 
-          const previousVersionId = yield* findPreviousContentNodeVersion(tx, nodeId);
+          const previousVersionId = yield* findPreviousContentNodeVersion(
+            tx,
+            nodeId,
+          );
 
           // Create version node with relationships
           yield* createVersionInNeo4j(tx, nodeId, version, previousVersionId);
