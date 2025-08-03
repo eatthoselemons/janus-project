@@ -56,25 +56,29 @@ const readProvidersFromFile = Effect.sync(() => {
   }
 });
 
-// Get configured providers from config file or environment variable
+// Auto-detect providers based on available API keys
 const getConfiguredProviders = Effect.gen(function* () {
-  // Option 1: Check environment variable first (for override)
-  const envProviders = yield* Config.string('LLM_PROVIDERS').pipe(
-    Config.withDefault(''),
+  const allPossibleProviders = [
+    'openai', 'anthropic', 'google', 'azure', 'custom', 'mycorp', 'validprovider'
+  ];
+  const availableProviders: string[] = [];
+
+  // Check each possible provider to see if it has an API key
+  yield* Effect.forEach(allPossibleProviders, (provider) =>
+    Effect.gen(function* () {
+      const prefix = `LLM_${provider.toUpperCase()}`;
+      const maybeApiKey = yield* Config.option(
+        Config.redacted(`${prefix}_API_KEY`),
+      );
+      
+      if (maybeApiKey._tag === 'Some') {
+        availableProviders.push(provider);
+      }
+    }),
+    { concurrency: 'unbounded' }
   );
 
-  if (envProviders !== '') {
-    // Environment variable takes precedence
-    return envProviders
-      .split(',')
-      .map((p) => p.trim().toLowerCase())
-      .filter((p) => p !== '');
-  }
-
-  // Option 2: Read from configuration file
-  const fileProviders = yield* readProvidersFromFile;
-
-  return fileProviders;
+  return availableProviders;
 });
 
 // Implementation using Effect Config module

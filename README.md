@@ -27,13 +27,7 @@ anthropic
 custom
 ```
 
-Then set the environment variables for each provider you listed:
-
-**Note**: You can override the config file by setting the `LLM_PROVIDERS` environment variable:
-
-```bash
-export LLM_PROVIDERS="openai,anthropic,custom"
-```
+Providers are automatically detected based on available API keys. Just set the environment variables for each provider you want to use:
 
 #### OpenAI
 

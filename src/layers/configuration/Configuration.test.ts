@@ -317,13 +317,12 @@ describe('ConfigService', () => {
   );
 
   // Test explicit provider list configuration via environment variable
-  it.effect('should respect LLM_PROVIDERS environment variable', () =>
+  it.effect('should auto-detect custom providers based on API keys', () =>
     Effect.gen(function* () {
       const mockConfig = {
         NEO4J_URI: 'bolt://localhost:7687',
         NEO4J_USER: 'neo4j',
         NEO4J_PASSWORD: 'test-password',
-        LLM_PROVIDERS: 'custom,mycorp',
         LLM_CUSTOM_API_KEY: 'custom-key',
         LLM_CUSTOM_BASE_URL: 'https://custom.api.com',
         LLM_MYCORP_API_KEY: 'mycorp-key',
