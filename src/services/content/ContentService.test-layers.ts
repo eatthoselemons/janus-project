@@ -1,4 +1,4 @@
-import { Effect, Layer, Schema } from 'effect';
+import { Effect, Layer, Schema, Match } from 'effect';
 import { Neo4jService } from '../neo4j';
 import {
   ContentNode,
@@ -20,7 +20,7 @@ export interface ContentTestData {
   versions: Array<{
     version: ContentNodeVersion;
     nodeId: ContentNodeId;
-    previousVersionId?: ContentNodeVersionId;
+    previousVersionId?: ContentNodeVersionId | undefined;
   }>;
   edges: Array<{
     parentId: ContentNodeVersionId;
@@ -240,259 +240,291 @@ export const ContentTestWithData = (
 ) => {
   // Create a deep copy to avoid cross-test pollution
   const testData = copyTestData(initialData);
-  // Mock function to handle parameter-based queries
-  const handleQuery = (query: string, params: any = {}): unknown[] => {
-    // Check if content node exists by name
-    if (query.includes('MATCH (n:ContentNode {name: $name}) RETURN n')) {
-      const name = params.name;
-      return testData.nodes.filter((n) => n.name === name).map((n) => ({ n }));
-    }
 
-    // Create content node query
-    if (query.includes('CREATE (n:ContentNode $props) RETURN n')) {
-      // Add the new node to testData
-      if (params.props) {
-        testData.nodes.push(params.props as ContentNode);
-      }
-      return [{ n: params.props }];
-    }
+  // Type definitions for query parameters
+  type NodeByNameParams = { name: string };
+  type NodeByIdParams = { id: ContentNodeId };
+  type CreateNodeParams = { props: { id: ContentNodeId; name: string; description: string } };
+  type VersionParams = { parentId: ContentNodeId };
+  type VersionChildrenParams = { parentId: ContentNodeVersionId };
+  type CreateVersionParams = {
+    parentId: ContentNodeId;
+    previousId?: ContentNodeVersionId;
+    props: {
+      id: ContentNodeVersionId;
+      content: string | undefined;
+      createdAt: string;
+      commitMessage: string;
+    };
+  };
+  type VersionByIdParams = { versionId: ContentNodeVersionId };
+  type TagParams = { nodeId: ContentNodeId; tagName: string };
+  type NodeTagsParams = { nodeId: ContentNodeId };
+  type TestCaseParams = { props: TestCase };
+  type TestCaseByIdParams = { id: string };
+  type EdgeRelationshipParams = {
+    parentVersion: ContentNodeVersionId;
+    relationships: Array<{
+      versionId: ContentNodeVersionId;
+      operation: EdgeOperation;
+      key?: string;
+    }>;
+  };
+  type LinkNodesParams = {
+    parentId: ContentNodeVersionId;
+    childId: ContentNodeVersionId;
+    operation: EdgeOperation;
+    key?: string;
+  };
+  type FindContentForSlotsParams = {
+    slots: string[];
+    tags: string[];
+    excludeVersionIds?: ContentNodeVersionId[];
+  };
+  type FindContentByTagsParams = {
+    tags: string[];
+  };
 
-    // Find content node by ID (for version creation)
-    if (query.includes('MATCH (p:ContentNode {id: $id}) RETURN p')) {
-      const id = params.id;
-      const node = testData.nodes.find((n) => n.id === id);
-      return node ? [{ p: node }] : [];
-    }
+  // Query handler functions
+  const findNodeByName = (params: NodeByNameParams): unknown[] => {
+    const name = params.name;
+    return testData.nodes.filter((n) => n.name === name).map((n) => ({ n }));
+  };
 
-    // Find latest version query
-    if (
-      query.includes(
-        'MATCH (p:ContentNode {id: $parentId})<-[:VERSION_OF]-(v:ContentNodeVersion)',
-      )
-    ) {
-      const parentId = params.parentId;
-      const versions = testData.versions
-        .filter((v) => v.nodeId === parentId)
-        .sort((a, b) => {
-          const dateA = new Date(
-            JSON.parse(JSON.stringify(a.version.createdAt)),
-          );
-          const dateB = new Date(
-            JSON.parse(JSON.stringify(b.version.createdAt)),
-          );
-          return dateB.getTime() - dateA.getTime();
-        })
-        .slice(0, 1)
-        .map((v) => ({
-          v: {
-            ...v.version,
-            createdAt: JSON.parse(JSON.stringify(v.version.createdAt)),
-          },
-        }));
-      return versions;
+  const createNode = (params: CreateNodeParams): unknown[] => {
+    if (params.props) {
+      testData.nodes.push(params.props as ContentNode);
     }
+    return [{ n: params.props }];
+  };
 
-    // Create version with previous
-    if (query.includes('CREATE (v)-[:PREVIOUS_VERSION]->(prev)')) {
-      // Add the new version to test data with previous version
-      if (params.props) {
-        const nodeId = params.parentId;
-        const previousVersionId = params.previousId;
-        testData.versions.push({
-          version: {
-            id: params.props.id,
-            content: params.props.content,
-            createdAt: Schema.decodeSync(Schema.DateTimeUtc)(
-              params.props.createdAt,
-            ),
-            commitMessage: params.props.commitMessage,
-          },
-          nodeId,
-          previousVersionId,
-        });
-      }
-      return [
-        {
-          v: {
-            id: params.props.id,
-            content: params.props.content,
-            createdAt: params.props.createdAt,
-            commitMessage: params.props.commitMessage,
-          },
+  const findNodeById = (params: NodeByIdParams): unknown[] => {
+    const id = params.id;
+    const node = testData.nodes.find((n) => n.id === id);
+    return node ? [{ p: node }] : [];
+  };
+
+  const findLatestVersion = (params: VersionParams): unknown[] => {
+    const parentId = params.parentId;
+    const versions = testData.versions
+      .filter((v) => v.nodeId === parentId)
+      .sort((a, b) => {
+        const dateA = new Date(JSON.parse(JSON.stringify(a.version.createdAt)));
+        const dateB = new Date(JSON.parse(JSON.stringify(b.version.createdAt)));
+        return dateB.getTime() - dateA.getTime();
+      })
+      .slice(0, 1)
+      .map((v) => ({
+        v: {
+          ...v.version,
+          createdAt: JSON.parse(JSON.stringify(v.version.createdAt)),
         },
-      ];
-    }
+      }));
+    return versions;
+  };
 
-    // Create version without previous
-    if (
-      query.includes('CREATE (v)-[:VERSION_OF]->(p)') &&
-      query.includes('CREATE (v:ContentNodeVersion $props)')
-    ) {
-      // Add the new version to test data
-      if (params.props) {
-        const nodeId = params.parentId;
-        testData.versions.push({
-          version: {
-            id: params.props.id,
-            content: params.props.content,
-            createdAt: Schema.decodeSync(Schema.DateTimeUtc)(
-              params.props.createdAt,
-            ),
-            commitMessage: params.props.commitMessage,
-          },
-          nodeId,
-        });
-      }
-      return [
-        {
-          v: {
-            id: params.props.id,
-            content: params.props.content,
-            createdAt: params.props.createdAt,
-            commitMessage: params.props.commitMessage,
-          },
+  const createVersionWithPrevious = (params: CreateVersionParams): unknown[] => {
+    if (params.props) {
+      const nodeId = params.parentId;
+      const previousVersionId = params.previousId;
+      testData.versions.push({
+        version: {
+          id: params.props.id,
+          content: params.props.content,
+          createdAt: Schema.decodeSync(Schema.DateTimeUtc)(
+            params.props.createdAt,
+          ),
+          commitMessage: params.props.commitMessage,
         },
-      ];
-    }
-
-    // Get node only (new query pattern)
-    if (
-      query.includes('MATCH (node:ContentNodeVersion {id: $versionId})') &&
-      query.includes('RETURN node') &&
-      !query.includes('OPTIONAL MATCH')
-    ) {
-      const versionId = params.versionId;
-      const version = testData.versions.find((v) => v.version.id === versionId);
-      if (!version) return [];
-
-      return [
-        {
-          node: {
-            ...version.version,
-            createdAt: JSON.parse(JSON.stringify(version.version.createdAt)),
-          },
-        },
-      ];
-    }
-
-    // Get children of a node with parent name (new query pattern)
-    if (
-      query.includes(
-        'MATCH (node:ContentNodeVersion {id: $versionId})-[r:INCLUDES]->(child:ContentNodeVersion)',
-      ) &&
-      query.includes('MATCH (child)-[:VERSION_OF]->(parentNode:ContentNode)') &&
-      query.includes('RETURN child, r as edge, parentNode.name as parentName')
-    ) {
-      const versionId = params.versionId;
-      return testData.edges
-        .filter((e) => e.parentId === versionId)
-        .map((e) => {
-          const childVersion = testData.versions.find(
-            (v) => v.version.id === e.childId,
-          );
-          if (!childVersion) return null;
-          // Find the parent node for this version
-          const parentNode = testData.nodes.find(
-            (n) => n.id === childVersion.nodeId,
-          );
-          return {
-            child: {
-              ...childVersion.version,
-              createdAt: JSON.parse(
-                JSON.stringify(childVersion.version.createdAt),
-              ),
-            },
-            edge: e.properties,
-            parentName: parentNode?.name || '',
-          };
-        })
-        .filter((c) => c !== null);
-    }
-
-    // Get children
-    if (
-      query.includes(
-        'MATCH (parent:ContentNodeVersion {id: $parentId})-[r:INCLUDES]->(child:ContentNodeVersion)',
-      )
-    ) {
-      const parentId = params.parentId;
-      return testData.edges
-        .filter((e) => e.parentId === parentId)
-        .map((e) => {
-          const childVersion = testData.versions.find(
-            (v) => v.version.id === e.childId,
-          );
-          return {
-            child: childVersion
-              ? {
-                  ...childVersion.version,
-                  createdAt: JSON.parse(
-                    JSON.stringify(childVersion.version.createdAt),
-                  ),
-                }
-              : undefined,
-            r: e.properties,
-          };
-        })
-        .filter((c) => c.child !== undefined);
-    }
-
-    // Create tag
-    if (query.includes('MERGE (t:Tag {name: $tagName})')) {
-      // Check if this is part of the tagContent flow
-      if (query.includes('MERGE (n)-[:HAS_TAG]->(t)')) {
-        const nodeId = params.nodeId;
-        const tagName = params.tagName;
-        if (nodeId && tagName) {
-          // Add tag to testData if not already exists
-          const exists = testData.tags.some(
-            (t) => t.nodeId === nodeId && t.tagName === tagName,
-          );
-          if (!exists) {
-            testData.tags.push({ nodeId, tagName });
-          }
-        }
-      }
-      return [];
-    }
-
-    // Create INCLUDES relationship
-    if (query.includes('CREATE (parent)-[:INCLUDES {operation:')) {
-      // Add edge to test data
-      if (params.parentId && params.childId) {
-        testData.edges.push({
-          parentId: params.parentId,
-          childId: params.childId,
-          properties: {
-            operation: params.operation,
-            key: params.key || undefined,
-          },
-        });
-      }
-      return [];
-    }
-
-    // Find content for slot with tags
-    if (
-      query.includes(
-        'MATCH (n:ContentNode)-[:VERSION_OF]-(v:ContentNodeVersion)',
-      ) &&
-      query.includes('WHERE ALL(tag IN $tags')
-    ) {
-      const tags = params.tags || [];
-      // Find nodes that have all required tags
-      const matchingNodes = testData.nodes.filter((node) => {
-        const nodeTags = testData.tags
-          .filter((t) => t.nodeId === node.id)
-          .map((t) => t.tagName);
-        return tags.every((tag: string) => nodeTags.includes(tag));
+        nodeId,
+        previousVersionId,
       });
+    }
+    return [
+      {
+        v: {
+          id: params.props.id,
+          content: params.props.content,
+          createdAt: params.props.createdAt,
+          commitMessage: params.props.commitMessage,
+        },
+      },
+    ];
+  };
 
-      // Get latest version for each matching node
-      return matchingNodes
-        .map((node) => {
-          const versions = testData.versions
-            .filter((v) => v.nodeId === node.id)
+  const createVersionWithoutPrevious = (params: CreateVersionParams): unknown[] => {
+    if (params.props) {
+      const nodeId = params.parentId;
+      testData.versions.push({
+        version: {
+          id: params.props.id,
+          content: params.props.content,
+          createdAt: Schema.decodeSync(Schema.DateTimeUtc)(
+            params.props.createdAt,
+          ),
+          commitMessage: params.props.commitMessage,
+        },
+        nodeId,
+      });
+    }
+    return [
+      {
+        v: {
+          id: params.props.id,
+          content: params.props.content,
+          createdAt: params.props.createdAt,
+          commitMessage: params.props.commitMessage,
+        },
+      },
+    ];
+  };
+
+  const getVersionById = (params: VersionByIdParams): unknown[] => {
+    const versionId = params.versionId;
+    const version = testData.versions.find((v) => v.version.id === versionId);
+    if (!version) return [];
+
+    return [
+      {
+        node: {
+          ...version.version,
+          createdAt: JSON.parse(JSON.stringify(version.version.createdAt)),
+        },
+      },
+    ];
+  };
+
+  const getChildrenWithParentName = (params: VersionByIdParams): unknown[] => {
+    const versionId = params.versionId;
+    return testData.edges
+      .filter((e) => e.parentId === versionId)
+      .map((e) => {
+        const childVersion = testData.versions.find(
+          (v) => v.version.id === e.childId,
+        );
+        if (!childVersion) return null;
+        // Find the parent node for this version
+        const parentNode = testData.nodes.find(
+          (n) => n.id === childVersion.nodeId,
+        );
+        return {
+          child: {
+            ...childVersion.version,
+            createdAt: JSON.parse(
+              JSON.stringify(childVersion.version.createdAt),
+            ),
+          },
+          edge: e.properties,
+          parentName: parentNode?.name || '',
+        };
+      })
+      .filter((c) => c !== null);
+  };
+
+  const createTag = (params: TagParams): unknown[] => {
+    const nodeId = params.nodeId;
+    const tagName = params.tagName;
+    if (nodeId && tagName) {
+      // Add tag to testData if not already exists
+      const exists = testData.tags.some(
+        (t) => t.nodeId === nodeId && t.tagName === tagName,
+      );
+      if (!exists) {
+        testData.tags.push({ nodeId, tagName });
+      }
+    }
+    return [];
+  };
+
+  const getNodeTags = (params: NodeTagsParams): unknown[] => {
+    const nodeId = params.nodeId;
+    return testData.tags
+      .filter((t) => t.nodeId === nodeId)
+      .map((t) => ({ tagName: t.tagName }))
+      .sort((a, b) => a.tagName.localeCompare(b.tagName));
+  };
+
+  const listAllNodes = (): unknown[] => {
+    return testData.nodes
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((n) => ({ n }));
+  };
+
+  const createTestCase = (params: TestCaseParams): unknown[] => {
+    if (params.props) {
+      testData.testCases.push(params.props as TestCase);
+    }
+    return [{ t: params.props }];
+  };
+
+  const findTestCaseById = (params: TestCaseByIdParams): unknown[] => {
+    const id = params.id;
+    const testCase = testData.testCases.find((t) => t.id === id);
+    return testCase ? [{ t: testCase }] : [];
+  };
+
+  const createEdgeRelationships = (params: EdgeRelationshipParams): unknown[] => {
+    const { parentVersion, relationships } = params;
+
+    relationships.forEach((rel: any) => {
+      testData.edges.push({
+        parentId: rel.versionId,
+        childId: parentVersion,
+        properties: {
+          operation: rel.operation as EdgeOperation,
+          key: rel.key,
+        },
+      });
+    });
+
+    return [];
+  };
+
+  const getChildrenWithSlotsAndRoles = (params: VersionChildrenParams): unknown[] => {
+    const parentId = params.parentId;
+    return testData.edges
+      .filter((e) => e.parentId === parentId)
+      .map((e) => {
+        const childVersion = testData.versions.find(
+          (v) => v.version.id === e.childId,
+        );
+        return {
+          child: childVersion
+            ? {
+                ...childVersion.version,
+                createdAt: JSON.parse(
+                  JSON.stringify(childVersion.version.createdAt),
+                ),
+              }
+            : null,
+          r: e.properties,
+        };
+      })
+      .filter((item) => item.child !== null);
+  };
+
+  const findContentForSlots = (params: FindContentForSlotsParams): unknown[] => {
+    const slots = params.slots;
+    const tags = params.tags;
+    const excludeVersionIds = params.excludeVersionIds || [];
+
+    const results: { versionId: ContentNodeVersionId }[] = [];
+
+    for (const slot of slots) {
+      // Find nodes with matching tags
+      const nodesWithTags = testData.tags
+        .filter((t) => tags.includes(t.tagName))
+        .map((t) => t.nodeId);
+
+      // Find latest version for each matching node
+      const versions = nodesWithTags
+        .map((nodeId) => {
+          const nodeVersions = testData.versions
+            .filter(
+              (v) =>
+                v.nodeId === nodeId &&
+                !excludeVersionIds.includes(v.version.id),
+            )
             .sort((a, b) => {
               const dateA = new Date(
                 JSON.parse(JSON.stringify(a.version.createdAt)),
@@ -502,37 +534,214 @@ export const ContentTestWithData = (
               );
               return dateB.getTime() - dateA.getTime();
             });
-          return versions[0] ? { versionId: versions[0].version.id } : null;
+          return nodeVersions[0];
         })
-        .filter((v) => v !== null);
+        .filter(
+          (v): v is { version: ContentNodeVersion; nodeId: ContentNodeId } =>
+            !!v,
+        );
+
+      if (versions[0]) {
+        results.push({ versionId: versions[0].version.id });
+      }
     }
 
-    // List all nodes - check this after search to avoid false matches
-    if (
-      query.includes('MATCH (n:ContentNode)') &&
-      query.includes('RETURN n') &&
-      query.includes('ORDER BY n.name')
-    ) {
-      return testData.nodes
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((n) => ({ n }));
-    }
+    return results;
+  };
 
-    // Get tags for a node
-    if (
-      query.includes(
-        'MATCH (n:ContentNode {id: $nodeId})-[:HAS_TAG]->(t:Tag)',
-      ) &&
-      query.includes('RETURN t.name as tagName')
-    ) {
-      const nodeId = params.nodeId;
-      return testData.tags
-        .filter((t) => t.nodeId === nodeId)
-        .map((t) => ({ tagName: t.tagName }))
-        .sort((a, b) => a.tagName.localeCompare(b.tagName)); // Sort alphabetically like the query
-    }
+  // Helper to create query pattern matchers
+  const queryContains =
+    (...patterns: string[]) =>
+    (query: string) =>
+      patterns.every((pattern) => query.includes(pattern));
 
-    return [];
+  const queryContainsAny =
+    (...patterns: string[]) =>
+    (query: string) =>
+      patterns.some((pattern) => query.includes(pattern));
+
+  const queryExcludes =
+    (...patterns: string[]) =>
+    (query: string) =>
+      patterns.every((pattern) => !query.includes(pattern));
+
+  // Mock function to handle parameter-based queries
+  const handleQuery = (query: string, params: any = {}): unknown[] => {
+    return Match.value(query).pipe(
+      // Find node by name
+      Match.when(
+        queryContains('MATCH (n:ContentNode {name: $name}) RETURN n'),
+        () => findNodeByName(params as NodeByNameParams),
+      ),
+      // Create content node
+      Match.when(queryContains('CREATE (n:ContentNode $props) RETURN n'), () =>
+        createNode(params as CreateNodeParams),
+      ),
+      // Find node by ID
+      Match.when(
+        queryContains('MATCH (p:ContentNode {id: $id}) RETURN p'),
+        () => findNodeById(params as NodeByIdParams),
+      ),
+      // Find latest version
+      Match.when(
+        queryContains(
+          'MATCH (p:ContentNode {id: $parentId})<-[:VERSION_OF]-(v:ContentNodeVersion)',
+        ),
+        () => findLatestVersion(params as VersionParams),
+      ),
+      // Create version with previous
+      Match.when(queryContains('CREATE (v)-[:PREVIOUS_VERSION]->(prev)'), () =>
+        createVersionWithPrevious(params as CreateVersionParams),
+      ),
+      // Create version without previous
+      Match.when(
+        (q) =>
+          queryContains(
+            'CREATE (v)-[:VERSION_OF]->(p)',
+            'CREATE (v:ContentNodeVersion $props)',
+          )(q),
+        () => createVersionWithoutPrevious(params as CreateVersionParams),
+      ),
+      // Get version by ID
+      Match.when(
+        (q) =>
+          queryContains(
+            'MATCH (node:ContentNodeVersion {id: $versionId})',
+            'RETURN node',
+          )(q) && queryExcludes('OPTIONAL MATCH')(q),
+        () => getVersionById(params as VersionByIdParams),
+      ),
+      // Get children with parent name
+      Match.when(
+        (q) =>
+          queryContains(
+            'MATCH (node:ContentNodeVersion {id: $versionId})-[r:INCLUDES]->(child:ContentNodeVersion)',
+            'MATCH (child)-[:VERSION_OF]->(parentNode:ContentNode)',
+            'RETURN child, r as edge, parentNode.name as parentName',
+          )(q),
+        () => getChildrenWithParentName(params as VersionByIdParams),
+      ),
+      // Get children (old pattern)
+      Match.when(
+        (q) =>
+          queryContains(
+            'MATCH (parent:ContentNodeVersion {id: $parentId})-[r:INCLUDES]->(child:ContentNodeVersion)',
+          )(q) && queryExcludes('parentNode.name')(q),
+        () => getChildrenWithSlotsAndRoles(params as VersionChildrenParams),
+      ),
+      // Create tag with relationship
+      Match.when(
+        (q) =>
+          queryContains(
+            'MERGE (t:Tag {name: $tagName})',
+            'MERGE (n)-[:HAS_TAG]->(t)',
+          )(q),
+        () => createTag(params as TagParams),
+      ),
+      // Create tag without relationship
+      Match.when(
+        (q) =>
+          queryContains('MERGE (t:Tag {name: $tagName})')(q) &&
+          queryExcludes('MERGE (n)-[:HAS_TAG]->(t)')(q),
+        () => [],
+      ),
+      // Create INCLUDES relationship
+      Match.when(
+        queryContains('CREATE (parent)-[:INCLUDES {operation:'),
+        () => {
+          const linkParams = params as LinkNodesParams;
+          if (linkParams.parentId && linkParams.childId) {
+            testData.edges.push({
+              parentId: linkParams.parentId,
+              childId: linkParams.childId,
+              properties: {
+                operation: linkParams.operation,
+                key: linkParams.key || undefined,
+              },
+            });
+          }
+          return [];
+        },
+      ),
+      // Find content for slot with tags
+      Match.when(
+        (q) =>
+          queryContains(
+            'MATCH (n:ContentNode)-[:VERSION_OF]-(v:ContentNodeVersion)',
+            'WHERE ALL(tag IN $tags',
+          )(q),
+        () => {
+          const tagParams = params as FindContentByTagsParams;
+          const tags = tagParams.tags || [];
+          // Find nodes that have all required tags
+          const matchingNodes = testData.nodes.filter((node) => {
+            const nodeTags = testData.tags
+              .filter((t) => t.nodeId === node.id)
+              .map((t) => t.tagName);
+            return tags.every((tag: string) => nodeTags.includes(tag));
+          });
+
+          // Get latest version for each matching node
+          const versionResults: { versionId: ContentNodeVersionId }[] = [];
+          for (const node of matchingNodes) {
+            const versions = testData.versions
+              .filter((v) => v.nodeId === node.id)
+              .sort((a, b) => {
+                const dateA = new Date(
+                  JSON.parse(JSON.stringify(a.version.createdAt)),
+                );
+                const dateB = new Date(
+                  JSON.parse(JSON.stringify(b.version.createdAt)),
+                );
+                return dateB.getTime() - dateA.getTime();
+              });
+            if (versions[0]) {
+              versionResults.push({ versionId: versions[0].version.id });
+            }
+          }
+          return versionResults;
+        },
+      ),
+      // List all nodes
+      Match.when(
+        (q) =>
+          queryContains(
+            'MATCH (n:ContentNode)',
+            'RETURN n',
+            'ORDER BY n.name',
+          )(q),
+        () => listAllNodes(),
+      ),
+      // Get tags for a node
+      Match.when(
+        (q) =>
+          queryContains(
+            'MATCH (n:ContentNode {id: $nodeId})-[:HAS_TAG]->(t:Tag)',
+            'RETURN t.name as tagName',
+          )(q),
+        () => getNodeTags(params as NodeTagsParams),
+      ),
+      // Create test case
+      Match.when(queryContains('CREATE (t:TestCase $props) RETURN t'), () =>
+        createTestCase(params as TestCaseParams),
+      ),
+      // Find test case by ID
+      Match.when(queryContains('MATCH (t:TestCase {id: $id}) RETURN t'), () =>
+        findTestCaseById(params as TestCaseByIdParams),
+      ),
+      // Create edge relationships
+      Match.when(queryContains('UNWIND $relationships AS rel'), () =>
+        createEdgeRelationships(params as EdgeRelationshipParams),
+      ),
+      // Find content for slots
+      Match.when(
+        (q) =>
+          queryContains('UNWIND $slots AS slot', 'WHERE ALL(tag IN $tags')(q),
+        () => findContentForSlots(params as FindContentForSlotsParams),
+      ),
+      // Default case
+      Match.orElse(() => []),
+    );
   };
 
   // Return Neo4j service with query handler

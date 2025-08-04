@@ -24,4 +24,4 @@ export {
 export {
   findContentForSlot,
   buildConversationFromTestCase,
-} from './ConversationBuilder';
+} from './TestCaseBuilder';
