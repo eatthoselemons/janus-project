@@ -23,7 +23,9 @@
     "@effect/cli": "^0.66.7",
     "@effect/platform-node": "^0.88.11",
     "effect": "^3.16.12",
+    "isomorphic-git": "^1.32.2",
     "neo4j-driver": "^5.28.1",
+    "node": "link:isomorphic-git/http/node",
     "ts-patch": "^3.3.0",
     "uuid": "^11.1.0"
   },

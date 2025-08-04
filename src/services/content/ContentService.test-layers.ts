@@ -39,9 +39,9 @@ export interface ContentTestData {
  * Generate test content node data
  */
 export const generateTestContentNode = (
-  name: string,
+  name: string = 'Node',
   description: string = 'Test content node',
-  id: string = '550e8400-e29b-41d4-a716-446655440001',
+  id: string = '550f8400-a29b-41d4-a716-446655440001',
 ): ContentNode => ({
   id: Schema.decodeSync(ContentNodeId)(id),
   name: Schema.decodeSync(Slug)(name),
@@ -55,7 +55,7 @@ export const generateTestContentNodeVersion = (
   content: string | undefined,
   commitMessage: string = 'Test commit',
   createdAt: string = '2024-01-01T00:00:00.000Z',
-  id: string = '650e8400-e29b-41d4-a716-446655440002',
+  id: string = '650f8400-a29b-41d4-a716-446655440002',
 ): ContentNodeVersion => ({
   id: Schema.decodeSync(ContentNodeVersionId)(id),
   content,
@@ -71,22 +71,22 @@ const defaultTestData: ContentTestData = {
     generateTestContentNode(
       'greeting-template',
       'Greeting template',
-      '550e8400-e29b-41d4-a716-446655440001',
+      '550b8400-a29b-41d4-a716-446655440001',
     ),
     generateTestContentNode(
       'user-name',
       'User name parameter',
-      '550e8400-e29b-41d4-a716-446655440002',
+      '550b8400-a29b-41d4-a716-446655440002',
     ),
     generateTestContentNode(
       'be-concise',
       'Conciseness instruction',
-      '550e8400-e29b-41d4-a716-446655440003',
+      '550b8400-a29b-41d4-a716-446655440003',
     ),
     generateTestContentNode(
       'be-helpful',
       'Helpfulness instruction',
-      '550e8400-e29b-41d4-a716-446655440004',
+      '550b8400-a29b-41d4-a716-446655440004',
     ),
   ],
   versions: [
@@ -95,10 +95,10 @@ const defaultTestData: ContentTestData = {
         'Hello {{name}}, welcome to our service!',
         'Initial greeting template',
         '2024-01-01T00:00:00.000Z',
-        '650e8400-e29b-41d4-a716-446655440001',
+        '650f8400-a29b-41d4-a716-446655440001',
       ),
       nodeId: Schema.decodeSync(ContentNodeId)(
-        '550e8400-e29b-41d4-a716-446655440001',
+        '550b8400-a29b-41d4-a716-446655440001',
       ),
     },
     {
@@ -106,10 +106,10 @@ const defaultTestData: ContentTestData = {
         'Alice',
         'Default user name',
         '2024-01-02T00:00:00.000Z',
-        '650e8400-e29b-41d4-a716-446655440002',
+        '650f8400-a29b-41d4-a716-446655440002',
       ),
       nodeId: Schema.decodeSync(ContentNodeId)(
-        '550e8400-e29b-41d4-a716-446655440002',
+        '550b8400-a29b-41d4-a716-446655440002',
       ),
     },
     {
@@ -117,10 +117,10 @@ const defaultTestData: ContentTestData = {
         'Be concise and direct in your responses',
         'Conciseness instruction',
         '2024-01-03T00:00:00.000Z',
-        '650e8400-e29b-41d4-a716-446655440003',
+        '650f8400-a29b-41d4-a716-446655440003',
       ),
       nodeId: Schema.decodeSync(ContentNodeId)(
-        '550e8400-e29b-41d4-a716-446655440003',
+        '550b8400-a29b-41d4-a716-446655440003',
       ),
     },
     {
@@ -128,20 +128,20 @@ const defaultTestData: ContentTestData = {
         'Be helpful and supportive',
         'Helpfulness instruction',
         '2024-01-04T00:00:00.000Z',
-        '650e8400-e29b-41d4-a716-446655440004',
+        '650f8400-a29b-41d4-a716-446655440004',
       ),
       nodeId: Schema.decodeSync(ContentNodeId)(
-        '550e8400-e29b-41d4-a716-446655440004',
+        '550b8400-a29b-41d4-a716-446655440004',
       ),
     },
   ],
   edges: [
     {
       parentId: Schema.decodeSync(ContentNodeVersionId)(
-        '650e8400-e29b-41d4-a716-446655440001',
+        '650f8400-a29b-41d4-a716-446655440001',
       ),
       childId: Schema.decodeSync(ContentNodeVersionId)(
-        '650e8400-e29b-41d4-a716-446655440002',
+        '650f8400-a29b-41d4-a716-446655440002',
       ),
       properties: {
         operation: 'insert' as EdgeOperation,
@@ -152,49 +152,49 @@ const defaultTestData: ContentTestData = {
   tags: [
     {
       nodeId: Schema.decodeSync(ContentNodeId)(
-        '550e8400-e29b-41d4-a716-446655440001',
+        '550b8400-a29b-41d4-a716-446655440001',
       ),
       tagName: 'greeting',
     },
     {
       nodeId: Schema.decodeSync(ContentNodeId)(
-        '550e8400-e29b-41d4-a716-446655440001',
+        '550b8400-a29b-41d4-a716-446655440001',
       ),
       tagName: 'formal',
     },
     {
       nodeId: Schema.decodeSync(ContentNodeId)(
-        '550e8400-e29b-41d4-a716-446655440001',
+        '550b8400-a29b-41d4-a716-446655440001',
       ),
       tagName: 'tone',
     },
     {
       nodeId: Schema.decodeSync(ContentNodeId)(
-        '550e8400-e29b-41d4-a716-446655440002',
+        '550b8400-a29b-41d4-a716-446655440002',
       ),
       tagName: 'parameter',
     },
     {
       nodeId: Schema.decodeSync(ContentNodeId)(
-        '550e8400-e29b-41d4-a716-446655440003',
+        '550b8400-a29b-41d4-a716-446655440003',
       ),
       tagName: 'instruction',
     },
     {
       nodeId: Schema.decodeSync(ContentNodeId)(
-        '550e8400-e29b-41d4-a716-446655440003',
+        '550b8400-a29b-41d4-a716-446655440003',
       ),
       tagName: 'tone',
     },
     {
       nodeId: Schema.decodeSync(ContentNodeId)(
-        '550e8400-e29b-41d4-a716-446655440004',
+        '550b8400-a29b-41d4-a716-446655440004',
       ),
       tagName: 'instruction',
     },
     {
       nodeId: Schema.decodeSync(ContentNodeId)(
-        '550e8400-e29b-41d4-a716-446655440004',
+        '550b8400-a29b-41d4-a716-446655440004',
       ),
       tagName: 'behavior',
     },
@@ -202,7 +202,7 @@ const defaultTestData: ContentTestData = {
   testCases: [
     {
       id: Schema.decodeSync(Schema.String.pipe(Schema.brand('TestCaseId')))(
-        '123e4567-e89b-42d3-a456-426614174000',
+        '123a4567-a89b-42d3-a456-426614174000',
       ),
       name: 'Concise instruction as system',
       description: 'Test with conciseness in system role',
@@ -600,7 +600,7 @@ export const ContentTestWithNodeNoVersions = ContentTestWithData({
     generateTestContentNode(
       'node-no-versions',
       'Has no versions',
-      '550e8400-e29b-41d4-a716-446655440001',
+      '550a8400-a29b-41d4-a716-446655440001',
     ),
   ],
   versions: [],

@@ -4,7 +4,11 @@ import {
   TransactionContext,
   type StorageError,
 } from '../storage';
-import { NotFoundError, PersistenceError, Neo4jError } from '../../domain/types/errors';
+import {
+  NotFoundError,
+  PersistenceError,
+  Neo4jError,
+} from '../../domain/types/errors';
 import { cypher, queryParams } from '../../domain/types/database';
 import {
   ContentNodeVersion,

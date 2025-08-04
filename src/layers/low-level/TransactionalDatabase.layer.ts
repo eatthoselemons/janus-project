@@ -1,0 +1,359 @@
+import { Config, Effect, Layer, Redacted } from 'effect';
+import neo4j, {
+  type Driver,
+  type Session,
+  type Transaction,
+} from 'neo4j-driver';
+import {
+  TransactionalDatabaseService,
+  type TransactionContext,
+} from '../../services/low-level/TransactionalDatabase.service';
+import { ConfigService } from '../../services/config';
+import { Neo4jError } from '../../domain/types/errors';
+import { makeTestLayerFor } from '../../lib/test-utils';
+import { CypherQuery, QueryParameters } from '../../domain/types/database';
+
+// ===========================
+// DRIVER CONFIGURATION
+// ===========================
+
+const driverConfig = {
+  maxConnectionPoolSize: 100,
+  connectionAcquisitionTimeout: 60000,
+  logging: {
+    level: 'info' as const,
+    logger: (level: string, message: string) => {
+      if (level === 'error') {
+        Effect.logError(message).pipe(Effect.runSync);
+      } else {
+        Effect.logInfo(message).pipe(Effect.runSync);
+      }
+    },
+  },
+};
+
+// ===========================
+// DRIVER LIFECYCLE
+// ===========================
+
+const createDriver = (config: {
+  uri: string;
+  user: string;
+  password: string;
+}) =>
+  Effect.try({
+    try: () =>
+      neo4j.driver(
+        config.uri,
+        neo4j.auth.basic(config.user, config.password),
+        driverConfig,
+      ),
+    catch: (e) =>
+      new Neo4jError({
+        query: 'DRIVER_INIT',
+        originalMessage: e instanceof Error ? e.message : String(e),
+      }),
+  });
+
+const closeDriver = (driver: Driver) =>
+  Effect.tryPromise({
+    try: () => driver.close(),
+    catch: (e) =>
+      new Neo4jError({
+        query: 'DRIVER_CLOSE',
+        originalMessage: e instanceof Error ? e.message : String(e),
+      }),
+  }).pipe(
+    Effect.catchAll(() =>
+      Effect.sync(() => {
+        Effect.logWarning('Failed to close Neo4j driver').pipe(Effect.runSync);
+      }),
+    ),
+  );
+
+const verifyConnectivity = (driver: Driver) =>
+  Effect.tryPromise({
+    try: () => driver.verifyConnectivity(),
+    catch: (e) =>
+      new Neo4jError({
+        query: 'VERIFY_CONNECTIVITY',
+        originalMessage: e instanceof Error ? e.message : String(e),
+      }),
+  });
+
+// ===========================
+// SESSION MANAGEMENT
+// ===========================
+
+const closeSession = (session: Session) =>
+  Effect.tryPromise({
+    try: () => session.close(),
+    catch: (e) =>
+      new Neo4jError({
+        query: 'SESSION_CLOSE',
+        originalMessage: e instanceof Error ? e.message : String(e),
+      }),
+  }).pipe(
+    Effect.catchAll(() => Effect.logWarning('Failed to close Neo4j session')),
+  );
+
+const createTransactionContext = (tx: Transaction): TransactionContext => ({
+  run: <T = unknown>(query: CypherQuery, params?: QueryParameters) =>
+    Effect.tryPromise({
+      try: async () => {
+        const result = await tx.run(query, params);
+        return result.records.map((r) => r.toObject()) as T[];
+      },
+      catch: (e) =>
+        new Neo4jError({
+          query,
+          originalMessage: e instanceof Error ? e.message : String(e),
+        }),
+    }),
+});
+
+const runInTransactionWithDriver =
+  (driver: Driver) =>
+  <A, E>(
+    operations: (tx: TransactionContext) => Effect.Effect<A, E | Neo4jError>,
+  ): Effect.Effect<A, E | Neo4jError> =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const session = yield* Effect.acquireRelease(
+          Effect.sync(() => driver.session()),
+          (session) => closeSession(session),
+        );
+
+        const tx = session.beginTransaction();
+
+        const result = yield* Effect.tryPromise({
+          try: async () => {
+            try {
+              const txContext = createTransactionContext(tx);
+              const res = await Effect.runPromise(operations(txContext));
+              await tx.commit();
+              return res;
+            } catch (error) {
+              await tx.rollback();
+              throw error;
+            }
+          },
+          catch: (e) =>
+            new Neo4jError({
+              query: 'TRANSACTION',
+              originalMessage: e instanceof Error ? e.message : String(e),
+            }),
+        });
+
+        return result;
+      }),
+    ).pipe(Effect.withLogSpan('runInTransaction'));
+
+const runBatchWithDriver =
+  (driver: Driver) =>
+  <T = unknown>(
+    queries: Array<{
+      query: CypherQuery;
+      params?: QueryParameters;
+    }>,
+  ): Effect.Effect<T[][], Neo4jError> =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const session = yield* Effect.acquireRelease(
+          Effect.sync(() => driver.session()),
+          (session) => closeSession(session),
+        );
+
+        const results: T[][] = [];
+
+        for (const { query, params } of queries) {
+          const result = yield* Effect.tryPromise({
+            try: () => session.run(query, params || {}),
+            catch: (e) =>
+              new Neo4jError({
+                query,
+                originalMessage: e instanceof Error ? e.message : String(e),
+              }),
+          });
+          results.push(result.records.map((r) => r.toObject()) as T[]);
+        }
+
+        return results;
+      }),
+    ).pipe(Effect.withLogSpan(`runBatch:${queries.length} queries`));
+
+const withSessionScoped =
+  (driver: Driver) =>
+  <A, E>(
+    work: (session: Session) => Effect.Effect<A, E | Neo4jError>,
+  ): Effect.Effect<A, E | Neo4jError> =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const session = yield* Effect.acquireRelease(
+          Effect.sync(() => driver.session()),
+          (session) => closeSession(session),
+        );
+
+        return yield* work(session);
+      }),
+    ).pipe(Effect.withLogSpan('withSession'));
+
+const runQueryWithDriver =
+  (driver: Driver) =>
+  (query: CypherQuery, params: QueryParameters = {}) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const session = yield* Effect.acquireRelease(
+          Effect.sync(() => driver.session()),
+          (session) => closeSession(session),
+        );
+
+        const result = yield* Effect.tryPromise({
+          try: () => session.run(query, params),
+          catch: (e) =>
+            new Neo4jError({
+              query,
+              originalMessage: e instanceof Error ? e.message : String(e),
+            }),
+        });
+
+        return result.records.map((record) => record.toObject());
+      }),
+    ).pipe(Effect.withLogSpan('runQuery'));
+
+// ===========================
+// SERVICE IMPLEMENTATION
+// ===========================
+
+export const make = (config: { uri: string; user: string; password: string }) =>
+  Effect.gen(function* () {
+    const driver = yield* Effect.acquireRelease(
+      createDriver(config),
+      (driver) => closeDriver(driver),
+    );
+
+    yield* verifyConnectivity(driver);
+    yield* Effect.logInfo(`Connected to Neo4j at ${config.uri}`);
+
+    return TransactionalDatabaseService.of({
+      runQuery: runQueryWithDriver(driver),
+      runInTransaction: runInTransactionWithDriver(driver),
+      runBatch: runBatchWithDriver(driver),
+      withSession: withSessionScoped(driver),
+    });
+  });
+
+// ===========================
+// LAYER IMPLEMENTATIONS
+// ===========================
+
+export const TransactionalDatabaseLive = Layer.scoped(
+  TransactionalDatabaseService,
+  Effect.gen(function* () {
+    const config = yield* ConfigService;
+    return yield* make({
+      uri: config.neo4j.uri,
+      user: config.neo4j.user,
+      password: Redacted.value(config.neo4j.password),
+    });
+  }),
+);
+
+export const fromEnv = Layer.scoped(
+  TransactionalDatabaseService,
+  Effect.gen(function* () {
+    const uri = yield* Config.string('NEO4J_URI');
+    const user = yield* Config.string('NEO4J_USER');
+    const password = yield* Config.redacted('NEO4J_PASSWORD');
+
+    return yield* make({
+      uri,
+      user,
+      password: Redacted.value(password),
+    });
+  }),
+);
+
+// ===========================
+// TEST IMPLEMENTATIONS
+// ===========================
+
+const createMockSession = (mockData: Map<string, unknown[]>): Session => {
+  const mockSession = {
+    run: (query: string, _params?: unknown) => {
+      const mockRecords = (mockData.get(query) || []).map((obj) => ({
+        toObject: () => obj,
+        keys: typeof obj === 'object' && obj !== null ? Object.keys(obj) : [],
+        get: (key: string) =>
+          typeof obj === 'object' && obj !== null
+            ? (obj as Record<string, unknown>)[key]
+            : undefined,
+      }));
+
+      return Promise.resolve({
+        records: mockRecords,
+        summary: {},
+      });
+    },
+    close: () => Promise.resolve(),
+  } as unknown as Session;
+
+  return mockSession;
+};
+
+export const Neo4jTest = (mockData: Map<string, unknown[]> = new Map()) =>
+  Layer.succeed(
+    TransactionalDatabaseService,
+    TransactionalDatabaseService.of({
+      runQuery: <T = unknown>(
+        query: CypherQuery,
+        _params: QueryParameters = {},
+      ) =>
+        Effect.gen(function* () {
+          const data = mockData.get(query) || [];
+          yield* Effect.logDebug(`Mock query: ${query}`);
+          return data as T[];
+        }),
+
+      runInTransaction: (operations) =>
+        Effect.gen(function* () {
+          const txContext: TransactionContext = {
+            run: <T = unknown>(
+              query: CypherQuery,
+              _params: QueryParameters = {},
+            ) =>
+              Effect.gen(function* () {
+                const data = mockData.get(query) || [];
+                yield* Effect.logDebug(`Mock transaction query: ${query}`);
+                return data as T[];
+              }),
+          };
+          return yield* operations(txContext);
+        }),
+
+      runBatch: <T = unknown>(
+        queries: Array<{ query: CypherQuery; params?: QueryParameters }>,
+      ) =>
+        Effect.gen(function* () {
+          const results: T[][] = [];
+          for (const { query } of queries) {
+            const data = mockData.get(query) || [];
+            yield* Effect.logDebug(`Mock batch query: ${query}`);
+            results.push(data as T[]);
+          }
+          return results;
+        }),
+
+      withSession: (work) =>
+        Effect.gen(function* () {
+          const mockSession = createMockSession(mockData);
+          return yield* work(mockSession);
+        }),
+    }),
+  );
+
+export const Neo4jTestPartial = (
+  impl: Partial<TransactionalDatabaseService['Type']>,
+) => {
+  return makeTestLayerFor(TransactionalDatabaseService)(impl);
+};

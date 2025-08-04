@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@effect/vitest';
 import { Effect, Redacted, Schema } from 'effect';
 import { ConfigService } from '../../../services/config';
-import { Neo4jService } from '../../../services/neo4j';
+import { TransactionalDatabaseService } from '../../../services/low-level/TransactionalDatabase.service';
 import {
   Neo4jUri,
   Neo4jUser,
@@ -100,7 +100,7 @@ describe('Database Types Integration', () => {
   describe('Neo4jService with branded types', () => {
     it('should use CypherQuery and QueryParameters correctly', async () => {
       const program = Effect.gen(function* () {
-        const neo4j = yield* Neo4jService;
+        const neo4j = yield* TransactionalDatabaseService;
 
         const query = Schema.decodeSync(CypherQuery)(
           'MATCH (n:Person {name: $name}) RETURN n',
@@ -120,7 +120,7 @@ describe('Database Types Integration', () => {
 
     it('should handle complex query parameters', async () => {
       const program = Effect.gen(function* () {
-        const neo4j = yield* Neo4jService;
+        const neo4j = yield* TransactionalDatabaseService;
 
         const query = Schema.decodeSync(CypherQuery)(
           'CREATE (n:Person $props) RETURN n',
@@ -148,7 +148,7 @@ describe('Database Types Integration', () => {
 
     it('should work with transactions using branded types', async () => {
       const program = Effect.gen(function* () {
-        const neo4j = yield* Neo4jService;
+        const neo4j = yield* TransactionalDatabaseService;
 
         const result = yield* neo4j.runInTransaction((tx) =>
           Effect.gen(function* () {
@@ -179,7 +179,7 @@ describe('Database Types Integration', () => {
 
     it('should work with batch queries using branded types', async () => {
       const program = Effect.gen(function* () {
-        const neo4j = yield* Neo4jService;
+        const neo4j = yield* TransactionalDatabaseService;
 
         const queries = [
           {
