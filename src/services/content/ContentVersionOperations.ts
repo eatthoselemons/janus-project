@@ -1,6 +1,10 @@
 import { Effect, Option, Schema, Match } from 'effect';
-import { StorageService, TransactionContext, type StorageError } from '../storage';
-import { NotFoundError, PersistenceError } from '../../domain/types/errors';
+import {
+  StorageService,
+  TransactionContext,
+  type StorageError,
+} from '../storage';
+import { NotFoundError, PersistenceError, Neo4jError } from '../../domain/types/errors';
 import { cypher, queryParams } from '../../domain/types/database';
 import {
   ContentNodeVersion,
@@ -79,12 +83,12 @@ const createParentRelationships = (
       Effect.mapError((error) =>
         Match.value(error).pipe(
           Match.when(
-            (e): e is PersistenceError => e instanceof PersistenceError,
-            (e) => e
+            (e: any): e is PersistenceError => e instanceof PersistenceError,
+            (e) => e,
           ),
           // Let backend-specific errors bubble up
-          Match.orElse(() => error)
-        )
+          Match.orElse(() => error),
+        ),
       ),
     );
 
@@ -102,7 +106,7 @@ export const createContentNodeVersion = (
   }>,
 ): Effect.Effect<
   ContentNodeVersion,
-  NotFoundError | PersistenceError,
+  NotFoundError | PersistenceError | StorageError,
   StorageService
 > =>
   Effect.gen(function* () {
@@ -137,16 +141,18 @@ export const createContentNodeVersion = (
         Effect.mapError((error) =>
           Match.value(error).pipe(
             Match.when(
-              (e): e is PersistenceError => 
-                e instanceof PersistenceError && e.originalMessage.includes('not found'),
-              () => new NotFoundError({
-                entityType: 'content node',
-                id: nodeId,
-              })
+              (e): e is PersistenceError =>
+                e instanceof PersistenceError &&
+                e.originalMessage.includes('not found'),
+              () =>
+                new NotFoundError({
+                  entityType: 'content node',
+                  id: nodeId,
+                }),
             ),
             // Let all other errors bubble up (PersistenceError or backend-specific)
-            Match.orElse(() => error)
-          )
+            Match.orElse(() => error),
+          ),
         ),
       );
 
@@ -190,7 +196,7 @@ export const getLatestContentNodeVersion = (
           new PersistenceError({
             originalMessage: error.originalMessage,
             operation: 'read',
-            query: error.query,
+            query: error instanceof Neo4jError ? error.query : undefined,
           }),
       ),
     );

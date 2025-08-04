@@ -8,15 +8,17 @@ import { StorageTestWithGenericData } from '../persistence/GenericPersistence.te
 describe('StorageError Union Type', () => {
   it('should handle Neo4j errors when using Neo4j backend', async () => {
     const layer = StorageTestWithGenericData({}, undefined, 'neo4j');
-    
+
     const program = Effect.gen(function* () {
       const storage = yield* StorageService;
       // withSession is not implemented in test layer and should fail
       return yield* storage.withSession(() => Effect.succeed('test'));
     });
 
-    const result = await Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
-    
+    const result = await Effect.runPromiseExit(
+      program.pipe(Effect.provide(layer)),
+    );
+
     expect(Exit.isFailure(result)).toBe(true);
     if (Exit.isFailure(result)) {
       const error = result.cause._tag === 'Fail' ? result.cause.error : null;
@@ -27,15 +29,17 @@ describe('StorageError Union Type', () => {
 
   it('should handle Git errors when using Git backend', async () => {
     const layer = StorageTestWithGenericData({}, undefined, 'git');
-    
+
     const program = Effect.gen(function* () {
       const storage = yield* StorageService;
       // withSession is not implemented in test layer and should fail
       return yield* storage.withSession(() => Effect.succeed('test'));
     });
 
-    const result = await Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
-    
+    const result = await Effect.runPromiseExit(
+      program.pipe(Effect.provide(layer)),
+    );
+
     expect(Exit.isFailure(result)).toBe(true);
     if (Exit.isFailure(result)) {
       const error = result.cause._tag === 'Fail' ? result.cause.error : null;
@@ -48,8 +52,11 @@ describe('StorageError Union Type', () => {
     const handleStorageError = (error: StorageError): string =>
       Match.value(error).pipe(
         Match.tag('Neo4jError', (err) => `Neo4j error: ${err.originalMessage}`),
-        Match.tag('GitPersistenceError', (err) => `Git error at ${err.path}: ${err.originalMessage}`),
-        Match.exhaustive
+        Match.tag(
+          'GitPersistenceError',
+          (err) => `Git error at ${err.path}: ${err.originalMessage}`,
+        ),
+        Match.exhaustive,
       );
 
     const neo4jError = new Neo4jError({
@@ -63,7 +70,11 @@ describe('StorageError Union Type', () => {
       originalMessage: 'File not found',
     });
 
-    expect(handleStorageError(neo4jError)).toBe('Neo4j error: Connection failed');
-    expect(handleStorageError(gitError)).toBe('Git error at /repo/data.json: File not found');
+    expect(handleStorageError(neo4jError)).toBe(
+      'Neo4j error: Connection failed',
+    );
+    expect(handleStorageError(gitError)).toBe(
+      'Git error at /repo/data.json: File not found',
+    );
   });
 });

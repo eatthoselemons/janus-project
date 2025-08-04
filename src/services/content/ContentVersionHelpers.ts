@@ -85,7 +85,11 @@ export const verifyContentNodeExists = (
 export const findPreviousContentNodeVersion = (
   tx: TransactionContext,
   nodeId: ContentNodeId,
-): Effect.Effect<Option.Option<ContentNodeVersionId>, PersistenceError | StorageError, never> =>
+): Effect.Effect<
+  Option.Option<ContentNodeVersionId>,
+  PersistenceError | StorageError,
+  never
+> =>
   Effect.gen(function* () {
     const previousQuery = cypher`
       MATCH (p:ContentNode {id: $parentId})<-[:VERSION_OF]-(v:ContentNodeVersion)

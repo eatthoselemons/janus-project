@@ -92,10 +92,8 @@ export interface StorageImpl {
    * @returns Effect containing the result of the operations
    */
   readonly runInTransaction: <A, E>(
-    operations: (
-      tx: TransactionContext,
-    ) => Effect.Effect<A, E, never>,
-  ) => Effect.Effect<A, E, never>;
+    operations: (tx: TransactionContext) => Effect.Effect<A, E, never>,
+  ) => Effect.Effect<A, E | StorageError, never>;
 
   /**
    * Execute multiple queries efficiently with the same session
@@ -116,7 +114,7 @@ export interface StorageImpl {
    */
   readonly withSession: <A, E>(
     work: (session: Session) => Effect.Effect<A, E, never>,
-  ) => Effect.Effect<A, E, never>;
+  ) => Effect.Effect<A, E | StorageError, never>;
 }
 
 export class StorageService extends Context.Tag('StorageService')<

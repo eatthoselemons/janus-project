@@ -1,6 +1,15 @@
 import { Effect, Option, Schema, Match } from 'effect';
-import { StorageService, TransactionContext, type StorageError } from '../storage';
-import { NotFoundError, PersistenceError, Neo4jError, GitPersistenceError } from '../../domain/types/errors';
+import {
+  StorageService,
+  TransactionContext,
+  type StorageError,
+} from '../storage';
+import {
+  NotFoundError,
+  PersistenceError,
+  Neo4jError,
+  GitPersistenceError,
+} from '../../domain/types/errors';
 import {
   cypher,
   queryParams,
@@ -51,38 +60,43 @@ const mapToPersistenceError =
     effect.pipe(
       Effect.mapError((error) =>
         Match.value(error).pipe(
-            //todo could this be simplified since we do the same thing
-            // for multiple types?
+          //todo could this be simplified since we do the same thing
+          // for multiple types?
           // Already a PersistenceError, return as-is
           Match.when(
-            (e): e is PersistenceError => e instanceof PersistenceError,
-            (e) => e
+            (e: any): e is PersistenceError => e instanceof PersistenceError,
+            (e) => e,
           ),
           // Let backend-specific errors bubble up for transparency
           Match.when(
-            (e): e is Neo4jError => e instanceof Neo4jError,
-            (e) => e
+            (e: any): e is Neo4jError => e instanceof Neo4jError,
+            (e) => e,
           ),
           Match.when(
-            (e): e is GitPersistenceError => e instanceof GitPersistenceError,
-            (e) => e
+            (e: any): e is GitPersistenceError => e instanceof GitPersistenceError,
+            (e) => e,
           ),
           // Convert query parameter errors to PersistenceError
           Match.when(
-            (e): e is UndefinedQueryParameterError => e instanceof UndefinedQueryParameterError,
-            (e) => new PersistenceError({
-              originalMessage: e.message,
-              operation,
-              query,
-            })
+            (e: any): e is UndefinedQueryParameterError =>
+              e instanceof UndefinedQueryParameterError,
+            (e) =>
+              new PersistenceError({
+                originalMessage: e.message,
+                operation,
+                query,
+              }),
           ),
           // Default: wrap unknown errors in PersistenceError
-          Match.orElse(() => new PersistenceError({
-            originalMessage: String(error),
-            operation,
-            query,
-          }))
-        )
+          Match.orElse(
+            () =>
+              new PersistenceError({
+                originalMessage: String(error),
+                operation,
+                query,
+              }),
+          ),
+        ),
       ),
     );
 
@@ -101,7 +115,7 @@ export const findEntityByName = <A, I, R>(
   name: Slug,
 ): Effect.Effect<
   Option.Option<Schema.Schema.Type<typeof schema>>,
-  PersistenceError,
+  PersistenceError | StorageError,
   R | StorageService
 > =>
   Effect.gen(function* () {
@@ -275,7 +289,7 @@ const verifyParentExists = (
   tx: TransactionContext,
   parentLabel: string,
   parentId: Brand<string>,
-): Effect.Effect<void, PersistenceError, never> =>
+): Effect.Effect<void, PersistenceError | StorageError, never> =>
   Effect.gen(function* () {
     const parentQuery = cypher`MATCH (p:${parentLabel} {id: $id}) RETURN p`;
     const parentParams = yield* queryParams({ id: parentId });
@@ -300,7 +314,11 @@ const findPreviousVersion = (
   parentLabel: string,
   versionLabel: string,
   parentId: Brand<string>,
-): Effect.Effect<Option.Option<string>, PersistenceError | StorageError, never> =>
+): Effect.Effect<
+  Option.Option<string>,
+  PersistenceError | StorageError,
+  never
+> =>
   Effect.gen(function* () {
     const prevQuery = cypher`
       MATCH (p:${parentLabel} {id: $parentId})<-[:VERSION_OF]-(v:${versionLabel})
@@ -446,7 +464,13 @@ export const createVersion = <
 
     return yield* storage
       .runInTransaction(
-        (tx): Effect.Effect<Schema.Schema.Type<S>, PersistenceError | StorageError, never> =>
+        (
+          tx,
+        ): Effect.Effect<
+          Schema.Schema.Type<S>,
+          PersistenceError | StorageError,
+          never
+        > =>
           Effect.gen(function* () {
             // Verify parent exists
             yield* verifyParentExists(tx, parentLabel, parentId);
@@ -503,7 +527,11 @@ export const createVersion = <
                   schema,
                 ),
             });
-          }) as Effect.Effect<Schema.Schema.Type<S>, PersistenceError | StorageError, never>,
+          }) as Effect.Effect<
+            Schema.Schema.Type<S>,
+            PersistenceError | StorageError,
+            never
+          >,
       )
       .pipe(
         Effect.mapError((error) => {
