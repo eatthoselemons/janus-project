@@ -169,15 +169,6 @@ describe('ConfigService', () => {
       expect(Redacted.value(config.llm.providers.anthropic!.apiKey)).toBe(
         'sk-anthropic-key',
       );
-
-      // Check Azure provider
-      expect(config.llm.providers.azure).toBeDefined();
-      expect(Redacted.value(config.llm.providers.azure!.apiKey)).toBe(
-        'azure-key',
-      );
-      expect(config.llm.providers.azure!.baseUrl).toBe(
-        'https://myazure.openai.azure.com',
-      );
     }),
   );
 

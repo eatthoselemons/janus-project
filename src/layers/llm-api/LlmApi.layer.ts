@@ -8,9 +8,9 @@ import * as Anthropic from '@effect/ai-anthropic/AnthropicLanguageModel';
 import * as AnthropicClient from '@effect/ai-anthropic/AnthropicClient';
 import * as Google from '@effect/ai-google/GoogleAiLanguageModel';
 import * as GoogleClient from '@effect/ai-google/GoogleAiClient';
-import { NodeHttpClient } from '@effect/platform-node';
+import * as NodeHttpClient from '@effect/platform-node/NodeHttpClient';
 import { ConfigService } from '../../services/config';
-import { LlmApi, type LlmApiImpl } from '../../services/llm-api';
+import { LlmApi } from '../../services/llm-api';
 import { LlmApiError } from '../../domain/types/errors';
 import { Conversation } from '../../domain/types/testCase';
 
@@ -93,41 +93,34 @@ const createProviderLayer = (
   provider: string,
   apiKey: string,
   model: string,
-): Layer.Layer<
-  AiLanguageModel.AiLanguageModel,
-  never,
-  NodeHttpClient.HttpClient
-> => {
-  const createClientAndLayer = <A, E, R>(
-    clientLayer: Layer.Layer<A, E, never>,
-    modelLayer: Layer.Layer<AiLanguageModel.AiLanguageModel, never, A>,
-  ): Layer.Layer<AiLanguageModel.AiLanguageModel, E, R> =>
-    pipe(modelLayer, Layer.provide(clientLayer));
-
+): Layer.Layer<AiLanguageModel.AiLanguageModel> => {
   return pipe(
     Match.value(provider),
     Match.when('openai', () =>
-      createClientAndLayer(
-        OpenAiClient.layer({ apiKey: Redacted.make(apiKey) }),
+      pipe(
         OpenAi.layer({ model }),
+        Layer.provide(OpenAiClient.layer({ apiKey: Redacted.make(apiKey) })),
+        Layer.provide(NodeHttpClient.layer),
       ),
     ),
     Match.when('anthropic', () =>
-      createClientAndLayer(
-        AnthropicClient.layer({ apiKey: Redacted.make(apiKey) }),
+      pipe(
         Anthropic.layer({ model }),
+        Layer.provide(AnthropicClient.layer({ apiKey: Redacted.make(apiKey) })),
+        Layer.provide(NodeHttpClient.layer),
       ),
     ),
     Match.when('google', () =>
-      createClientAndLayer(
-        GoogleClient.layer({ apiKey: Redacted.make(apiKey) }),
+      pipe(
         Google.layer({ model }),
+        Layer.provide(GoogleClient.layer({ apiKey: Redacted.make(apiKey) })),
+        Layer.provide(NodeHttpClient.layer),
       ),
     ),
     Match.orElse(() => {
       throw new Error(`Unsupported provider: ${provider}`);
     }),
-  );
+  ) as Layer.Layer<AiLanguageModel.AiLanguageModel>;
 };
 
 /**
@@ -165,7 +158,6 @@ const make = Effect.gen(function* () {
       const providerConfig =
         config.llm.providers[providerName as keyof typeof config.llm.providers];
       const apiKey = Redacted.value(providerConfig.apiKey);
-      const baseUrl = providerConfig.baseUrl;
 
       // Create provider-specific language model layer
       const languageModelLayer = yield* Effect.try({
@@ -214,7 +206,7 @@ const make = Effect.gen(function* () {
       return textParts.map((part) => part.text).join('');
     }).pipe(Effect.withLogSpan(`generate:${model}`));
 
-  return LlmApi.of({ generate });
+  return { generate };
 });
 
 export const LlmApiLive = Layer.effect(LlmApi, make);

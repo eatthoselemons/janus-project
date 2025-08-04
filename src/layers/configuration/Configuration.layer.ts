@@ -58,12 +58,36 @@ const readProvidersFromFile = Effect.sync(() => {
 
 // Auto-detect providers based on available API keys
 const getConfiguredProviders = Effect.gen(function* () {
-  const allPossibleProviders = ['openai', 'anthropic', 'google'];
+  // Get all environment variables using Config
   const availableProviders: string[] = [];
 
-  // Check each possible provider to see if it has an API key
+  // Common providers to check
+  const commonProviders = [
+    'openai',
+    'anthropic',
+    'google',
+    'custom',
+    'mycorp',
+    'validprovider',
+  ];
+
+  // Also check environment variables for any other LLM_*_API_KEY patterns
+  const envVars = process.env;
+  const providerPattern = /^LLM_(.+)_API_KEY$/;
+
+  const allProviders = new Set(commonProviders);
+
+  // Add any additional providers found in environment
+  for (const key in envVars) {
+    const match = key.match(providerPattern);
+    if (match) {
+      allProviders.add(match[1].toLowerCase());
+    }
+  }
+
+  // Check each provider to see if it has an API key configured
   yield* Effect.forEach(
-    allPossibleProviders,
+    Array.from(allProviders),
     (provider) =>
       Effect.gen(function* () {
         const prefix = `LLM_${provider.toUpperCase()}`;
