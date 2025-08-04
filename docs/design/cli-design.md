@@ -6,95 +6,124 @@ This document outlines the design and functionality of the `janus` command-line 
 
 The CLI is designed with two core principles:
 
-1.  **Git-like Workflow:** For creating and editing core entities like Snippets, the CLI mimics the familiar `pull`/`push` cycle of Git. This allows users to leverage their favorite local text editors for content creation while maintaining a structured, versioned history in the database.
-2.  **Ephemeral Configuration:** Test execution is initiated by a `test_config.yaml` file. This file is treated as a temporary script or recipe. The CLI uses it to create permanent, immutable entities (like `CompositionVersion` and `TestRun`) in the database, which then become the persistent record of the experiment.
+1.  **Git-like Workflow:** For creating and editing core entities like Content nodes, the CLI mimics the familiar `pull`/`push` cycle of Git. This allows users to leverage their favorite local text editors for content creation while maintaining a structured, versioned history in the database.
+2.  **Ephemeral Configuration:** Test execution is initiated by a `test_config.yaml` file. This file is treated as a temporary script or recipe. The CLI uses it to create permanent, immutable entities (like `TestCase` and `TestRun`) in the database, which then become the persistent record of the experiment.
 
 ### Command Structure
 
-The CLI follows a `noun verb` structure (e.g., `janus snippet pull`).
+The CLI follows a `noun verb` structure (e.g., `janus content pull`).
 
 ---
 
-### 1. `janus snippet`
+### 1. `janus content`
 
-Commands for managing reusable prompt snippets.
+Commands for managing unified content nodes in the content tree.
 
-#### `janus snippet pull <snippet-name>`
+#### `janus content pull <content-name>`
 
-Downloads the latest version of a snippet from the database to a local file.
+Downloads the latest version of a content node from the database to a local file.
 
 - **Arguments:**
-  - `<snippet-name>`: The `Slug` of the snippet to pull.
+  - `<content-name>`: The `Slug` of the content node to pull.
 - **Behavior:**
-  - Creates a file in a local `janus_workspace/` directory named `<snippet-name>.txt`.
+  - Creates a file in a local `janus_workspace/` directory named `<content-name>.txt`.
   - If the file already exists, it will be overwritten.
 
-#### `janus snippet push <file-path> -m <message>`
+#### `janus content push <file-path> -m <message>`
 
-Pushes changes from a local file to the database, creating a new `SnippetVersion`.
+Pushes changes from a local file to the database, creating a new `ContentNodeVersion`.
 
 - **Arguments:**
-  - `<file-path>`: The path to the local snippet file. The filename is used to determine the snippet's `Slug`.
+  - `<file-path>`: The path to the local content file. The filename is used to determine the content node's `Slug`.
 - **Options:**
   - `-m`, `--message <message>`: **(Required)** A commit message describing the change.
 - **Behavior:**
   - Reads the file content and calculates its hash.
   - If the hash matches the latest version in the database, it does nothing.
-  - If the hash is different, it creates a new `SnippetVersion` with the new content and the provided commit message.
+  - If the hash is different, it creates a new `ContentNodeVersion` with the new content and the provided commit message.
 
-#### `janus snippet list`
+#### `janus content list`
 
-Lists all available snippets.
+Lists all available content nodes.
 
-#### `janus snippet search "<query>"`
+#### `janus content search "<query>"`
 
-Performs a semantic vector search across all snippets to find conceptually similar ones.
+Performs a semantic vector search across all content nodes to find conceptually similar ones.
 
 - **Arguments:**
   - `<query>`: The text string to search for.
 
+#### `janus content tag <content-name> <tag-name>`
+
+Applies a tag to a content node for organization and filtering.
+
+- **Arguments:**
+  - `<content-name>`: The `Slug` of the content node to tag.
+  - `<tag-name>`: The `Slug` of the tag to apply.
+
 ---
 
-### 2. `janus composition`
+### 2. `janus test-case`
 
-Commands for managing compositions (recipes for assembling prompts).
+Commands for managing test cases (conversation structures for LLM prompts).
 
-#### `janus composition create-version --from-composition <id> | --from-group <name> -m <message>`
+#### `janus test-case create <name> --model <llm-model>`
 
-Creates a new, immutable `CompositionVersion` by locking in the current state of a composition or group.
+Creates a new test case that defines a conversation structure.
 
+- **Arguments:**
+  - `<name>`: The name of the test case.
 - **Options:**
-  - `--from-composition <id>`: The ID of an existing `CompositionVersion` to use as a base.
-  - `--from-group <name>`: The `Slug` of a `Tag` to use for assembling the composition (includes latest versions of all snippets with that tag).
-  - `-m`, `--message <message>`: **(Required)** A commit message describing the new version.
-- **Behavior:**
-  - Creates a new `CompositionVersion` node in the database with an immutable list of `SnippetVersion` IDs.
+  - `--model <llm-model>`: **(Required)** The LLM model this test case is designed for (e.g., 'gpt-4', 'claude-3').
+  - `--description <desc>`: Optional description of the test case purpose.
 
-#### `janus composition list`
+#### `janus test-case add-slot <test-case-name> --role <role> --tags <tags> --sequence <number>`
 
-Lists all available abstract `Composition` entities.
+Adds a message slot to a test case.
+
+- **Arguments:**
+  - `<test-case-name>`: The name of the test case to modify.
+- **Options:**
+  - `--role <role>`: **(Required)** The role for this slot ('system', 'user', or 'assistant').
+  - `--tags <tags>`: Comma-separated list of tags to filter content.
+  - `--sequence <number>`: **(Required)** The order of this slot in the conversation.
+  - `--include <nodes>`: Comma-separated list of specific content nodes to include.
+  - `--exclude <nodes>`: Comma-separated list of specific content nodes to exclude.
+
+#### `janus test-case list`
+
+Lists all available test cases.
+
+#### `janus test-case build <test-case-name>`
+
+Previews the conversation that would be built from a test case.
+
+- **Arguments:**
+  - `<test-case-name>`: The name of the test case to preview.
 
 ---
 
-### 3. `janus parameter`
+### 3. `janus tag`
 
-Commands for managing injectable parameters.
+Commands for managing tags used to organize and filter content.
 
-#### `janus parameter create <name> --description "<desc>"`
+#### `janus tag create <name>`
 
-Defines a new parameter.
+Creates a new tag.
 
-#### `janus parameter add-option --parameter-name <name> <value> -m <message>`
+- **Arguments:**
+  - `<name>`: The `Slug` of the tag to create.
 
-Adds a new value option for an existing parameter.
+#### `janus tag list`
 
-#### `janus parameter list`
+Lists all available tags.
 
-Lists all defined parameters.
+#### `janus tag search "<query>"`
 
-#### `janus parameter list-options <parameter-name>`
+Searches for tags matching the query.
 
-Lists all available `ParameterOption` values for a given parameter.
+- **Arguments:**
+  - `<query>`: The text to search for in tag names.
 
 ---
 
@@ -111,7 +140,7 @@ Executes a test suite based on a YAML configuration file.
 - **Behavior:**
   - Parses the config file.
   - Creates a permanent `TestRun` entity in the database.
-  - If the config uses declarative composition, it first creates a new, immutable `CompositionVersion`.
+  - Executes the specified test cases by building conversations from the content tree.
   - Executes the test matrix, making calls to the specified LLMs.
   - Saves each result as a `DataPoint` linked to the `TestRun`.
 
@@ -167,30 +196,32 @@ llms:
 
 # The list of tests to execute.
 tests:
-  # Test Case 1: Using a pre-defined, immutable composition.
+  # Test Case 1: Using a pre-defined test case.
   - name: 'formal_summary_test'
-    # Points to a specific CompositionVersion ID. This is the most reproducible method.
-    composition_id: 'formal-summary-composition-v2'
+    # References a TestCase that defines the conversation structure.
+    test_case_name: 'formal-summary-v2'
     # Parameters to inject. The engine will create a test for each value in an array.
     parameters:
       document_source: 'file://./data/financial_report.txt'
       # This will generate two DataPoints for this test case (one for each length).
       summary_length: [3, 5]
 
-  # Test Case 2: Using declarative composition to build a prompt on the fly.
-  # The CLI will create a new, immutable CompositionVersion from this recipe.
+  # Test Case 2: Using inline test case definition.
   - name: 'informal_persona_test'
-    composition:
-      # A commit message for the auto-generated CompositionVersion.
-      commit_message: 'Ad-hoc composition for informal persona test.'
-      # A list of rules to assemble the prompt.
-      rules:
-        # Include the latest versions of all snippets tagged with 'informal-persona'.
-        - include_group: 'informal-persona'
-        # But explicitly exclude one of them.
-        - exclude_snippet: 'formal-greeting'
-        # And explicitly include a specific version of another snippet.
-        - include_snippet_version: 'informal-closing-v3'
+    test_case:
+      # Define the conversation structure inline.
+      description: 'Informal persona with friendly tone'
+      message_slots:
+        - role: 'system'
+          tags: ['informal-persona', 'friendly']
+          sequence: 0
+        - role: 'user'
+          tags: ['greeting']
+          exclude: ['formal-greeting']
+          sequence: 1
+        - role: 'assistant'
+          tags: ['response']
+          sequence: 2
     parameters:
       user_name: 'Alex'
 ```

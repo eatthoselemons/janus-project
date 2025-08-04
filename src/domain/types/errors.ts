@@ -72,14 +72,7 @@ export class FileSystemError extends Schema.TaggedError<FileSystemError>()(
 export class NotFoundError extends Schema.TaggedError<NotFoundError>()(
   'NotFoundError',
   {
-    entityType: Schema.Literal(
-      'snippet',
-      'parameter',
-      'composition',
-      'tag',
-      'test-run',
-      'data-point',
-    ),
+    entityType: Schema.Literal('content node', 'tag', 'test-run', 'data-point'),
     id: Schema.optional(AnyId),
     slug: Schema.optional(Slug),
   },
@@ -98,12 +91,8 @@ export class ConflictError extends Schema.TaggedError<ConflictError>()(
   'ConflictError',
   {
     entityType: Schema.Literal(
-      'snippet',
-      'snippet-version',
-      'parameter',
-      'parameter-option',
-      'composition',
-      'composition-version',
+      'content node',
+      'content node version',
       'tag',
       'test-run',
       'data-point',
@@ -133,6 +122,23 @@ export class Neo4jError extends Schema.TaggedError<Neo4jError>()('Neo4jError', {
 }
 
 /**
+ * Git persistence error for file-based operations
+ * Includes the file path, operation type, and error details
+ */
+export class GitPersistenceError extends Schema.TaggedError<GitPersistenceError>()(
+  'GitPersistenceError',
+  {
+    path: Schema.String,
+    operation: Schema.Literal('read', 'write', 'delete', 'sync', 'parse'),
+    originalMessage: Schema.String,
+  },
+) {
+  get message() {
+    return `Git persistence ${this.operation} error at ${this.path}: ${this.originalMessage}`;
+  }
+}
+
+/**
  * Union type for all Janus errors
  */
 export type JanusErrors =
@@ -142,4 +148,5 @@ export type JanusErrors =
   | FileSystemError
   | NotFoundError
   | ConflictError
-  | Neo4jError;
+  | Neo4jError
+  | GitPersistenceError;

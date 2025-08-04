@@ -1,12 +1,15 @@
 import { Layer } from 'effect';
 import { ConfigServiceLive } from './configuration';
 import { Neo4jLive } from './neo4j';
+import { StorageLive } from './storage/Storage.layer';
 
 /**
  * Main application layer that combines all service layers
- * This provides both ConfigService and Neo4jService
+ * This provides ConfigService, Neo4jService (for backward compatibility), and StorageService
  */
-export const MainLive = Neo4jLive.pipe(Layer.provide(ConfigServiceLive));
+export const MainLive = Layer.mergeAll(Neo4jLive, StorageLive).pipe(
+  Layer.provide(ConfigServiceLive),
+);
 
 /**
  * All services layer - alias for MainLive

@@ -1,15 +1,9 @@
 // Create constraints for unique IDs across all entity types
-CREATE CONSTRAINT snippet_id_unique IF NOT EXISTS FOR (s:Snippet) REQUIRE s.id IS UNIQUE;
-CREATE CONSTRAINT snippet_name_unique IF NOT EXISTS FOR (s:Snippet) REQUIRE s.name IS UNIQUE;
-CREATE CONSTRAINT snippet_version_id_unique IF NOT EXISTS FOR (sv:SnippetVersion) REQUIRE sv.id IS UNIQUE;
+CREATE CONSTRAINT content_node_id_unique IF NOT EXISTS FOR (n:ContentNode) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT content_node_name_unique IF NOT EXISTS FOR (n:ContentNode) REQUIRE n.name IS UNIQUE;
+CREATE CONSTRAINT content_version_id_unique IF NOT EXISTS FOR (v:ContentNodeVersion) REQUIRE v.id IS UNIQUE;
 
-CREATE CONSTRAINT composition_id_unique IF NOT EXISTS FOR (c:Composition) REQUIRE c.id IS UNIQUE;
-CREATE CONSTRAINT composition_name_unique IF NOT EXISTS FOR (c:Composition) REQUIRE c.name IS UNIQUE;
-CREATE CONSTRAINT composition_version_id_unique IF NOT EXISTS FOR (cv:CompositionVersion) REQUIRE cv.id IS UNIQUE;
-
-CREATE CONSTRAINT parameter_id_unique IF NOT EXISTS FOR (p:Parameter) REQUIRE p.id IS UNIQUE;
-CREATE CONSTRAINT parameter_name_unique IF NOT EXISTS FOR (p:Parameter) REQUIRE p.name IS UNIQUE;
-CREATE CONSTRAINT parameter_option_id_unique IF NOT EXISTS FOR (po:ParameterOption) REQUIRE po.id IS UNIQUE;
+CREATE CONSTRAINT test_case_id_unique IF NOT EXISTS FOR (t:TestCase) REQUIRE t.id IS UNIQUE;
 
 CREATE CONSTRAINT test_run_id_unique IF NOT EXISTS FOR (tr:TestRun) REQUIRE tr.id IS UNIQUE;
 CREATE CONSTRAINT data_point_id_unique IF NOT EXISTS FOR (dp:DataPoint) REQUIRE dp.id IS UNIQUE;
@@ -18,13 +12,12 @@ CREATE CONSTRAINT tag_id_unique IF NOT EXISTS FOR (t:Tag) REQUIRE t.id IS UNIQUE
 CREATE CONSTRAINT tag_name_unique IF NOT EXISTS FOR (t:Tag) REQUIRE t.name IS UNIQUE;
 
 // Create indexes for performance on commonly queried properties
-CREATE INDEX snippet_name_index IF NOT EXISTS FOR (s:Snippet) ON (s.name);
-CREATE INDEX composition_name_index IF NOT EXISTS FOR (c:Composition) ON (c.name);
-CREATE INDEX parameter_name_index IF NOT EXISTS FOR (p:Parameter) ON (p.name);
+CREATE INDEX content_node_name_index IF NOT EXISTS FOR (n:ContentNode) ON (n.name);
+CREATE INDEX content_node_description_index IF NOT EXISTS FOR (n:ContentNode) ON (n.description);
+CREATE INDEX test_case_name_index IF NOT EXISTS FOR (t:TestCase) ON (t.name);
+CREATE INDEX test_case_model_index IF NOT EXISTS FOR (t:TestCase) ON (t.llmModel);
 CREATE INDEX tag_name_index IF NOT EXISTS FOR (t:Tag) ON (t.name);
 
 // Create indexes for temporal queries
-CREATE INDEX snippet_version_created_at_index IF NOT EXISTS FOR (sv:SnippetVersion) ON (sv.createdAt);
-CREATE INDEX composition_version_created_at_index IF NOT EXISTS FOR (cv:CompositionVersion) ON (cv.createdAt);
-CREATE INDEX parameter_option_created_at_index IF NOT EXISTS FOR (po:ParameterOption) ON (po.createdAt);
+CREATE INDEX content_version_created_at_index IF NOT EXISTS FOR (v:ContentNodeVersion) ON (v.createdAt);
 CREATE INDEX test_run_created_at_index IF NOT EXISTS FOR (tr:TestRun) ON (tr.createdAt);
