@@ -93,11 +93,15 @@ const createProviderLayer = (
   provider: string,
   apiKey: string,
   model: string,
-): Layer.Layer<AiLanguageModel.AiLanguageModel, never, NodeHttpClient.HttpClient> => {
+): Layer.Layer<
+  AiLanguageModel.AiLanguageModel,
+  never,
+  NodeHttpClient.HttpClient
+> => {
   const createClientAndLayer = <A, E, R>(
     clientLayer: Layer.Layer<A, E, never>,
     modelLayer: Layer.Layer<AiLanguageModel.AiLanguageModel, never, A>,
-  ): Layer.Layer<AiLanguageModel.AiLanguageModel, E, R> => 
+  ): Layer.Layer<AiLanguageModel.AiLanguageModel, E, R> =>
     pipe(modelLayer, Layer.provide(clientLayer));
 
   return pipe(

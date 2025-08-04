@@ -58,11 +58,7 @@ const readProvidersFromFile = Effect.sync(() => {
 
 // Auto-detect providers based on available API keys
 const getConfiguredProviders = Effect.gen(function* () {
-  const allPossibleProviders = [
-    'openai',
-    'anthropic',
-    'google',
-  ];
+  const allPossibleProviders = ['openai', 'anthropic', 'google'];
   const availableProviders: string[] = [];
 
   // Check each possible provider to see if it has an API key
