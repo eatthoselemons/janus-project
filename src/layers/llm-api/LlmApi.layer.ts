@@ -14,10 +14,6 @@ import { LlmApi, type LlmApiImpl } from '../../services/llm-api';
 import { LlmApiError } from '../../domain/types/errors';
 import { Conversation } from '../../domain/types/testCase';
 
-// ===========================
-// PROVIDER DETECTION
-// ===========================
-
 /**
  * Determines the provider name from the model string
  */
@@ -33,36 +29,45 @@ const getProviderFromModel = (model: string): string => {
   }
 };
 
-// ===========================
-// CONVERSATION CONVERSION
-// ===========================
-
 /**
- * Converts our Conversation type to the AI package's raw format
+ * Extracts system messages and converts remaining messages to AI package format
  */
-const convertConversation = (conversation: Conversation): AiInput.Raw => {
-  // Convert to array of messages with simplified format that AiInput.make can handle
-  return Chunk.toArray(conversation).map((msg) => {
-    switch (msg.role) {
-      case 'user':
-        return new AiInput.UserMessage({
-          parts: [new AiInput.TextPart({ text: msg.content })],
-        });
-      case 'assistant':
-        return new AiInput.AssistantMessage({
-          parts: [new AiInput.TextPart({ text: msg.content })],
-        });
-      case 'system':
-        // System messages become user messages with system prefix
-        return new AiInput.UserMessage({
-          parts: [new AiInput.TextPart({ text: `[System] ${msg.content}` })],
-        });
-      default:
-        return new AiInput.UserMessage({
-          parts: [new AiInput.TextPart({ text: msg.content })],
-        });
-    }
-  });
+const processConversation = (conversation: Conversation): {
+  system: string | undefined;
+  messages: AiInput.Raw;
+} => {
+  const messages = Chunk.toArray(conversation);
+  
+  // Extract system messages and combine them
+  const systemMessages = messages
+    .filter((msg) => msg.role === 'system')
+    .map((msg) => msg.content);
+  
+  const system = systemMessages.length > 0 
+    ? systemMessages.join('\n') 
+    : undefined;
+  
+  // Convert non-system messages
+  const conversationMessages = messages
+    .filter((msg) => msg.role !== 'system')
+    .map((msg) => {
+      switch (msg.role) {
+        case 'user':
+          return new AiInput.UserMessage({
+            parts: [new AiInput.TextPart({ text: msg.content })],
+          });
+        case 'assistant':
+          return new AiInput.AssistantMessage({
+            parts: [new AiInput.TextPart({ text: msg.content })],
+          });
+        default:
+          return new AiInput.UserMessage({
+            parts: [new AiInput.TextPart({ text: msg.content })],
+          });
+      }
+    });
+  
+  return { system, messages: conversationMessages };
 };
 
 /**
@@ -108,7 +113,6 @@ const make = Effect.gen(function* () {
           case 'openai': {
             const clientLayer = OpenAiClient.layer({
               apiKey: Redacted.make(apiKey),
-              apiUrl: baseUrl,
             });
             return pipe(OpenAi.layer({ model }), Layer.provide(clientLayer));
           }
@@ -116,7 +120,6 @@ const make = Effect.gen(function* () {
           case 'anthropic': {
             const clientLayer = AnthropicClient.layer({
               apiKey: Redacted.make(apiKey),
-              apiUrl: baseUrl,
             });
             return pipe(Anthropic.layer({ model }), Layer.provide(clientLayer));
           }
@@ -124,7 +127,6 @@ const make = Effect.gen(function* () {
           case 'google': {
             const clientLayer = GoogleClient.layer({
               apiKey: Redacted.make(apiKey),
-              apiUrl: baseUrl,
             });
             return pipe(Google.layer({ model }), Layer.provide(clientLayer));
           }
@@ -139,8 +141,8 @@ const make = Effect.gen(function* () {
         }
       });
 
-      // Convert conversation to AI input format
-      const messages = convertConversation(conversation);
+      // Process conversation to extract system message and convert messages
+      const { system, messages } = processConversation(conversation);
 
       // Generate text using the language model
       const response = yield* pipe(
@@ -148,7 +150,7 @@ const make = Effect.gen(function* () {
           const languageModel = yield* AiLanguageModel.AiLanguageModel;
           return yield* languageModel.generateText({
             prompt: messages,
-            system: undefined, // Could extract system message if needed
+            system,
           });
         }),
         Effect.provide(languageModelLayer),
