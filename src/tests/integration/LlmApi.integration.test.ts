@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@effect/vitest';
 import { Effect, Chunk } from 'effect';
-import { LlmApi } from './LlmApi.service';
+import { LlmApi } from '../../services/llm-api/LlmApi.service';
 import { LlmApiLive } from '../../layers/llm-api/LlmApi.layer';
 import { ConfigServiceLive } from '../../layers/configuration/Configuration.layer';
 import type { Message } from '../../domain/types/testCase';
