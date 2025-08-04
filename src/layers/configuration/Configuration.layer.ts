@@ -59,23 +59,27 @@ const readProvidersFromFile = Effect.sync(() => {
 // Auto-detect providers based on available API keys
 const getConfiguredProviders = Effect.gen(function* () {
   const allPossibleProviders = [
-    'openai', 'anthropic', 'google', 'azure', 'custom', 'mycorp', 'validprovider'
+    'openai',
+    'anthropic',
+    'google',
   ];
   const availableProviders: string[] = [];
 
   // Check each possible provider to see if it has an API key
-  yield* Effect.forEach(allPossibleProviders, (provider) =>
-    Effect.gen(function* () {
-      const prefix = `LLM_${provider.toUpperCase()}`;
-      const maybeApiKey = yield* Config.option(
-        Config.redacted(`${prefix}_API_KEY`),
-      );
-      
-      if (maybeApiKey._tag === 'Some') {
-        availableProviders.push(provider);
-      }
-    }),
-    { concurrency: 'unbounded' }
+  yield* Effect.forEach(
+    allPossibleProviders,
+    (provider) =>
+      Effect.gen(function* () {
+        const prefix = `LLM_${provider.toUpperCase()}`;
+        const maybeApiKey = yield* Config.option(
+          Config.redacted(`${prefix}_API_KEY`),
+        );
+
+        if (maybeApiKey._tag === 'Some') {
+          availableProviders.push(provider);
+        }
+      }),
+    { concurrency: 'unbounded' },
   );
 
   return availableProviders;

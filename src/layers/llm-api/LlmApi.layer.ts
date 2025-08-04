@@ -1,4 +1,4 @@
-import { Effect, Layer, Chunk, Redacted, pipe } from 'effect';
+import { Effect, Layer, Chunk, Redacted, pipe, Match } from 'effect';
 import * as AiLanguageModel from '@effect/ai/AiLanguageModel';
 import * as AiInput from '@effect/ai/AiInput';
 import * as AiResponse from '@effect/ai/AiResponse';
@@ -17,57 +17,113 @@ import { Conversation } from '../../domain/types/testCase';
 /**
  * Determines the provider name from the model string
  */
-const getProviderFromModel = (model: string): string => {
-  if (model.startsWith('gpt')) {
-    return 'openai';
-  } else if (model.startsWith('claude')) {
-    return 'anthropic';
-  } else if (model.startsWith('gemini')) {
-    return 'google';
-  } else {
-    return 'unknown';
-  }
-};
+const getProviderFromModel = (model: string): string =>
+  pipe(
+    Match.value(model),
+    Match.when(
+      (m) => m.startsWith('gpt'),
+      () => 'openai',
+    ),
+    Match.when(
+      (m) => m.startsWith('claude'),
+      () => 'anthropic',
+    ),
+    Match.when(
+      (m) => m.startsWith('gemini'),
+      () => 'google',
+    ),
+    Match.orElse(() => 'unknown'),
+  );
 
 /**
  * Extracts system messages and converts remaining messages to AI package format
  */
-const processConversation = (conversation: Conversation): {
+const processConversation = (
+  conversation: Conversation,
+): {
   system: string | undefined;
   messages: AiInput.Raw;
 } => {
   const messages = Chunk.toArray(conversation);
-  
+
   // Extract system messages and combine them
   const systemMessages = messages
     .filter((msg) => msg.role === 'system')
     .map((msg) => msg.content);
-  
-  const system = systemMessages.length > 0 
-    ? systemMessages.join('\n') 
-    : undefined;
-  
+
+  const system =
+    systemMessages.length > 0 ? systemMessages.join('\n') : undefined;
+
   // Convert non-system messages
   const conversationMessages = messages
     .filter((msg) => msg.role !== 'system')
-    .map((msg) => {
-      switch (msg.role) {
-        case 'user':
-          return new AiInput.UserMessage({
-            parts: [new AiInput.TextPart({ text: msg.content })],
-          });
-        case 'assistant':
-          return new AiInput.AssistantMessage({
-            parts: [new AiInput.TextPart({ text: msg.content })],
-          });
-        default:
-          return new AiInput.UserMessage({
-            parts: [new AiInput.TextPart({ text: msg.content })],
-          });
-      }
-    });
-  
+    .map((msg) =>
+      pipe(
+        Match.value(msg.role),
+        Match.when(
+          'user',
+          () =>
+            new AiInput.UserMessage({
+              parts: [new AiInput.TextPart({ text: msg.content })],
+            }),
+        ),
+        Match.when(
+          'assistant',
+          () =>
+            new AiInput.AssistantMessage({
+              parts: [new AiInput.TextPart({ text: msg.content })],
+            }),
+        ),
+        Match.orElse(
+          () =>
+            new AiInput.UserMessage({
+              parts: [new AiInput.TextPart({ text: msg.content })],
+            }),
+        ),
+      ),
+    );
+
   return { system, messages: conversationMessages };
+};
+
+/**
+ * Creates a language model layer for a specific provider
+ */
+const createProviderLayer = (
+  provider: string,
+  apiKey: string,
+  model: string,
+): Layer.Layer<AiLanguageModel.AiLanguageModel, never, NodeHttpClient.HttpClient> => {
+  const createClientAndLayer = <A, E, R>(
+    clientLayer: Layer.Layer<A, E, never>,
+    modelLayer: Layer.Layer<AiLanguageModel.AiLanguageModel, never, A>,
+  ): Layer.Layer<AiLanguageModel.AiLanguageModel, E, R> => 
+    pipe(modelLayer, Layer.provide(clientLayer));
+
+  return pipe(
+    Match.value(provider),
+    Match.when('openai', () =>
+      createClientAndLayer(
+        OpenAiClient.layer({ apiKey: Redacted.make(apiKey) }),
+        OpenAi.layer({ model }),
+      ),
+    ),
+    Match.when('anthropic', () =>
+      createClientAndLayer(
+        AnthropicClient.layer({ apiKey: Redacted.make(apiKey) }),
+        Anthropic.layer({ model }),
+      ),
+    ),
+    Match.when('google', () =>
+      createClientAndLayer(
+        GoogleClient.layer({ apiKey: Redacted.make(apiKey) }),
+        Google.layer({ model }),
+      ),
+    ),
+    Match.orElse(() => {
+      throw new Error(`Unsupported provider: ${provider}`);
+    }),
+  );
 };
 
 /**
@@ -108,37 +164,14 @@ const make = Effect.gen(function* () {
       const baseUrl = providerConfig.baseUrl;
 
       // Create provider-specific language model layer
-      const languageModelLayer = yield* Effect.gen(function* () {
-        switch (providerName) {
-          case 'openai': {
-            const clientLayer = OpenAiClient.layer({
-              apiKey: Redacted.make(apiKey),
-            });
-            return pipe(OpenAi.layer({ model }), Layer.provide(clientLayer));
-          }
-
-          case 'anthropic': {
-            const clientLayer = AnthropicClient.layer({
-              apiKey: Redacted.make(apiKey),
-            });
-            return pipe(Anthropic.layer({ model }), Layer.provide(clientLayer));
-          }
-
-          case 'google': {
-            const clientLayer = GoogleClient.layer({
-              apiKey: Redacted.make(apiKey),
-            });
-            return pipe(Google.layer({ model }), Layer.provide(clientLayer));
-          }
-
-          default:
-            return yield* Effect.fail(
-              new LlmApiError({
-                provider: providerName,
-                originalMessage: `Unsupported provider: ${providerName}`,
-              }),
-            );
-        }
+      const languageModelLayer = yield* Effect.try({
+        try: () => createProviderLayer(providerName, apiKey, model),
+        catch: (error) =>
+          new LlmApiError({
+            provider: providerName,
+            originalMessage:
+              error instanceof Error ? error.message : String(error),
+          }),
       });
 
       // Process conversation to extract system message and convert messages
