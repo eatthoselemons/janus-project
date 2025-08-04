@@ -91,6 +91,42 @@ const multiTurnTests = [
   }
 ];
 
+// System message test data
+const systemMessageTests = [
+  {
+    provider: 'OpenAI',
+    model: 'gpt-3.5-turbo',
+    systemMessage: 'You are a helpful assistant who always responds in exactly 5 words.',
+    userMessage: 'What is the capital of France?',
+    // We expect exactly 5 words in response
+    validateResponse: (response: string) => {
+      const wordCount = response.trim().split(/\s+/).length;
+      return wordCount === 5;
+    }
+  },
+  {
+    provider: 'Anthropic',
+    model: 'claude-3-haiku-20240307',
+    systemMessage: 'You are a helpful assistant who always responds with a haiku poem.',
+    userMessage: 'Tell me about the ocean.',
+    // Haikus have 3 lines, so we expect at least 2 newlines
+    validateResponse: (response: string) => {
+      const lines = response.trim().split('\n').filter(line => line.trim());
+      return lines.length >= 3;
+    }
+  },
+  {
+    provider: 'Google',
+    model: 'gemini-1.5-flash',
+    systemMessage: 'You are a helpful assistant who always includes the word "certainly" in your responses.',
+    userMessage: 'What is 2 + 2?',
+    // We expect the word "certainly" somewhere in the response
+    validateResponse: (response: string) => {
+      return response.toLowerCase().includes('certainly');
+    }
+  }
+];
+
 describe.skipIf(process.env.INTEGRATION_TEST !== 'true')(
   'LlmApi Integration Tests',
   { timeout: 60000 }, // 60 second timeout for all tests in this suite
@@ -141,6 +177,32 @@ describe.skipIf(process.env.INTEGRATION_TEST !== 'true')(
             // Check that the model remembers the context
             expect(result).toBeDefined();
             expect(result.toLowerCase()).toContain(value);
+          })
+        )
+      );
+    });
+
+    // Generate system message tests
+    systemMessageTests.forEach(({ provider, model, systemMessage, userMessage, validateResponse }) => {
+      it.effect(`should handle system messages with ${provider}`, () =>
+        runTest(
+          Effect.gen(function* () {
+            const llmApi = yield* LlmApi;
+            const conversation = Chunk.fromIterable<Message>([
+              { role: 'system', content: systemMessage },
+              { role: 'user', content: userMessage }
+            ]);
+
+            const result = yield* llmApi.generate(conversation, model);
+
+            // Check that we got a response
+            expect(result).toBeDefined();
+            expect(typeof result).toBe('string');
+            expect(result.length).toBeGreaterThan(0);
+
+            // Validate that the system message was respected
+            const isValid = validateResponse(result);
+            expect(isValid).toBe(true);
           })
         )
       );
