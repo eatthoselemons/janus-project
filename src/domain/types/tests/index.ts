@@ -5,4 +5,4 @@
  * that can be used across different test files.
  */
 
-export * from './database-integration.test-layers';
+export * from '../../../tests/integration/database-integration.test-layers';
