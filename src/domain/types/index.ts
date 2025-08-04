@@ -10,11 +10,10 @@ export * from './branded';
 export * from './database';
 
 // Core entity schemas
-export * from './snippet';
-export * from './parameter';
-export * from './composition';
+export * from './contentNode';
 export * from './experiment';
 export * from './tag';
+export * from './testCase';
 
 // Error types
 export * from './errors';

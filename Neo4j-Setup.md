@@ -57,12 +57,9 @@ The schema implements the domain model with the following node types:
 
 ### Nodes
 
-- `Snippet` - Abstract snippet containers
-- `SnippetVersion` - Versioned snippet content
-- `Composition` - Abstract composition containers
-- `CompositionVersion` - Versioned composition recipes
-- `Parameter` - Parameter definitions
-- `ParameterOption` - Parameter values
+- `ContentNode` - Unified content containers
+- `ContentNodeVersion` - Versioned content
+- `TestCase` - Test case definitions
 - `TestRun` - Test execution containers
 - `DataPoint` - Individual test results
 - `Tag` - Categorization labels
@@ -71,12 +68,8 @@ The schema implements the domain model with the following node types:
 
 - `VERSION_OF` - Links versions to their parent entities
 - `PREVIOUS_VERSION` - Creates version history chains
-- `DEFINES_PARAMETER` - Links snippets to parameters they use
-- `HAS_OPTION` - Links parameters to their possible values
-- `DERIVED_FROM` - Tracks composition lineage
-- `INCLUDES` - Links compositions to snippet versions (with role/sequence properties)
+- `INCLUDES` - Links content versions together (with operation/key properties)
 - `GENERATED` - Links test runs to their data points
-- `USING_COMPOSITION` - Links results to the composition used
 - `HAS_TAG` - Applies tags to entities
 
 ## Database Management Commands
@@ -133,14 +126,17 @@ node dist/index.js db status
 The database layer uses the repository pattern with Effect-TS:
 
 ```typescript
-import { SnippetRepository } from './db/repositories';
+import { ContentService } from './services/content';
 import { Effect } from 'effect';
 
 // Example usage
-const createSnippetProgram = Effect.gen(function* () {
-  const repo = yield* SnippetRepository;
-  const snippet = createSnippet(slug, description);
-  yield* repo.create(snippet);
+const createContentProgram = Effect.gen(function* () {
+  const node = yield* ContentService.createContentNode(slug, description);
+  const version = yield* ContentService.createContentNodeVersion(
+    node.id,
+    'Content text',
+    'Initial version',
+  );
 });
 ```
 
