@@ -1,6 +1,6 @@
 import { Layer, ConfigProvider, Redacted, Schema } from 'effect';
-import { Neo4jTest } from '../../../layers/neo4j/Neo4j.layer';
-import { ConfigServiceLive } from '../../../layers/configuration/Configuration.layer';
+import { Neo4jTest } from '../../layers/neo4j/Neo4j.layer';
+import { ConfigServiceLive } from '../../layers/configuration/Configuration.layer';
 
 // ===========================
 // NEO4J TEST LAYERS

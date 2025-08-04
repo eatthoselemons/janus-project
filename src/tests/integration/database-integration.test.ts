@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@effect/vitest';
 import { Effect, Redacted, Schema } from 'effect';
-import { ConfigService } from '../../../services/config';
-import { Neo4jService } from '../../../services/neo4j';
+import { ConfigService } from '../../services/config';
+import { Neo4jService } from '../../services/neo4j';
 import {
   Neo4jUri,
   Neo4jUser,
@@ -9,7 +9,7 @@ import {
   ProviderName,
   ApiBaseUrl,
   queryParams,
-} from '../database';
+} from '../../domain/types/database';
 import {
   Neo4jTestWithPersonData,
   Neo4jTestWithComplexPersonData,
