@@ -64,7 +64,7 @@ The project adheres strictly to **Functional Programming** and **Type-Driven Dev
 
 - **Prefer Plain Objects over Classes** - Use plain objects and `type` declarations
 - **Use ES Modules for Encapsulation** - Export only the public API
-- **Avoid `any`; Prefer `unknown`** - Perform safe type-narrowing
+- **Avoid `any`; Prefer `unknown`** - Always perform safe type-narrowing
 - **Minimize Type Assertions** - Their use may indicate a type model flaw
 - **Embrace Array Operators** - Use `.map()`, `.filter()`, `.reduce()` over loops
 - **Use Effect's Immutable Data Structures** - Prefer `Chunk`, `HashMap`, and `HashSet` from Effect over native JavaScript arrays and objects for collections to ensure immutability and leverage performance optimizations.
