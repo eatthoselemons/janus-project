@@ -1,8 +1,7 @@
 export { LlmApiLive } from './LlmApi.layer';
 export {
-  LlmApiTestSimple,
-  LlmApiTestWithValidation,
-  LlmApiTestWithError,
+  createMockAiLanguageModel,
+  createMockAiLanguageModelLayer,
 } from './LlmApi.test-layers';
 export {
   ProviderRegistryLive,

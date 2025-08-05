@@ -1,23 +1,16 @@
-import { Effect, Layer, Chunk, Redacted, pipe, Match } from 'effect';
-import * as AiLanguageModel from '@effect/ai/AiLanguageModel';
+import { Effect, Layer, Chunk, pipe, Match, Option } from 'effect';
 import * as AiInput from '@effect/ai/AiInput';
 import * as AiResponse from '@effect/ai/AiResponse';
-import * as OpenAi from '@effect/ai-openai/OpenAiLanguageModel';
-import * as OpenAiClient from '@effect/ai-openai/OpenAiClient';
-import * as Anthropic from '@effect/ai-anthropic/AnthropicLanguageModel';
-import * as AnthropicClient from '@effect/ai-anthropic/AnthropicClient';
-import * as Google from '@effect/ai-google/GoogleAiLanguageModel';
-import * as GoogleClient from '@effect/ai-google/GoogleAiClient';
-import * as NodeHttpClient from '@effect/platform-node/NodeHttpClient';
-import { ConfigService } from '../../services/config';
+import { AiLanguageModel } from '@effect/ai/AiLanguageModel';
 import { LlmApi } from '../../services/llm-api';
+import { ProviderRegistry } from '../../services/llm-api/ProviderRegistry.service';
 import { LlmApiError } from '../../domain/types/errors';
 import { Conversation } from '../../domain/types/testCase';
 
 /**
  * Determines the provider name from the model string
  */
-const getProviderFromModel = (model: string): string =>
+export const getProviderFromModel = (model: string): string =>
   pipe(
     Match.value(model),
     Match.when(
@@ -38,7 +31,7 @@ const getProviderFromModel = (model: string): string =>
 /**
  * Extracts system messages and converts remaining messages to AI package format
  */
-const processConversation = (
+export const processConversation = (
   conversation: Conversation,
 ): {
   system: string | undefined;
@@ -87,53 +80,16 @@ const processConversation = (
 };
 
 /**
- * Creates a language model layer for a specific provider
- */
-const createProviderLayer = (
-  provider: string,
-  apiKey: string,
-  model: string,
-): Layer.Layer<AiLanguageModel.AiLanguageModel> => {
-  return pipe(
-    Match.value(provider),
-    Match.when('openai', () =>
-      pipe(
-        OpenAi.layer({ model }),
-        Layer.provide(OpenAiClient.layer({ apiKey: Redacted.make(apiKey) })),
-        Layer.provide(NodeHttpClient.layer),
-      ),
-    ),
-    Match.when('anthropic', () =>
-      pipe(
-        Anthropic.layer({ model }),
-        Layer.provide(AnthropicClient.layer({ apiKey: Redacted.make(apiKey) })),
-        Layer.provide(NodeHttpClient.layer),
-      ),
-    ),
-    Match.when('google', () =>
-      pipe(
-        Google.layer({ model }),
-        Layer.provide(GoogleClient.layer({ apiKey: Redacted.make(apiKey) })),
-        Layer.provide(NodeHttpClient.layer),
-      ),
-    ),
-    Match.orElse(() => {
-      throw new Error(`Unsupported provider: ${provider}`);
-    }),
-  ) as Layer.Layer<AiLanguageModel.AiLanguageModel>;
-};
-
-/**
- * Creates the LLM API service
+ * Creates the LLM API service using the provider registry
+ * This follows the proper Effect pattern where dependencies are yielded
  */
 const make = Effect.gen(function* () {
-  const config = yield* ConfigService;
-  // Get list of actually configured providers
-  const configuredProviders = Object.keys(config.llm.providers);
+  const registry = yield* ProviderRegistry;
 
   // Log available providers for debugging
+  const availableProviders = registry.getAvailableProviders();
   yield* Effect.logInfo(
-    `Available LLM providers: ${configuredProviders.join(', ')}`,
+    `Available LLM providers: ${availableProviders.join(', ')}`,
   );
 
   const generate = (conversation: Conversation, model: string) =>
@@ -141,55 +97,46 @@ const make = Effect.gen(function* () {
       // Determine provider from model name
       const providerName = getProviderFromModel(model);
 
-      // Check if provider is configured
-      if (!configuredProviders.includes(providerName)) {
+      // Get provider layer from registry
+      const providerLayerOption = registry.getProviderLayer(
+        providerName,
+        model,
+      );
+
+      if (Option.isNone(providerLayerOption)) {
         return yield* Effect.fail(
           new LlmApiError({
             provider: providerName,
             originalMessage:
               providerName === 'unknown'
                 ? `Unknown model: ${model}`
-                : `Provider ${providerName} is not configured. Available providers: ${configuredProviders.join(', ')}`,
+                : `Provider ${providerName} is not configured. Available providers: ${availableProviders.join(', ')}`,
           }),
         );
       }
 
-      // Get provider configuration
-      const providerConfig =
-        config.llm.providers[providerName as keyof typeof config.llm.providers];
-      const apiKey = Redacted.value(providerConfig.apiKey);
-
-      // Create provider-specific language model layer
-      const languageModelLayer = yield* Effect.try({
-        try: () => createProviderLayer(providerName, apiKey, model),
-        catch: (error) =>
-          new LlmApiError({
-            provider: providerName,
-            originalMessage:
-              error instanceof Error ? error.message : String(error),
-          }),
-      });
+      const providerLayer = providerLayerOption.value;
 
       // Process conversation to extract system message and convert messages
       const { system, messages } = processConversation(conversation);
 
-      // Generate text using the language model
+      // Create an effect that uses AiLanguageModel and provide the layer
       const response = yield* pipe(
         Effect.gen(function* () {
-          const languageModel = yield* AiLanguageModel.AiLanguageModel;
-          return yield* languageModel.generateText({
+          const aiModel = yield* AiLanguageModel;
+          return yield* aiModel.generateText({
             prompt: messages,
             system,
           });
         }),
-        Effect.provide(languageModelLayer),
-        Effect.provide(NodeHttpClient.layer),
+        Effect.provide(providerLayer),
         Effect.scoped,
         Effect.mapError(
           (error): LlmApiError =>
             new LlmApiError({
               provider: providerName,
-              originalMessage: error.message || String(error),
+              originalMessage:
+                error instanceof Error ? error.message : String(error),
               statusCode:
                 error && typeof error === 'object' && 'statusCode' in error
                   ? (error.statusCode as number)
@@ -209,4 +156,8 @@ const make = Effect.gen(function* () {
   return { generate };
 });
 
+/**
+ * LLM API layer that uses the ProviderRegistry for dynamic provider selection
+ * This follows the proper Effect pattern while supporting runtime provider selection
+ */
 export const LlmApiLive = Layer.effect(LlmApi, make);
