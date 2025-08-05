@@ -10,6 +10,7 @@ import { ConfigServiceLive } from '../configuration/Configuration.layer';
 import { LlmApiError } from '../../domain/types/errors';
 import type { Message } from '../../domain/types/testCase';
 import { getProviderFromModel, processConversation } from './LlmApi.layer';
+import { createMockRegistry, createCapturingMock } from './LlmApi.test-layers';
 
 describe('LlmApi', () => {
   describe('unit tests for exported functions', () => {
@@ -110,46 +111,6 @@ describe('LlmApi', () => {
   });
 
   describe('LlmApi layer integration tests', () => {
-    // Helper to create a mock registry with controllable behavior
-    const createMockRegistry = (config: {
-      availableProviders: string[];
-      providerLayers?: Record<string, Layer.Layer<AiLanguageModel>>;
-      shouldFailFor?: string[];
-    }) =>
-      Layer.succeed(ProviderRegistry, {
-        getAvailableProviders: () => config.availableProviders,
-        getProviderLayer: (name: string, model: string) => {
-          if (config.shouldFailFor?.includes(name)) {
-            return Option.none();
-          }
-          const layer = config.providerLayers?.[name];
-          return layer ? Option.some(layer) : Option.none();
-        },
-      });
-
-    // Helper to create a capturing mock for AiLanguageModel
-    const createCapturingMock = (response?: string, error?: Error) => {
-      const capturedCalls: any[] = [];
-
-      const layer = Layer.succeed(AiLanguageModel, {
-        generateText: (params: any) => {
-          capturedCalls.push(params);
-          if (error) {
-            return Effect.fail(error);
-          }
-          const text = response ?? 'Mock response';
-          return Effect.succeed({
-            parts: text
-              ? [new AiResponse.TextPart({ text })]
-              : ([] as AiResponse.Part[]),
-          });
-        },
-        generateObject: () => Effect.fail(new Error('Not implemented')),
-        generateObjectArray: () => Effect.fail(new Error('Not implemented')),
-      } as any);
-
-      return { layer, capturedCalls };
-    };
 
     it.effect('should process messages correctly and call AI model', () => {
       const mockConfig = {
@@ -368,21 +329,6 @@ describe('LlmApi', () => {
   });
 
   describe('error handling', () => {
-    const createMockRegistry = (config: {
-      availableProviders: string[];
-      providerLayers?: Record<string, Layer.Layer<AiLanguageModel>>;
-      shouldFailFor?: string[];
-    }) =>
-      Layer.succeed(ProviderRegistry, {
-        getAvailableProviders: () => config.availableProviders,
-        getProviderLayer: (name: string, model: string) => {
-          if (config.shouldFailFor?.includes(name)) {
-            return Option.none();
-          }
-          const layer = config.providerLayers?.[name];
-          return layer ? Option.some(layer) : Option.none();
-        },
-      });
 
     it.effect('should wrap provider errors in LlmApiError', () => {
       const mockConfig = {
@@ -609,7 +555,7 @@ describe('LlmApi', () => {
         };
 
         const mockRegistry = Layer.succeed(ProviderRegistry, {
-          getAvailableProviders: () => ['openai', 'anthropic', 'google'],
+          getAvailableProviders: () => ['openai'], // Only openai is available
           getProviderLayer: (name: string) => {
             // Only openai is configured
             return name === 'openai'
@@ -633,9 +579,8 @@ describe('LlmApi', () => {
           if (exit._tag === 'Failure') {
             const error = exit.cause._tag === 'Fail' ? exit.cause.error : null;
             expect(error).toBeInstanceOf(LlmApiError);
-            expect(error?.originalMessage).toContain('not configured');
-            expect(error?.originalMessage).toContain(
-              'Available providers: openai, anthropic, google',
+            expect(error?.originalMessage).toBe(
+              'Provider anthropic is not configured. Available providers: openai',
             );
           }
         }).pipe(
