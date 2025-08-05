@@ -13,6 +13,12 @@ import { Neo4jError } from '../../domain/types/errors';
 import { makeTestLayerFor } from '../../lib/test-utils';
 import { CypherQuery, QueryParameters } from '../../domain/types/database';
 
+/**
+ * TransactionalDatabase Layer
+ * 
+ * This layer provides low-level database operations for Neo4j.
+ * It handles connection management, session lifecycle, and transaction control.
+ * 
 // ===========================
 // DRIVER CONFIGURATION
 // ===========================
@@ -36,6 +42,15 @@ const driverConfig = {
 // DRIVER LIFECYCLE
 // ===========================
 
+/**
+ * ⚠️ INTERNAL - DO NOT USE DIRECTLY
+ * 
+ * Creates a Neo4j driver instance with the provided configuration.
+ * The driver manages the connection pool to the database.
+ * 
+ * @internal - This is internal to the layer implementation.
+ * @private
+ */
 const createDriver = (config: {
   uri: string;
   user: string;
@@ -55,6 +70,15 @@ const createDriver = (config: {
       }),
   });
 
+/**
+ * ⚠️ INTERNAL - DO NOT USE DIRECTLY
+ * 
+ * Safely closes a Neo4j driver and its connection pool.
+ * Handles errors gracefully to ensure cleanup always succeeds.
+ * 
+ * @internal - This is internal to the layer implementation.
+ * @private
+ */
 const closeDriver = (driver: Driver) =>
   Effect.tryPromise({
     try: () => driver.close(),
@@ -97,6 +121,17 @@ const closeSession = (session: Session) =>
     Effect.catchAll(() => Effect.logWarning('Failed to close Neo4j session')),
   );
 
+/**
+ * ⚠️ INTERNAL - DO NOT USE DIRECTLY
+ * 
+ * Creates a transaction context wrapper around a Neo4j transaction.
+ * This provides a type-safe interface for running queries within a transaction.
+ * 
+ * @internal - This is internal to the layer implementation.
+ * @private - Only used by runInTransactionWithDriver
+ * @param tx - An open Neo4j transaction
+ * @returns TransactionContext with a run method for executing queries
+ */
 const createTransactionContext = (tx: Transaction): TransactionContext => ({
   run: <T = unknown>(query: CypherQuery, params?: QueryParameters) =>
     Effect.tryPromise({
@@ -112,6 +147,20 @@ const createTransactionContext = (tx: Transaction): TransactionContext => ({
     }),
 });
 
+/**
+ * ⚠️ INTERNAL - DO NOT USE DIRECTLY
+ * Use TransactionalDatabaseService.runInTransaction instead.
+ * 
+ * Executes multiple operations within a single database transaction.
+ * 
+ * @internal - This is wrapped by the service layer.
+ * @private
+ * 
+ * Features:
+ * - Automatically commits on success, rolls back on failure
+ * - All operations share the same transaction context
+ * - Session is automatically closed after completion
+ */
 const runInTransactionWithDriver =
   (driver: Driver) =>
   <A, E>(
@@ -149,6 +198,18 @@ const runInTransactionWithDriver =
       }),
     ).pipe(Effect.withLogSpan('runInTransaction'));
 
+/**
+ * ⚠️ INTERNAL - DO NOT USE DIRECTLY
+ * Use TransactionalDatabaseService.runBatch instead.
+ * 
+ * Executes multiple queries in sequence within a single session.
+ * 
+ * @internal - This is wrapped by the service layer.
+ * @private
+ * 
+ * Note: Unlike runInTransaction, these queries are NOT in a transaction.
+ * Each query auto-commits independently.
+ */
 const runBatchWithDriver =
   (driver: Driver) =>
   <T = unknown>(
@@ -198,6 +259,19 @@ const withSessionScoped =
       }),
     ).pipe(Effect.withLogSpan('withSession'));
 
+/**
+ * ⚠️ INTERNAL - DO NOT USE DIRECTLY
+ * Use TransactionalDatabaseService.runQuery instead.
+ * 
+ * Executes a single query with automatic session management.
+ * 
+ * @internal - This is wrapped by the service layer.
+ * @private
+ * 
+ * Features:
+ * - Opens a session, runs the query, closes the session
+ * - Query auto-commits (not in a transaction)
+ */
 const runQueryWithDriver =
   (driver: Driver) =>
   (query: CypherQuery, params: QueryParameters = {}) =>
@@ -225,6 +299,20 @@ const runQueryWithDriver =
 // SERVICE IMPLEMENTATION
 // ===========================
 
+/**
+ * ⚠️ INTERNAL - DO NOT USE DIRECTLY
+ * Use Layer.provide(TransactionalDatabaseLive) instead.
+ * 
+ * Creates a TransactionalDatabaseService instance.
+ * 
+ * @internal - This factory is only for layer construction.
+ * @private
+ * 
+ * This factory function:
+ * 1. Creates and verifies the Neo4j driver connection
+ * 2. Returns a service with all database operations
+ * 3. Ensures proper cleanup when the service is disposed
+ */
 export const make = (config: { uri: string; user: string; password: string }) =>
   Effect.gen(function* () {
     const driver = yield* Effect.acquireRelease(
@@ -247,6 +335,24 @@ export const make = (config: { uri: string; user: string; password: string }) =>
 // LAYER IMPLEMENTATIONS
 // ===========================
 
+/**
+ * ✅ PUBLIC - USE THIS FOR PRODUCTION
+ * 
+ * Production layer that creates TransactionalDatabaseService from ConfigService.
+ * 
+ * Usage:
+ * ```typescript
+ * const program = Effect.gen(function* () {
+ *   const db = yield* TransactionalDatabaseService;
+ *   return yield* db.runQuery('MATCH (n) RETURN n');
+ * });
+ * 
+ * // Provide the layer
+ * program.pipe(Effect.provide(TransactionalDatabaseLive))
+ * ```
+ * 
+ * @public
+ */
 export const TransactionalDatabaseLive = Layer.scoped(
   TransactionalDatabaseService,
   Effect.gen(function* () {
@@ -301,6 +407,26 @@ const createMockSession = (mockData: Map<string, unknown[]>): Session => {
   return mockSession;
 };
 
+/**
+ * ✅ PUBLIC - USE THIS FOR TESTING
+ * 
+ * Test layer that mocks database operations using in-memory data.
+ * 
+ * Features:
+ * - Query results are looked up by exact query string match
+ * - No actual database connection required
+ * - Useful for unit testing
+ * 
+ * @example
+ * ```typescript
+ * const testLayer = Neo4jTest(new Map([
+ *   ['MATCH (n:User) RETURN n', [{ n: { id: 1, name: 'Alice' } }]]
+ * ]));
+ * ```
+ * 
+ * @param mockData - Map of query strings to their mock results
+ * @public
+ */
 export const Neo4jTest = (mockData: Map<string, unknown[]> = new Map()) =>
   Layer.succeed(
     TransactionalDatabaseService,
