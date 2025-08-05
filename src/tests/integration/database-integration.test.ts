@@ -1,16 +1,15 @@
 import { describe, it, expect } from '@effect/vitest';
 import { Effect, Redacted, Schema } from 'effect';
-import { ConfigService } from '../../../services/config';
-import { Neo4jService } from '../../../services/neo4j';
+import { ConfigService } from '../../services/config';
+import { Neo4jService } from '../../services/neo4j';
 import {
   Neo4jUri,
   Neo4jUser,
   CypherQuery,
   ProviderName,
   ApiBaseUrl,
-  LlmModel,
   queryParams,
-} from '../database';
+} from '../../domain/types/database';
 import {
   Neo4jTestWithPersonData,
   Neo4jTestWithComplexPersonData,
@@ -45,10 +44,8 @@ describe('Database Types Integration', () => {
         expect(provider).toBeDefined();
         if (provider) {
           const baseUrl: ApiBaseUrl = provider.baseUrl;
-          const model: LlmModel = provider.model;
 
           expect(baseUrl).toBe('https://api.openai.com/v1');
-          expect(model).toBe('gpt-4');
         }
       });
 

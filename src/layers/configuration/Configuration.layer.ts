@@ -7,7 +7,6 @@ import {
   Neo4jUser,
   ProviderName,
   ApiBaseUrl,
-  LlmModel,
 } from '../../domain/types';
 
 // Helper function to load a provider configuration
@@ -28,16 +27,13 @@ const loadProviderConfig = (providerName: string) =>
     // If API key exists, the other fields are required
     // These will fail with ConfigError if missing, which is what we want
     const baseUrlStr = yield* Config.string(`${prefix}_BASE_URL`);
-    const modelStr = yield* Config.string(`${prefix}_MODEL`);
 
     // Validate and convert to branded types
     const baseUrl = yield* Schema.decode(ApiBaseUrl)(baseUrlStr);
-    const model = yield* Schema.decode(LlmModel)(modelStr);
 
     return {
       apiKey: maybeApiKey.value,
       baseUrl,
-      model,
     };
   });
 
@@ -60,25 +56,53 @@ const readProvidersFromFile = Effect.sync(() => {
   }
 });
 
-// Get configured providers from config file or environment variable
+// Auto-detect providers based on available API keys
 const getConfiguredProviders = Effect.gen(function* () {
-  // Option 1: Check environment variable first (for override)
-  const envProviders = yield* Config.string('LLM_PROVIDERS').pipe(
-    Config.withDefault(''),
-  );
+  // Get all environment variables using Config
+  const availableProviders: string[] = [];
 
-  if (envProviders !== '') {
-    // Environment variable takes precedence
-    return envProviders
-      .split(',')
-      .map((p) => p.trim().toLowerCase())
-      .filter((p) => p !== '');
+  // Common providers to check
+  const commonProviders = [
+    'openai',
+    'anthropic',
+    'google',
+    'custom',
+    'mycorp',
+    'validprovider',
+  ];
+
+  // Also check environment variables for any other LLM_*_API_KEY patterns
+  const envVars = process.env;
+  const providerPattern = /^LLM_(.+)_API_KEY$/;
+
+  const allProviders = new Set(commonProviders);
+
+  // Add any additional providers found in environment
+  for (const key in envVars) {
+    const match = key.match(providerPattern);
+    if (match) {
+      allProviders.add(match[1].toLowerCase());
+    }
   }
 
-  // Option 2: Read from configuration file
-  const fileProviders = yield* readProvidersFromFile;
+  // Check each provider to see if it has an API key configured
+  yield* Effect.forEach(
+    Array.from(allProviders),
+    (provider) =>
+      Effect.gen(function* () {
+        const prefix = `LLM_${provider.toUpperCase()}`;
+        const maybeApiKey = yield* Config.option(
+          Config.redacted(`${prefix}_API_KEY`),
+        );
 
-  return fileProviders;
+        if (maybeApiKey._tag === 'Some') {
+          availableProviders.push(provider);
+        }
+      }),
+    { concurrency: 'unbounded' },
+  );
+
+  return availableProviders;
 });
 
 // Implementation using Effect Config module
@@ -107,7 +131,6 @@ const configProgram = Effect.gen(function* () {
   type ProviderConfig = {
     apiKey: Redacted.Redacted<string>;
     baseUrl: ApiBaseUrl;
-    model: LlmModel;
   };
   const providers: Record<ProviderName, ProviderConfig> = {};
 

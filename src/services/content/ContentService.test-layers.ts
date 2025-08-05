@@ -244,7 +244,9 @@ export const ContentTestWithData = (
   // Type definitions for query parameters
   type NodeByNameParams = { name: string };
   type NodeByIdParams = { id: ContentNodeId };
-  type CreateNodeParams = { props: { id: ContentNodeId; name: string; description: string } };
+  type CreateNodeParams = {
+    props: { id: ContentNodeId; name: string; description: string };
+  };
   type VersionParams = { parentId: ContentNodeId };
   type VersionChildrenParams = { parentId: ContentNodeVersionId };
   type CreateVersionParams = {
@@ -323,7 +325,9 @@ export const ContentTestWithData = (
     return versions;
   };
 
-  const createVersionWithPrevious = (params: CreateVersionParams): unknown[] => {
+  const createVersionWithPrevious = (
+    params: CreateVersionParams,
+  ): unknown[] => {
     if (params.props) {
       const nodeId = params.parentId;
       const previousVersionId = params.previousId;
@@ -352,7 +356,9 @@ export const ContentTestWithData = (
     ];
   };
 
-  const createVersionWithoutPrevious = (params: CreateVersionParams): unknown[] => {
+  const createVersionWithoutPrevious = (
+    params: CreateVersionParams,
+  ): unknown[] => {
     if (params.props) {
       const nodeId = params.parentId;
       testData.versions.push({
@@ -463,7 +469,9 @@ export const ContentTestWithData = (
     return testCase ? [{ t: testCase }] : [];
   };
 
-  const createEdgeRelationships = (params: EdgeRelationshipParams): unknown[] => {
+  const createEdgeRelationships = (
+    params: EdgeRelationshipParams,
+  ): unknown[] => {
     const { parentVersion, relationships } = params;
 
     relationships.forEach((rel: any) => {
@@ -480,7 +488,9 @@ export const ContentTestWithData = (
     return [];
   };
 
-  const getChildrenWithSlotsAndRoles = (params: VersionChildrenParams): unknown[] => {
+  const getChildrenWithSlotsAndRoles = (
+    params: VersionChildrenParams,
+  ): unknown[] => {
     const parentId = params.parentId;
     return testData.edges
       .filter((e) => e.parentId === parentId)
@@ -503,13 +513,15 @@ export const ContentTestWithData = (
       .filter((item) => item.child !== null);
   };
 
-  const findContentForSlots = (params: FindContentForSlotsParams): unknown[] => {
+  const findContentForSlots = (
+    params: FindContentForSlotsParams,
+  ): unknown[] => {
     const slots = params.slots;
     const tags = params.tags;
     const excludeVersionIds = params.excludeVersionIds || [];
 
     const results: { versionId: ContentNodeVersionId }[] = [];
-    
+
     for (const slot of slots) {
       // Find nodes with matching tags
       const nodesWithTags = testData.tags
@@ -545,7 +557,7 @@ export const ContentTestWithData = (
         results.push({ versionId: versions[0].version.id });
       }
     }
-    
+
     return results;
   };
 

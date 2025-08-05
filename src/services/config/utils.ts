@@ -90,11 +90,10 @@ export const extractCredentials = Effect.gen(function* () {
         acc[name] = {
           apiKey: Redacted.value(provider.apiKey),
           baseUrl: provider.baseUrl,
-          model: provider.model,
         };
         return acc;
       },
-      {} as Record<string, { apiKey: string; baseUrl: string; model: string }>,
+      {} as Record<string, { apiKey: string; baseUrl: string }>,
     ),
   };
 });

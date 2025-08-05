@@ -64,7 +64,7 @@ The project adheres strictly to **Functional Programming** and **Type-Driven Dev
 
 - **Prefer Plain Objects over Classes** - Use plain objects and `type` declarations
 - **Use ES Modules for Encapsulation** - Export only the public API
-- **Avoid `any`; Prefer `unknown`** - Perform safe type-narrowing
+- **Avoid `any`; Prefer `unknown`** - Always perform safe type-narrowing
 - **Minimize Type Assertions** - Their use may indicate a type model flaw
 - **Embrace Array Operators** - Use `.map()`, `.filter()`, `.reduce()` over loops
 - **Use Effect's Immutable Data Structures** - Prefer `Chunk`, `HashMap`, and `HashSet` from Effect over native JavaScript arrays and objects for collections to ensure immutability and leverage performance optimizations.
@@ -101,6 +101,12 @@ The project adheres strictly to **Functional Programming** and **Type-Driven Dev
 - **Never assume missing context** - Ask questions if uncertain
 - **Never hallucinate libraries or functions** - Only use verified packages
 - **Always confirm file paths and module names exist** before referencing them
+
+### Notes When Making Tests
+
+- Use the language server mcp often to check types when you get errors in tests
+- Build errors usually are not descriptive enough
+- Poke around with the language server
 
 ## 5. Core Principles Checklist
 

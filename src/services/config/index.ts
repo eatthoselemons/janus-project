@@ -4,7 +4,6 @@ import {
   Neo4jUser,
   ProviderName,
   ApiBaseUrl,
-  LlmModel,
 } from '../../domain/types';
 
 /**
@@ -25,7 +24,6 @@ export class ConfigService extends Context.Tag('ConfigService')<
         {
           readonly apiKey: Redacted.Redacted<string>;
           readonly baseUrl: ApiBaseUrl;
-          readonly model: LlmModel;
         }
       >;
     };

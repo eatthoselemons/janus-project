@@ -7,6 +7,18 @@ settings:
 importers:
   .:
     dependencies:
+      '@effect/ai':
+        specifier: ^0.25.0
+        version: 0.25.0(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(@effect/rpc@0.64.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(effect@3.16.12)
+      '@effect/ai-anthropic':
+        specifier: ^0.15.0
+        version: 0.15.0(@effect/ai@0.25.0(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(@effect/rpc@0.64.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(effect@3.16.12))(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12)
+      '@effect/ai-google':
+        specifier: ^0.4.0
+        version: 0.4.0(@effect/ai@0.25.0(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(@effect/rpc@0.64.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(effect@3.16.12))(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12)
+      '@effect/ai-openai':
+        specifier: ^0.28.0
+        version: 0.28.0(@effect/ai@0.25.0(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(@effect/rpc@0.64.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(effect@3.16.12))(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12)
       '@effect/cli':
         specifier: ^0.66.7
         version: 0.66.7(@effect/platform@0.88.2(effect@3.16.12))(@effect/printer-ansi@0.44.12(@effect/typeclass@0.35.12(effect@3.16.12))(effect@3.16.12))(@effect/printer@0.44.12(@effect/typeclass@0.35.12(effect@3.16.12))(effect@3.16.12))(effect@3.16.12)
@@ -76,12 +88,62 @@ importers:
         version: 3.2.4(@types/node@24.0.10)(yaml@2.8.0)
 
 packages:
+  '@anthropic-ai/tokenizer@0.0.4':
+    resolution:
+      {
+        integrity: sha512-EHRKbxlxlc8W4KCBEseByJ7YwyYCmgu9OyN59H9+IYIGPoKv8tXyQXinkeGDI+cI8Tiuz9wk2jZb/kK7AyvL7g==,
+      }
+
   '@cspotcode/source-map-support@0.8.1':
     resolution:
       {
         integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==,
       }
     engines: { node: '>=12' }
+
+  '@effect/ai-anthropic@0.15.0':
+    resolution:
+      {
+        integrity: sha512-m4+RQXgkEV+wdBF+82HgL6qiFNURvLgz93Ppem2dspp4DVCHrowUkp51qF7cixbLDlKRI7aODvDExDTuEx1QiA==,
+      }
+    peerDependencies:
+      '@effect/ai': ^0.25.0
+      '@effect/experimental': ^0.54.0
+      '@effect/platform': ^0.90.0
+      effect: ^3.17.1
+
+  '@effect/ai-google@0.4.0':
+    resolution:
+      {
+        integrity: sha512-M4H7+ifzPHhgjuFatAD+nNoxY5Lp3+DndGqk3Nn62KBDdMuPmcNvTpWuXxlRajpNoqexGIL4EMgR0NwGQK++Bg==,
+      }
+    peerDependencies:
+      '@effect/ai': ^0.25.0
+      '@effect/experimental': ^0.54.0
+      '@effect/platform': ^0.90.0
+      effect: ^3.17.1
+
+  '@effect/ai-openai@0.28.0':
+    resolution:
+      {
+        integrity: sha512-KNpm5qopmN60L7KqUSAEkNULxvX54l0ban0ahb4fgBkCLqeeAGcGQESrOREvSbu4G/QOhyW25kWFLXkBJd/sCA==,
+      }
+    peerDependencies:
+      '@effect/ai': ^0.25.0
+      '@effect/experimental': ^0.54.0
+      '@effect/platform': ^0.90.0
+      effect: ^3.17.1
+
+  '@effect/ai@0.25.0':
+    resolution:
+      {
+        integrity: sha512-TreU0B0tLm4RgC7sd8ACJuqnL3Uk8qvZFKgIT+KJkYG0+809Mn5Jlx6IXe450rMcOh7Zd/1+sYZEU8G/n7eWsA==,
+      }
+    peerDependencies:
+      '@effect/experimental': ^0.54.0
+      '@effect/platform': ^0.90.0
+      '@effect/rpc': ^0.68.0
+      effect: ^3.17.1
 
   '@effect/cli@0.66.7':
     resolution:
@@ -990,6 +1052,12 @@ packages:
         integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==,
       }
 
+  '@types/node@18.19.121':
+    resolution:
+      {
+        integrity: sha512-bHOrbyztmyYIi4f1R0s17QsPs1uyyYnGcXeZoGEd227oZjry0q6XQBQxd82X1I57zEfwO8h9Xo+Kl5gX1d9MwQ==,
+      }
+
   '@types/node@24.0.10':
     resolution:
       {
@@ -1626,6 +1694,12 @@ packages:
       }
     engines: { node: '>=18' }
 
+  gpt-tokenizer@2.9.0:
+    resolution:
+      {
+        integrity: sha512-YSpexBL/k4bfliAzMrRqn3M6+it02LutVyhVpDeMKrC/O9+pCe/5s8U2hYKa2vFLD5/vHhsKc8sOn/qGqII8Kg==,
+      }
+
   graphemer@1.4.0:
     resolution:
       {
@@ -2198,6 +2272,12 @@ packages:
       }
     engines: { node: ^14.18.0 || >=16.0.0 }
 
+  tiktoken@1.0.21:
+    resolution:
+      {
+        integrity: sha512-/kqtlepLMptX0OgbYD9aMYbM7EFrMZCL7EoHM8Psmg2FuhXoo/bH64KqOiZGGwa6oS9TPdSEDKBnV2LuB8+5vQ==,
+      }
+
   tinybench@2.9.0:
     resolution:
       {
@@ -2314,6 +2394,12 @@ packages:
       }
     engines: { node: '>=14.17' }
     hasBin: true
+
+  undici-types@5.26.5:
+    resolution:
+      {
+        integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==,
+      }
 
   undici-types@7.8.0:
     resolution:
@@ -2498,9 +2584,45 @@ packages:
     engines: { node: '>=10' }
 
 snapshots:
+  '@anthropic-ai/tokenizer@0.0.4':
+    dependencies:
+      '@types/node': 18.19.121
+      tiktoken: 1.0.21
+
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
+
+  '@effect/ai-anthropic@0.15.0(@effect/ai@0.25.0(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(@effect/rpc@0.64.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(effect@3.16.12))(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12)':
+    dependencies:
+      '@anthropic-ai/tokenizer': 0.0.4
+      '@effect/ai': 0.25.0(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(@effect/rpc@0.64.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(effect@3.16.12)
+      '@effect/experimental': 0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12)
+      '@effect/platform': 0.88.2(effect@3.16.12)
+      effect: 3.16.12
+
+  '@effect/ai-google@0.4.0(@effect/ai@0.25.0(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(@effect/rpc@0.64.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(effect@3.16.12))(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12)':
+    dependencies:
+      '@effect/ai': 0.25.0(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(@effect/rpc@0.64.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(effect@3.16.12)
+      '@effect/experimental': 0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12)
+      '@effect/platform': 0.88.2(effect@3.16.12)
+      effect: 3.16.12
+
+  '@effect/ai-openai@0.28.0(@effect/ai@0.25.0(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(@effect/rpc@0.64.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(effect@3.16.12))(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12)':
+    dependencies:
+      '@effect/ai': 0.25.0(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(@effect/rpc@0.64.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(effect@3.16.12)
+      '@effect/experimental': 0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12)
+      '@effect/platform': 0.88.2(effect@3.16.12)
+      effect: 3.16.12
+      gpt-tokenizer: 2.9.0
+
+  '@effect/ai@0.25.0(@effect/experimental@0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(@effect/platform@0.88.2(effect@3.16.12))(@effect/rpc@0.64.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12))(effect@3.16.12)':
+    dependencies:
+      '@effect/experimental': 0.51.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12)
+      '@effect/platform': 0.88.2(effect@3.16.12)
+      '@effect/rpc': 0.64.8(@effect/platform@0.88.2(effect@3.16.12))(effect@3.16.12)
+      effect: 3.16.12
+      find-my-way-ts: 0.1.6
 
   '@effect/cli@0.66.7(@effect/platform@0.88.2(effect@3.16.12))(@effect/printer-ansi@0.44.12(@effect/typeclass@0.35.12(effect@3.16.12))(effect@3.16.12))(@effect/printer@0.44.12(@effect/typeclass@0.35.12(effect@3.16.12))(effect@3.16.12))(effect@3.16.12)':
     dependencies:
@@ -2918,6 +3040,10 @@ snapshots:
   '@types/estree@1.0.8': {}
 
   '@types/json-schema@7.0.15': {}
+
+  '@types/node@18.19.121':
+    dependencies:
+      undici-types: 5.26.5
 
   '@types/node@24.0.10':
     dependencies:
@@ -3354,6 +3480,8 @@ snapshots:
 
   globals@14.0.0: {}
 
+  gpt-tokenizer@2.9.0: {}
+
   graphemer@1.4.0: {}
 
   has-flag@4.0.0: {}
@@ -3639,6 +3767,8 @@ snapshots:
     dependencies:
       '@pkgr/core': 0.2.7
 
+  tiktoken@1.0.21: {}
+
   tinybench@2.9.0: {}
 
   tinyexec@0.3.2: {}
@@ -3708,6 +3838,8 @@ snapshots:
       - supports-color
 
   typescript@5.8.3: {}
+
+  undici-types@5.26.5: {}
 
   undici-types@7.8.0: {}
 
