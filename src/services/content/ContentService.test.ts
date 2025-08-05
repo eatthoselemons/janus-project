@@ -2,7 +2,7 @@ import { describe, it, expect } from '@effect/vitest';
 import { Effect, Layer, Option, Schema } from 'effect';
 import { PersistenceService } from '../../services/persistence/Persistence.service';
 import { Neo4jPersistenceLive } from '../../layers/persistence/Neo4jPersistence.layer';
-import { Neo4jTest } from '../../layers/low-level/TransactionalDatabase.layer';
+import { Neo4jTest } from '../../layers/low-level/Neo4jTransactionalDatabase.layer';
 import { Slug, ContentNodeId } from '../../domain/types/branded';
 import { ContentNode } from '../../domain';
 

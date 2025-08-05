@@ -15,32 +15,32 @@ import { TransactionalDatabaseService } from '../../services/low-level/Transacti
 
 /**
  * Neo4j Persistence Layer
- * 
+ *
  * This layer implements the PersistenceService interface using Neo4j as the backend.
  * It translates high-level domain operations into Cypher queries.
- * 
+ *
  * ✅ PUBLIC EXPORT:
  * - Neo4jPersistenceLive - Use with Effect.provide() to implement PersistenceService
- * 
+ *
  * ⚠️ NOTE: The individual method implementations below are internal.
  * Access them through PersistenceService interface after providing this layer.
  */
 /**
  * ✅ PUBLIC - USE THIS TO PROVIDE PERSISTENCE SERVICE
- * 
+ *
  * Example:
  * ```typescript
  * const program = Effect.gen(function* () {
  *   const persistence = yield* PersistenceService;
  *   return yield* persistence.findNodeByName(slug);
  * });
- * 
+ *
  * program.pipe(
  *   Effect.provide(Neo4jPersistenceLive),
  *   Effect.provide(TransactionalDatabaseLive)
  * )
  * ```
- * 
+ *
  * @public
  */
 export const Neo4jPersistenceLive = Layer.effect(
@@ -50,9 +50,9 @@ export const Neo4jPersistenceLive = Layer.effect(
 
     /**
      * ⚠️ INTERNAL - Access via PersistenceService.findNodeByName
-     * 
+     *
      * Finds a ContentNode by its unique slug name.
-     * 
+     *
      * @param name - The slug identifier of the node
      * @returns The ContentNode if found
      * @throws NotFoundError if no node exists with the given name
@@ -85,9 +85,9 @@ export const Neo4jPersistenceLive = Layer.effect(
 
     /**
      * ⚠️ INTERNAL - Access via PersistenceService.createNode
-     * 
+     *
      * Creates a new ContentNode with an auto-generated ID.
-     * 
+     *
      * @param nodeData - Node data without the ID field
      * @returns The created ContentNode with generated ID
      * @throws PersistenceError if creation or validation fails
@@ -114,13 +114,13 @@ export const Neo4jPersistenceLive = Layer.effect(
 
     /**
      * ⚠️ INTERNAL - Access via PersistenceService.addVersion
-     * 
+     *
      * Adds a new version to an existing ContentNode.
-     * 
+     *
      * Auto-generates:
      * - Version ID (UUID v4)
      * - Creation timestamp
-     * 
+     *
      * @param nodeId - ID of the ContentNode to add version to
      * @param versionData - Version data without ID and timestamp
      * @returns The created ContentNodeVersion
@@ -168,11 +168,11 @@ export const Neo4jPersistenceLive = Layer.effect(
 
     /**
      * ⚠️ INTERNAL - Access via PersistenceService.getLatestVersion
-     * 
+     *
      * Retrieves the most recent version of a ContentNode.
-     * 
+     *
      * Orders versions by createdAt timestamp descending.
-     * 
+     *
      * @param nodeId - ID of the ContentNode
      * @returns Option.some(version) if versions exist, Option.none() otherwise
      * @throws PersistenceError if query or validation fails
@@ -199,9 +199,9 @@ export const Neo4jPersistenceLive = Layer.effect(
 
     /**
      * ⚠️ INTERNAL - Access via PersistenceService.listNodes
-     * 
+     *
      * Lists all ContentNodes ordered by name.
-     * 
+     *
      * @returns Array of all ContentNodes in the system
      * @throws PersistenceError if query or validation fails
      * @internal
@@ -217,9 +217,9 @@ export const Neo4jPersistenceLive = Layer.effect(
 
     /**
      * ⚠️ INTERNAL - Access via PersistenceService.createTag
-     * 
+     *
      * Creates a new Tag with an auto-generated ID.
-     * 
+     *
      * @param tagData - Tag data without the ID field
      * @returns The created Tag with generated ID
      * @throws PersistenceError if creation or validation fails
@@ -237,9 +237,9 @@ export const Neo4jPersistenceLive = Layer.effect(
 
     /**
      * ⚠️ INTERNAL - Access via PersistenceService.findTagByName
-     * 
+     *
      * Finds a Tag by its unique slug name.
-     * 
+     *
      * @param name - The slug identifier of the tag
      * @returns The Tag if found
      * @throws NotFoundError if no tag exists with the given name
@@ -263,9 +263,9 @@ export const Neo4jPersistenceLive = Layer.effect(
 
     /**
      * ⚠️ INTERNAL - Access via PersistenceService.listTags
-     * 
+     *
      * Lists all Tags ordered by name.
-     * 
+     *
      * @returns Array of all Tags in the system
      * @throws PersistenceError if query or validation fails
      * @internal
@@ -281,11 +281,11 @@ export const Neo4jPersistenceLive = Layer.effect(
 
     /**
      * ⚠️ INTERNAL - Access via PersistenceService.tagNode
-     * 
+     *
      * Attaches a Tag to a ContentNode.
-     * 
+     *
      * Uses MERGE to ensure the relationship is created only once.
-     * 
+     *
      * @param nodeId - ID of the ContentNode
      * @param tagId - ID of the Tag
      * @throws PersistenceError if the operation fails

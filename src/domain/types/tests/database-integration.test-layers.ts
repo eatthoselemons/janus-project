@@ -1,6 +1,6 @@
 import { Layer, ConfigProvider, Redacted, Schema } from 'effect';
 import { ConfigService } from '../../../services/config';
-import { Neo4jTest } from '../../../layers/low-level/TransactionalDatabase.layer';
+import { Neo4jTest } from '../../../layers/low-level/Neo4jTransactionalDatabase.layer';
 import { ConfigServiceLive } from '../../../layers/configuration/Configuration.layer';
 import {
   Neo4jUri,
