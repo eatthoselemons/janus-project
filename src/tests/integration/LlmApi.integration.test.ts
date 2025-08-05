@@ -2,6 +2,7 @@ import { describe, expect, it } from '@effect/vitest';
 import { Effect, Chunk } from 'effect';
 import { LlmApi } from '../../services/llm-api/LlmApi.service';
 import { LlmApiLive } from '../../layers/llm-api/LlmApi.layer';
+import { ProviderRegistryLive } from '../../layers/llm-api/ProviderRegistry.layer';
 import { ConfigServiceLive } from '../../layers/configuration/Configuration.layer';
 import type { Message } from '../../domain/types/testCase';
 
@@ -153,6 +154,7 @@ describe.skipIf(process.env.INTEGRATION_TEST !== 'true')(
     const runTest = <A>(effect: Effect.Effect<A, unknown, LlmApi>) =>
       effect.pipe(
         Effect.provide(LlmApiLive),
+        Effect.provide(ProviderRegistryLive),
         Effect.provide(ConfigServiceLive),
         Effect.timeout('30 seconds'),
       );
