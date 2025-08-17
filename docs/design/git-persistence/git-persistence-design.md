@@ -372,6 +372,7 @@ interface PersistenceService {
 | Versions | Git history only | Git already provides this |
 | Concatenation | Automatic for directories | Simple convention, no config needed |
 | Inserts | Single inserts.yaml file | Explicit but centralized |
+| Test Cases | YAML in content/test-cases/ | Human-readable and editable |
 | File naming | Alphabetical ordering | Use 01-, 02- prefixes for control |
 | Complexity | Minimal for Git, full for Neo4j | Trade simplicity for power |
 
