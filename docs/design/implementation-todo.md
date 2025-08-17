@@ -59,7 +59,9 @@ Only create entity-specific services if you need domain-specific operations beyo
 
 ## Phase 3: Content Management
 
-- [ ] **3.1: Content CLI Commands**
+**Note:** CLI commands in this phase may be deferred or minimal. Most content operations will be handled through the GitPersistence layer or a future Neo4j web interface.
+
+- [ ] **3.1: Content CLI Commands** (May be deferred)
   - [ ] **Implementation:** `janus content pull <content-name>`
   - [ ] **Implementation:** `janus content push <file-path> -m <message>`
   - [ ] **Implementation:** `janus content list`
@@ -70,7 +72,9 @@ Only create entity-specific services if you need domain-specific operations beyo
 
 ## Phase 4: Tag Management
 
-- [ ] **4.1: Tag CLI Commands**
+**Note:** CLI commands in this phase may be deferred or minimal. Tag operations will primarily be handled through the GitPersistence layer or a future Neo4j web interface.
+
+- [ ] **4.1: Tag CLI Commands** (May be deferred)
   - [ ] **Implementation:** `janus tag create <name>`
   - [ ] **Implementation:** `janus tag list`
   - [ ] **Implementation:** `janus tag search "<query>"`
@@ -79,7 +83,9 @@ Only create entity-specific services if you need domain-specific operations beyo
 
 ## Phase 5: Test Case Management
 
-- [ ] **5.1: Test Case CLI Commands**
+**Note:** CLI commands in this phase may be deferred or minimal. Test case management will primarily be handled through the GitPersistence layer or a future Neo4j web interface.
+
+- [ ] **5.1: Test Case CLI Commands** (May be deferred)
   - [ ] **Implementation:** `janus test-case create <name> --model <llm-model>`
   - [ ] **Implementation:** `janus test-case add-slot <test-case-name> --role <role> --tags <tags> --sequence <number>`
   - [ ] **Implementation:** `janus test-case list`
@@ -89,29 +95,50 @@ Only create entity-specific services if you need domain-specific operations beyo
 
 ## Phase 6: Test Execution & Results
 
-- [ ] **6.1: LLM API Service**
-  - [ ] **Implementation:** Create an `LlmApi` service (`Effect.Tag`) to abstract LLM provider interactions.
-  - [ ] **Implementation:** The service will expose `generate(conversation: conversation, model: string): Effect<string>, LlmApiError>`.
-  - [ ] **Implementation:** Create a `LlmApiLive` layer that reads the provider and API key from the `Config` service.
-  - [ ] **Testing:** Write an integration test for the `LlmApiLive` layer that makes a real API call (can be mocked in CI environments).
+- [x] **6.1: LLM API Service**
+  - [x] **Implementation:** Create an `LlmApi` service (`Effect.Tag`) to abstract LLM provider interactions.
+  - [x] **Implementation:** The service will expose `generate(conversation: conversation, model: string): Effect<string, LlmApiError>`.
+  - [x] **Implementation:** Create a `LlmApiLive` layer that reads the provider and API key from the `Config` service.
+  - [x] **Testing:** Write an integration test for the `LlmApiLive` layer that makes a real API call (can be mocked in CI environments).
 
-- [ ] **6.2: TestRun & DataPoint Persistence**
-  - [ ] **Implementation:** Use the generic persistence functions for standard operations:
+- [ ] **6.2: GitPersistence Layer** (Being developed in separate branch)
+  - [ ] **Implementation:** Create a `GitPersistence` service (`Effect.Tag`) for version control based persistence.
+  - [ ] **Implementation:** Implement git-based storage for test execution results.
+  - [ ] **Implementation:** Handle test run tracking through git commits and branches.
+  - [ ] **Implementation:** Support for storing TestRun and DataPoint entities in git.
+  - [ ] **Testing:** Write unit tests for GitPersistence operations.
+  - [ ] **Note:** This layer will replace the need for most CLI commands as operations will be git-based.
+
+- [ ] **6.3: TestRun & DataPoint Persistence** (Supporting both GitPersistence and Neo4j backends)
+  - [ ] **Implementation:** Design a common persistence interface that both GitPersistence and Neo4j can implement.
+  - [ ] **Implementation:** For Neo4j backend, use the generic persistence functions for standard operations:
     - For TestRun: Use `GenericPersistence.createNamedEntity('TestRun', TestRun, {...})`
     - For TestRun listing: Use `GenericPersistence.listAll('TestRun', TestRun)`
+  - [ ] **Implementation:** For GitPersistence backend, implement equivalent operations using git.
   - [ ] **Implementation:** Only if needed, create a `TestRunPersistence` service for complex domain-specific operations:
     - `createDataPoint(...)` - This might need custom logic for linking to TestRun and TestCase
     - Any complex queries that can't be handled by generic functions
-  - [ ] **Testing:** Write integration tests for any custom persistence methods.
+  - [ ] **Testing:** Write integration tests for both persistence backends.
+  - [ ] **Note:** Both persistence layers should be interchangeable through dependency injection.
 
-- [ ] **6.3: Test Execution Service (Business Logic)**
+- [ ] **6.4: Test Execution Service (Business Logic)**
   - [ ] **Implementation:** Create `TestExecutionService` (`Effect.Tag`). This is a business logic service, distinct from the persistence services.
   - [ ] **Implementation:** Define a `Schema` for the `test_config.yaml` file to ensure type-safe parsing and validation.
   - [ ] **Implementation:** Implement `runFromFile(configPath: string): Effect<TestRun, JanusError>`.
   - [ ] **Implementation:** This service will parse and validate the YAML, use the persistence services to create the `TestRun` and execute `TestCase`s, call the `LlmApi` service, and save `DataPoint`s.
-  - [ ] **Testing:** Write integration tests for the service, providing test implementations of the persistence and `LlmApi` services.
+  - [ ] **Implementation:** Support both GitPersistence and Neo4j persistence backends through dependency injection.
+  - [ ] **Testing:** Write integration tests for the service with both persistence backends.
+  - [ ] **Testing:** Provide test implementations of the persistence and `LlmApi` services.
 
-- [ ] **6.4: Run CLI Commands**
+- [ ] **6.5: Persistence Layer Testing**
+  - [ ] **Implementation:** Integration tests for GitPersistence layer.
+  - [ ] **Implementation:** Integration tests for Neo4j persistence layer.
+  - [ ] **Implementation:** Tests to ensure both layers implement the same interface correctly.
+  - [ ] **Implementation:** Cross-validation tests between GitPersistence and Neo4j persistence.
+  - [ ] **Testing:** Performance comparison tests between the two persistence approaches.
+  - [ ] **Documentation:** Document when to use each persistence layer.
+
+- [ ] **6.6: Run CLI Commands**
   - [ ] **Implementation:** `janus run <config-file-path>`
   - [ ] **Implementation:** `janus run list`
   - [ ] **Testing:** Write end-to-end tests for the CLI commands.
