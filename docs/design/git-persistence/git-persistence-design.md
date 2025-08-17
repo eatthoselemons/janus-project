@@ -24,21 +24,22 @@ project-root/
 │       ├── test-runs.json      # Test run metadata (TestRun)
 │       └── data-points.json    # Test results (DataPoint)
 │
-└── content/                    # Human-editable content
-    ├── nodes/                  # Content nodes
-    │   ├── getting-started.md  # Simple content node
-    │   ├── advanced-topics/    # Directory = auto-concatenate all .md files
-    │   │   ├── 01-overview.md  # Numbered for ordering
-    │   │   ├── 02-concepts.md
-    │   │   └── 03-examples.md
-    │   └── templates/
-    │       ├── tutorial.md     # Template node
-    │       └── reference.md
-    ├── test-cases/             # Test case definitions (YAML format)
-    │   ├── basic-tutorial.yaml
-    │   └── advanced-test.yaml
-    └── inserts/                # Insert definitions
-        └── inserts.yaml        # All insert mappings in one file
+├── content/                    # Human-editable content nodes
+│   ├── nodes/                  # Content nodes
+│   │   ├── getting-started.md  # Simple content node
+│   │   ├── advanced-topics/    # Directory = auto-concatenate all .md files
+│   │   │   ├── 01-overview.md  # Numbered for ordering
+│   │   │   ├── 02-concepts.md
+│   │   │   └── 03-examples.md
+│   │   └── templates/
+│   │       ├── tutorial.md     # Template node
+│   │       └── reference.md
+│   └── inserts/                # Insert definitions
+│       └── inserts.yaml        # All insert mappings in one file
+│
+└── test-cases/                 # Test case definitions (YAML format)
+    ├── basic-tutorial.yaml
+    └── advanced-test.yaml
 ```
 
 ## File Formats
@@ -180,16 +181,15 @@ Conclusion here...
 }
 ```
 
-#### Test Cases (`content/test-cases/basic-tutorial.yaml`)
+#### Test Cases (`test-cases/basic-tutorial.yaml`)
 
 Test cases are stored as YAML files for better readability:
 
 ```yaml
-# Test case definition
+# Test case definition - no createdAt needed (use Git timestamp)
 id: aa0e8400-e29b-41d4-a716-446655440005
 name: Basic Tutorial Test
 description: Test the tutorial flow with different models
-createdAt: 2024-01-15T10:00:00Z
 llmModel: gpt-4  # Note: Consider updating type to support list for A/B testing
 # llmModels: [gpt-4, claude-3]  # Future: support multiple models
 messageSlots:
@@ -208,6 +208,8 @@ parameters:  # Optional test parameters
 ```
 
 **Note on llmModel**: Currently the TestCase type defines `llmModel` as a single LLMModel. For A/B testing scenarios, this should be updated to `llmModels: Schema.Array(LLMModel)` to support testing with multiple models.
+
+**Note on createdAt**: The TestCase type includes `createdAt: Schema.DateTimeUtc`, but in the Git persistence layer this should come from the Git commit timestamp when the file was created, not be manually specified.
 
 ## Versioning Strategy
 
@@ -343,26 +345,46 @@ const buildTagIndex = () =>
 
 ### Service Interface Compatibility
 
+The Git persistence layer implements the actual `PersistenceServiceImpl` interface:
+
 ```typescript
-interface PersistenceService {
+interface PersistenceServiceImpl {
   // ContentNode operations
-  findNodeByName: (name: Slug) => Effect<ContentNode, NotFoundError>
-  createNode: (data: Omit<ContentNode, 'id'>) => Effect<ContentNode, PersistenceError>
-  listNodes: () => Effect<ContentNode[], PersistenceError>
+  readonly findNodeByName: (name: Slug) => 
+    Effect<ContentNode, NotFoundError | PersistenceError>
   
-  // Version operations (Git-based, no explicit version creation)
-  getLatestVersion: (nodeId: ContentNodeId) => Effect<Option<ContentNodeVersion>>
-  getVersionHistory: (nodeId: ContentNodeId) => Effect<ContentNodeVersion[], PersistenceError>
+  readonly createNode: (nodeData: Omit<ContentNode, 'id'>) => 
+    Effect<ContentNode, PersistenceError>
   
-  // Tag operations (extracted from metadata)
-  findTagByName: (name: Slug) => Effect<Tag, NotFoundError>
-  listTags: () => Effect<Tag[], PersistenceError>
-  tagNode: (nodeId: ContentNodeId, tagName: Slug) => Effect<void, PersistenceError>
+  readonly listNodes: () => 
+    Effect<readonly ContentNode[], PersistenceError>
   
-  // Relationship operations (derived from file structure)
-  getNodeChildren: (nodeId: ContentNodeId) => Effect<ChildNode[], PersistenceError>
+  // Version operations (Git-based)
+  readonly addVersion: (nodeId: string, versionData: Omit<ContentNodeVersion, 'id' | 'createdAt'>) => 
+    Effect<ContentNodeVersion, PersistenceError | NotFoundError>
+  
+  readonly getLatestVersion: (nodeId: string) => 
+    Effect<Option<ContentNodeVersion>, PersistenceError>
+  
+  // Tag operations (extracted from node metadata)
+  readonly createTag: (tagData: Omit<Tag, 'id'>) => 
+    Effect<Tag, PersistenceError>
+  
+  readonly findTagByName: (name: Slug) => 
+    Effect<Tag, NotFoundError | PersistenceError>
+  
+  readonly listTags: () => 
+    Effect<readonly Tag[], PersistenceError>
+  
+  readonly tagNode: (nodeId: string, tagId: string) => 
+    Effect<void, PersistenceError | NotFoundError>
 }
 ```
+
+**Note**: The Git implementation derives much of its data from the file system and Git history rather than storing it explicitly. For example:
+- `addVersion`: Creates a Git commit rather than a database record
+- `getLatestVersion`: Reads from Git HEAD for the file
+- Tags are extracted from node metadata rather than stored separately
 
 ## Key Design Decisions
 
@@ -370,9 +392,10 @@ interface PersistenceService {
 |--------|----------|-----------|
 | Tags | Inline in node metadata | No separate files to maintain |
 | Versions | Git history only | Git already provides this |
+| Timestamps | From Git commits | No manual createdAt fields |
 | Concatenation | Automatic for directories | Simple convention, no config needed |
 | Inserts | Single inserts.yaml file | Explicit but centralized |
-| Test Cases | YAML in content/test-cases/ | Human-readable and editable |
+| Test Cases | YAML in test-cases/ root | Separate from content, human-editable |
 | File naming | Alphabetical ordering | Use 01-, 02- prefixes for control |
 | Complexity | Minimal for Git, full for Neo4j | Trade simplicity for power |
 
