@@ -66,7 +66,42 @@ export const GitPersistenceLive = Layer.effect(
         });
       });
 
-    // Implement other methods as needed...
+    const createTag = (tagData: Omit<Tag, 'id'>) =>
+      Effect.gen(function* () {
+        const id = Brand.branded<Tag['id']>(crypto.randomUUID());
+        const tag = { ...tagData, id };
+        const content = JSON.stringify(tag, null, 2);
+        yield* storage.writeFile(`tags/${tag.name}.json`, content);
+        yield* storage.commit(`Created tag: ${tag.name}`);
+        return tag;
+      });
+
+    const findTagByName = (name: string) =>
+      Effect.gen(function* () {
+        const content = yield* storage.readFile(`tags/${name}.json`);
+        const json = JSON.parse(content);
+        return yield* Schema.decodeUnknown(Tag)(json);
+      });
+
+    const listTags = () =>
+      Effect.gen(function* () {
+        const files = yield* storage.listFiles('tags');
+        return yield* Effect.forEach(files, (file) => {
+          const name = file.replace('.json', '');
+          return findTagByName(name);
+        });
+      });
+
+    const tagNode = (nodeId: string, tagId: string) =>
+      Effect.gen(function* () {
+        // In a real implementation, this would create a relationship
+        // For now, we'll store it as a simple mapping file
+        const mapping = { nodeId, tagId, createdAt: new Date() };
+        const content = JSON.stringify(mapping, null, 2);
+        const filename = `${nodeId}-${tagId}.json`;
+        yield* storage.writeFile(`node-tags/${filename}`, content);
+        yield* storage.commit(`Tagged node ${nodeId} with tag ${tagId}`);
+      });
 
     return PersistenceService.of({
       findNodeByName,
@@ -74,10 +109,10 @@ export const GitPersistenceLive = Layer.effect(
       addVersion,
       getLatestVersion,
       listNodes,
-      createTag: (tagData) => Effect.die('Not implemented'),
-      findTagByName: (name) => Effect.die('Not implemented'),
-      listTags: () => Effect.die('Not implemented'),
-      tagNode: (nodeId, tagId) => Effect.die('Not implemented'),
+      createTag,
+      findTagByName,
+      listTags,
+      tagNode,
     });
   }),
 );
