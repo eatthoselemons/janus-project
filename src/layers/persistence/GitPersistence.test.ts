@@ -366,7 +366,7 @@ Content`,
 
         expect(tag.name).toBe('implicit-tag');
         expect(tag.description).toBe('Tag: implicit-tag');
-        expect(tag.id).toBeDefined()
+        expect(tag.id).toBeDefined();
       }).pipe(
         Effect.provide(GitPersistenceLive),
         Effect.provide(createMockLayer(initialFiles)),
