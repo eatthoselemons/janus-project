@@ -39,11 +39,25 @@ export const createMockFileSystemStorageLayer = (
       listFiles: (path: string) =>
         Effect.gen(function* () {
           const prefix = path.endsWith('/') ? path : path + '/';
-          const filesInPath = Array.from(files.keys())
-            .filter((key) => key.startsWith(prefix))
-            .map((key) => key.substring(prefix.length))
-            .filter((name) => !name.includes('/'));
-          return filesInPath;
+          const entries = new Set<string>();
+
+          Array.from(files.keys()).forEach((key) => {
+            if (key.startsWith(prefix)) {
+              const remaining = key.substring(prefix.length);
+              const slashIndex = remaining.indexOf('/');
+
+              if (slashIndex === -1) {
+                // # Reason: It's a file in this directory
+                entries.add(remaining);
+              } else {
+                // # Reason: It's a subdirectory - add the directory name
+                const dirName = remaining.substring(0, slashIndex);
+                entries.add(dirName);
+              }
+            }
+          });
+
+          return Array.from(entries);
         }),
 
       commit: (message: string) =>
