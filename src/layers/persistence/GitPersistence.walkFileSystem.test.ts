@@ -657,6 +657,145 @@ Content`,
       );
     });
 
+    it.effect('should only index files in content/ directory, not docs/ or other directories', () => {
+      const initialFiles = new Map<string, string>();
+      
+      // # Reason: Files in various directories
+      initialFiles.set('content/nodes/content-node.md', `---
+description: Node in content directory
+---
+
+Content`);
+      
+      initialFiles.set('docs/nodes/docs-node.md', `---
+description: Node in docs directory
+---
+
+Documentation`);
+      
+      initialFiles.set('docs/architecture.md', `---
+description: Architecture doc
+---
+
+Architecture details`);
+      
+      initialFiles.set('README.md', `# README`);
+      
+      return Effect.gen(function* () {
+        const persistence = yield* PersistenceService;
+        const storage = yield* FileSystemStorageService;
+        
+        // # Reason: Only content/nodes files should be indexed
+        const nodes = yield* persistence.listNodes();
+        expect(nodes).toHaveLength(1);
+        expect(nodes[0].name).toBe('content-node');
+        
+        // # Reason: Verify index only has content/ files
+        const indexContent = yield* storage.readFile('.janus/indexes.json');
+        const indexes = JSON.parse(indexContent);
+        
+        expect(Object.keys(indexes.nodes)).toHaveLength(1);
+        expect(indexes.nodes['content-node']).toBeDefined();
+        expect(indexes.nodes['docs-node']).toBeUndefined();
+        expect(indexes.nodes['architecture']).toBeUndefined();
+        expect(indexes.nodes['README']).toBeUndefined();
+      }).pipe(
+        Effect.provide(GitPersistenceLive),
+        Effect.provide(createMockLayer(initialFiles))
+      );
+    });
+
+    it.effect('should handle directory with both subdirectories and .md files', () => {
+      const initialFiles = new Map<string, string>();
+      
+      // # Reason: Directory with both .md files and subdirectories (only top-level indexed)
+      initialFiles.set('content/nodes/hybrid-dir/overview.md', `---
+description: Overview file
+---
+
+# Overview
+
+This is the overview.`);
+      
+      initialFiles.set('content/nodes/hybrid-dir/section1/part1.md', `# Section 1 Part 1
+
+Content for section 1 part 1`);
+      
+      initialFiles.set('content/nodes/hybrid-dir/section1/part2.md', `# Section 1 Part 2
+
+Content for section 1 part 2`);
+      
+      initialFiles.set('content/nodes/hybrid-dir/section2/intro.md', `# Section 2 Intro
+
+Introduction to section 2`);
+      
+      initialFiles.set('content/nodes/hybrid-dir/conclusion.md', `# Conclusion
+
+Final thoughts`);
+      
+      // # Reason: Also add some top-level nodes to test
+      initialFiles.set('content/nodes/section1/direct.md', `# Direct Section 1
+
+Direct content in section1 at top level`);
+      
+      initialFiles.set('content/nodes/section2/direct.md', `# Direct Section 2
+
+Direct content in section2 at top level`);
+      
+      return Effect.gen(function* () {
+        const persistence = yield* PersistenceService;
+        const storage = yield* FileSystemStorageService;
+        
+        // # Reason: Only top-level directories are indexed as nodes
+        const nodes = yield* persistence.listNodes();
+        const nodeNames = nodes.map(n => n.name).sort();
+        
+        // # Reason: Should have hybrid-dir and the separate top-level section1/section2
+        expect(nodeNames).toContain('hybrid-dir');
+        expect(nodeNames).toContain('section1');  
+        expect(nodeNames).toContain('section2');
+        
+        // # Reason: Verify index structure
+        const indexContent = yield* storage.readFile('.janus/indexes.json');
+        const indexes = JSON.parse(indexContent);
+        
+        // # Reason: Parent directory should be concatenate type
+        expect(indexes.nodes['hybrid-dir']).toBeDefined();
+        expect(indexes.nodes['hybrid-dir'].type).toBe('concatenate');
+        expect(indexes.nodes['hybrid-dir'].path).toBe('content/nodes/hybrid-dir');
+        
+        // # Reason: Top-level section directories should be indexed
+        expect(indexes.nodes['section1']).toBeDefined();
+        expect(indexes.nodes['section1'].type).toBe('concatenate');
+        expect(indexes.nodes['section1'].path).toBe('content/nodes/section1');
+        
+        expect(indexes.nodes['section2']).toBeDefined();
+        expect(indexes.nodes['section2'].type).toBe('concatenate');
+        expect(indexes.nodes['section2'].path).toBe('content/nodes/section2');
+        
+        // # Reason: Verify hybrid-dir concatenates only its direct .md files
+        const hybridNode = yield* persistence.findNodeByName('hybrid-dir' as Slug);
+        const version = yield* persistence.getLatestVersion(indexes.nodes['hybrid-dir'].id);
+        if (Option.isSome(version)) {
+          // # Reason: Should include overview and conclusion from parent dir
+          expect(version.value.content).toContain('This is the overview');
+          expect(version.value.content).toContain('Final thoughts');
+          // # Reason: Should NOT include subdirectory contents (they're in subdirs)
+          expect(version.value.content).not.toContain('Section 1 Part 1');
+        }
+        
+        // # Reason: Check top-level section1 has its own content
+        const section1Version = yield* persistence.getLatestVersion(indexes.nodes['section1'].id);
+        if (Option.isSome(section1Version)) {
+          expect(section1Version.value.content).toContain('Direct Section 1');
+          expect(section1Version.value.content).toContain('Direct content in section1 at top level');
+        }
+      }).pipe(
+        Effect.provide(GitPersistenceLive),
+        Effect.provide(createMockLayer(initialFiles))
+      );
+    });
+
     it.effect('should handle empty directories (no markdown files)', () => {
       const initialFiles = new Map<string, string>();
 

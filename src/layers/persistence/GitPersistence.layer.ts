@@ -136,7 +136,7 @@ export const GitPersistenceLive = Layer.effect(
 
                   return modified;
                 }),
-                Effect.orElseSucceed(() => null),
+                Effect.orElseSucceed(() => false),
               );
             }),
         );
@@ -150,7 +150,7 @@ export const GitPersistenceLive = Layer.effect(
         const dirUpdates = yield* Effect.all(
           dirs.map((dir) => {
             if (indexes.nodes[dir]) {
-              return Effect.succeed(null);
+              return Effect.succeed(false);
             }
 
             return storage.listFiles(`content/nodes/${dir}`).pipe(
@@ -164,16 +164,16 @@ export const GitPersistenceLive = Layer.effect(
                   };
                   return true;
                 }
-                return null;
+                return false;
               }),
-              Effect.orElseSucceed(() => null),
+              Effect.orElseSucceed(() => false),
             );
           }),
         );
 
         // # Reason: Save if any modifications were made
         const modified = [...fileUpdates, ...dirUpdates].some(
-          (update) => update !== null,
+          (update) => update === true,
         );
         if (modified) {
           yield* saveIndexes(indexes);
@@ -315,17 +315,17 @@ export const GitPersistenceLive = Layer.effect(
     // # Reason: Load indexes.json file
     const loadIndexes = (): Effect.Effect<IndexesJson, PersistenceError> =>
       storage.readFile('.janus/indexes.json').pipe(
-        Effect.map((content) => JSON.parse(content) as IndexesJson),
-        Effect.catchAll(() =>
-          // # Reason: Initialize with empty indexes if file doesn't exist
-          Effect.succeed({ nodes: {}, tags: {} }),
-        ),
         Effect.mapError(
           () =>
             new PersistenceError({
               originalMessage: 'Failed to read indexes.json',
               operation: 'read',
             }),
+        ),
+        Effect.map((content) => JSON.parse(content) as IndexesJson),
+        Effect.orElseSucceed(() =>
+          // # Reason: Initialize with empty indexes if file doesn't exist
+          ({ nodes: {}, tags: {} }),
         ),
       );
 
