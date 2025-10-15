@@ -144,6 +144,29 @@ Only create entity-specific services if you need domain-specific operations beyo
   - [ ] **Testing:** Write end-to-end tests for the CLI commands.
   - [ ] **Documentation:** Write user documentation for the `janus run` commands and the `test_config.yaml` format.
 
+- [ ] **6.7: AI Grader Service** (Optional - for automated test result analysis)
+  - [ ] **Implementation:** Create `AiGraderService` (`Effect.Tag`) for analyzing and grading test results.
+  - [ ] **Implementation:** Define `TestSummary` schema for the grader output including:
+    - Overall test run success/failure assessment
+    - Pattern analysis across multiple test executions
+    - Quality metrics and scores
+    - Recommendations for improvement
+  - [ ] **Implementation:** Create grading prompt templates using ContentNodes:
+    - Allow users to define custom grading criteria as content nodes
+    - Support parameterized grading prompts with test context injection
+  - [ ] **Implementation:** Implement `gradeTestRun(runId: TestRunId, gradingPromptId: ContentNodeId): Effect<TestSummary, JanusError>`:
+    - Fetch all DataPoints from a TestRun
+    - Apply the grading prompt template with test results
+    - Call LlmApi to generate the summary
+    - Store the TestSummary linked to the TestRun
+  - [ ] **Implementation:** Support batch grading for multiple test runs (e.g., 100 executions):
+    - Aggregate results across multiple runs
+    - Identify patterns and outliers
+    - Generate comparative analysis
+  - [ ] **Testing:** Write unit tests for grading prompt template processing.
+  - [ ] **Testing:** Write integration tests with mock LLM responses.
+  - [ ] **Documentation:** Document how to create effective grading prompts as content nodes.
+
 ## Phase 7: Import/Export
 
 - [ ] **7.1: Export Service (Business Logic)**

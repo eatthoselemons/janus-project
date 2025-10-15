@@ -3,7 +3,7 @@ docs/llms/guides/effect-docs/
 docs/llms/guides/effect-packages/
 
 # exclude examples
-examples/*
+examples/
 
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
